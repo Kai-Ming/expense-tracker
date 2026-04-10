@@ -463,7 +463,7 @@ export default function ExpensesScreen() {
 
             <View style={styles.section}>
               <Text style={styles.descriptionLabel}>Route:</Text>
-              {isEditing ? (
+              {/* {isEditing ? (
                 <View style={{ backgroundColor: "transparent" }}>
                   <TextInput
                     style={styles.inlineInput}
@@ -490,10 +490,13 @@ export default function ExpensesScreen() {
                 <Text style={styles.descriptionText}>
                   {item.from_address || "N/A"} → {item.to_address || "N/A"}
                 </Text>
-              )}
+              )} */}
+              <Text style={styles.descriptionText}>
+                {item.from_address || "N/A"} → {item.to_address || "N/A"}
+              </Text>
 
               <Text style={styles.descriptionLabel}>Time and Duration:</Text>
-              {isEditing ? (
+              {/* {isEditing ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -530,7 +533,11 @@ export default function ExpensesScreen() {
                     {format12Hour(item.to_time)} ({item.duration})
                   </Text>
                 )
-              )}
+              )} */}
+              <Text style={styles.descriptionText}>
+                {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
+                {item.duration})
+              </Text>
 
               <Text style={styles.descriptionLabel}>Trip Summary:</Text>
               {isEditing ? (
