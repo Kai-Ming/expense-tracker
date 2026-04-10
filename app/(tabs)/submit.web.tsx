@@ -1,10 +1,6 @@
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import {
-  addDoc,
-  collection,
-  serverTimestamp
-} from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
@@ -44,7 +40,7 @@ export default function SubmitExpenseWebScreen() {
   const [formToTime, setFormToTime] = useState<string>("");
   const [formParking, setFormParking] = useState<string>("0.00");
   const [formToll, setFormToll] = useState<string>("0.00");
-  const [formTripSummary, setFormTripSummary] = useState<string>("");
+  const [formTripReport, setFormTripReport] = useState<string>("");
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -170,7 +166,7 @@ export default function SubmitExpenseWebScreen() {
     setFormToTime("");
     setFormParking("0.00");
     setFormToll("0.00");
-    setFormTripSummary("");
+    setFormTripReport("");
     setBusinessCardFile(null);
     if (inputARef.current) inputARef.current.value = "";
     if (inputBRef.current) inputBRef.current.value = "";
@@ -291,7 +287,7 @@ export default function SubmitExpenseWebScreen() {
         to_time: formToTime,
         duration: calculateDuration(),
         distance: dist,
-        trip_summary: formTripSummary,
+        tripReport: formTripReport,
         business_card_url: businessCardUrl,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
@@ -620,10 +616,11 @@ export default function SubmitExpenseWebScreen() {
                 { marginTop: 10, alignItems: "flex-start" },
               ]}
             >
-              <Text style={styles.fieldLabel}>Trip Summary:</Text>
+              <Text style={styles.fieldLabel}>Trip Report:</Text>
               <textarea
-                value={formTripSummary}
-                onChange={(e) => setFormTripSummary(e.target.value)}
+                value={formTripReport}
+                onChange={(e) => setFormTripReport(e.target.value)}
+                maxLength={2000}
                 style={{
                   ...webStyles.input,
                   flex: 1,
@@ -632,7 +629,7 @@ export default function SubmitExpenseWebScreen() {
                   minHeight: 80,
                   fontFamily: "inherit",
                 }}
-                placeholder="Trip Summary"
+                placeholder="Trip Report"
               />
             </View>
             <View

@@ -21,6 +21,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -39,7 +40,7 @@ interface Expense {
   duration?: string;
   company: string;
   name: string;
-  trip_summary?: string;
+  trip_report?: string;
   contact_number: string;
   parking: number;
   toll: number;
@@ -59,8 +60,11 @@ export default function ExpensesScreen() {
   const [role, setRole] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [appliedStartDate, setAppliedStartDate] = useState<string>("");
+  const [appliedEndDate, setAppliedEndDate] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
+  const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -101,6 +105,17 @@ export default function ExpensesScreen() {
 
     return () => unsubscribe();
   }, [userId]);
+
+  const filteredExpenses = expenses.filter((e) => {
+    if (!e.date) return true;
+    if (!appliedStartDate && !appliedEndDate) return true;
+
+    const dateVal = e.date;
+    if (appliedStartDate && dateVal < appliedStartDate) return false;
+    if (appliedEndDate && dateVal > appliedEndDate) return false;
+
+    return true;
+  });
 
   const handleDelete = async (id: string) => {
     const performDelete = async () => {
@@ -189,63 +204,14 @@ export default function ExpensesScreen() {
     }
   };
 
-  const exportToCSV = () => {
-    if (Platform.OS !== "web") return;
-
-    const headers = [
-      "Date",
-      "Name",
-      "Company",
-      "Purpose",
-      "From",
-      "To",
-      "Distance (km)",
-      "Duration",
-      "Parking (RM)",
-      "Toll (RM)",
-      "Total Cost (RM)",
-      "Status",
-    ];
-    const csvData = expenses.map((e) => [
-      e.date ||
-        (e.createdAt ? e.createdAt.toDate().toLocaleDateString() : "N/A"),
-      e.name,
-      `"${e.company}"`,
-      `"${e.purpose}"`,
-      `"${e.from_address}"`,
-      `"${e.to_address}"`,
-      e.distance,
-      e.duration || "",
-      e.parking,
-      e.toll,
-      e.cost,
-    ]);
-
-    const csvContent = [headers, ...csvData]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `expenses_report_${new Date().toISOString().split("T")[0]}.csv`,
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const exportToHTML = () => {
     if (Platform.OS !== "web") return;
 
     const filteredExpenses = expenses.filter((e) => {
       if (!e.date) return true;
       const dateVal = e.date;
-      if (startDate && dateVal < startDate) return false;
-      if (endDate && dateVal > endDate) return false;
+      if (appliedStartDate && dateVal < appliedStartDate) return false;
+      if (appliedEndDate && dateVal > appliedEndDate) return false;
       return true;
     });
 
@@ -341,7 +307,7 @@ export default function ExpensesScreen() {
         <p><strong>Toll (RM):</strong> ${e.toll.toFixed(2)}</p>
         <p><strong>Mileage (RM):</strong> ${e.mileage.toFixed(2)}</p>
         <p><strong>Cost (RM):</strong> ${e.cost.toFixed(2)}</p>
-        <p><strong>Trip Summary:</strong> ${e.trip_summary}</p>
+        <p><strong>Trip Report:</strong> ${e.trip_report}</p>
         ${
           e.business_card_url
             ? `
@@ -420,6 +386,112 @@ export default function ExpensesScreen() {
   const renderItem = ({ item }: { item: Expense }) => {
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
+
+    if (Platform.OS === "web") {
+      return (
+        <React.Fragment>
+          <tr
+            style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
+            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+          >
+            <td style={webTableStyles.td}>{item.date || "N/A"}</td>
+            <td style={webTableStyles.td}>
+              {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
+              {item.duration})
+            </td>
+            <td style={webTableStyles.td}>{item.purpose}</td>
+            <td style={webTableStyles.td}>{item.company}</td>
+            <td style={webTableStyles.td}>{item.name}</td>
+            <td
+              style={{
+                ...webTableStyles.td,
+                fontWeight: "bold",
+                color: "#2196F3",
+              }}
+            >
+              RM {item.cost.toFixed(2)}
+            </td>
+          </tr>
+          {isExpanded && (
+            <tr>
+              <td
+                colSpan={6}
+                style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
+              >
+                <View style={styles.expandedContent}>
+                  <View style={styles.section}>
+                    <Text style={styles.descriptionLabel}>Route:</Text>
+                    <Text style={styles.descriptionText}>
+                      {item.from_address} → {item.to_address}
+                    </Text>
+                    <Text style={styles.descriptionLabel}>Parking:</Text>
+                    <Text style={styles.descriptionText}>
+                      RM {item.parking.toFixed(2)}
+                    </Text>
+                    <Text style={styles.descriptionLabel}>Toll:</Text>
+                    <Text style={styles.descriptionText}>
+                      RM {item.toll.toFixed(2)}
+                    </Text>
+                    <Text style={styles.descriptionLabel}>Mileage:</Text>
+                    <Text style={styles.descriptionText}>
+                      RM {item.mileage.toFixed(2)}
+                    </Text>
+                    <Text style={styles.descriptionLabel}>Trip Report:</Text>
+                    <Text style={styles.descriptionText}>
+                      {item.trip_report || "N/A"}
+                    </Text>
+                    {item.business_card_url && (
+                      <>
+                        <Text style={styles.descriptionLabel}>
+                          Business Card:
+                        </Text>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage(item.business_card_url || null);
+                          }}
+                        >
+                          <Image
+                            source={{ uri: item.business_card_url }}
+                            style={styles.businessCardImage}
+                            resizeMode="contain"
+                          />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                  <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(item.id)}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                    {role === 0 && item.approval_status === 0 && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.approveButton}
+                          onPress={() => handleStatus(item.id, 1)}
+                        >
+                          <Text style={styles.approveButtonText}>Approve</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.rejectButton}
+                          onPress={() => handleStatus(item.id, 2)}
+                        >
+                          <Text style={styles.rejectButtonText}>Reject</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </td>
+            </tr>
+          )}
+        </React.Fragment>
+      );
+    }
+
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -543,9 +615,9 @@ export default function ExpensesScreen() {
               {isEditing ? (
                 <TextInput
                   style={[styles.inlineInput, { minHeight: 60 }]}
-                  value={editFormData.trip_summary}
+                  value={editFormData.trip_report}
                   onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, trip_summary: text })
+                    setEditFormData({ ...editFormData, trip_report: text })
                   }
                   multiline
                   placeholder="Trip Summary"
@@ -554,7 +626,7 @@ export default function ExpensesScreen() {
                 />
               ) : (
                 <Text style={styles.descriptionText}>
-                  {item.trip_summary || "N/A"}
+                  {item.trip_report || "N/A"}
                 </Text>
               )}
             </View>
@@ -815,127 +887,570 @@ export default function ExpensesScreen() {
     );
   };
 
-  const renderHeader = () => (
-    <View style={styles.reportSummaryCard}>
-      <Text style={styles.reportSummaryTitle}>
-        {role === 0 ? "Organization" : "My"} Expense Report
-      </Text>
-      <View style={styles.reportSummaryRow}>
-        <View style={styles.reportSummaryItem}>
-          <Text style={styles.reportSummaryLabel}>Total Reimbursement</Text>
-          <Text style={styles.reportSummaryValue}>
-            RM {expenses.reduce((sum, e) => sum + e.cost, 0).toFixed(2)}
+  /* const renderItem = ({ item }: { item: Expense }) => {
+    const isExpanded = expandedId === item.id;
+    const isEditing = editingId === item.id;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          if (isEditing) {
+            return;
+          }
+          setExpandedId(isExpanded ? null : item.id);
+        }}
+        style={styles.card}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.name} numberOfLines={1}>
+            {item.purpose}
           </Text>
+          <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
         </View>
-        <View style={styles.reportSummaryItem}>
-          <Text style={styles.reportSummaryLabel}>Total Distance</Text>
-          <Text style={styles.reportSummaryValue}>
-            {expenses.reduce((sum, e) => sum + e.distance, 0).toFixed(2)} km
+        <View style={styles.cardFooter}>
+          <Text style={styles.companyText} numberOfLines={1}>
+            {item.name}
           </Text>
+          <Text style={styles.date}>{item.date || "N/A"}</Text>
         </View>
-      </View>
-      {Platform.OS === "web" && (
-        <View
-          style={{
-            marginTop: 20,
-            backgroundColor: "transparent",
-            borderTopWidth: 1,
-            borderTopColor: "rgba(255,255,255,0.2)",
-            paddingTop: 20,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 12,
-              marginBottom: 16,
-              backgroundColor: "transparent",
-              alignItems: "flex-end",
-            }}
+        <View style={[styles.cardFooter, { marginTop: 2 }]}>
+          <Text
+            style={[styles.companyText, { fontSize: 13 }]}
+            numberOfLines={1}
           >
-            <View
-              style={{
-                flex: 1,
-                marginRight: 12,
-                backgroundColor: "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 11,
-                  marginBottom: 4,
-                  fontWeight: "600",
-                }}
-              >
-                Start Date
-              </Text>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  borderRadius: "6px",
-                  border: "none",
-                  fontSize: "13px",
-                  outline: "none",
-                }}
-              />
-            </View>
-            <View
-              style={{
-                flex: 1,
-                marginRight: 12,
-                backgroundColor: "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 11,
-                  marginBottom: 4,
-                  fontWeight: "600",
-                }}
-              >
-                End Date
-              </Text>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  borderRadius: "6px",
-                  border: "none",
-                  fontSize: "13px",
-                  outline: "none",
-                }}
-              />
-            </View>
-            <TouchableOpacity
-              style={{
-                backgroundColor: "rgba(255,255,255,0.15)",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 6,
-              }}
-              onPress={() => {
-                setStartDate("");
-                setEndDate("");
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
-                Reset
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.exportButton} onPress={exportToHTML}>
-            <Text style={styles.exportButtonText}>Generate HTML Report</Text>
-          </TouchableOpacity>
+            {item.company}
+          </Text>
+          {item.from_time && item.to_time && (
+            <Text style={[styles.date, { fontSize: 13 }]}>
+              {format12Hour(item.from_time)} - {format12Hour(item.to_time)}
+            </Text>
+          )}
         </View>
+
+        {isExpanded && (
+          <View style={styles.expandedContent}>
+            <View style={styles.separator} />
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>Route:</Text>
+              {isEditing ? (
+                <View style={{ backgroundColor: "transparent" }}>
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormData.from_address}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, from_address: text })
+                    }
+                    placeholder="From Address"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormData.to_address}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, to_address: text })
+                    }
+                    placeholder="To Address"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                </View>
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.from_address || "N/A"} → {item.to_address || "N/A"}
+                </Text>
+              )}
+              <Text style={styles.descriptionText}>
+                {item.from_address || "N/A"} → {item.to_address || "N/A"}
+              </Text>
+
+              <Text style={styles.descriptionLabel}>Time and Duration:</Text>
+              {isEditing ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <TextInput
+                    style={[styles.inlineInput, { flex: 1 }]}
+                    value={editFormData.from_time}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, from_time: text })
+                    }
+                    placeholder="Start (e.g. 09:00)"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                  <TextInput
+                    style={[styles.inlineInput, { flex: 1 }]}
+                    value={editFormData.to_time}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, to_time: text })
+                    }
+                    placeholder="End (e.g. 17:00)"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                </View>
+              ) : (
+                item.from_time &&
+                item.to_time && (
+                  <Text style={styles.descriptionText}>
+                    {format12Hour(item.from_time)} -{" "}
+                    {format12Hour(item.to_time)} ({item.duration})
+                  </Text>
+                )
+              )}
+              <Text style={styles.descriptionText}>
+                {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
+                {item.duration})
+              </Text>
+
+              <Text style={styles.descriptionLabel}>Trip Summary:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.inlineInput, { minHeight: 60 }]}
+                  value={editFormData.trip_report}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, trip_report: text })
+                  }
+                  multiline
+                  placeholder="Trip Summary"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.trip_report || "N/A"}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>Company/Site:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.company}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, company: text })
+                  }
+                  placeholder="Company/Site"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.company || "N/A"}
+                </Text>
+              )}
+              <Text style={styles.descriptionLabel}>Name:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.name}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, name: text })
+                  }
+                  placeholder="Name"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>{item.name || "N/A"}</Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Contact Number:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.contact_number}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, contact_number: text })
+                  }
+                  keyboardType="phone-pad"
+                  placeholder="Contact Number"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.contact_number || "N/A"}
+                </Text>
+              )}
+
+              {isEditing && (
+                <>
+                  <Text style={styles.descriptionLabel}>Company / Site:</Text>
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormData.company}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, company: text })
+                    }
+                    placeholder="Company"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                </>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Mileage:</Text>
+                <Text style={styles.detailValue}>
+                  RM {item.mileage.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Toll:</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={[
+                      styles.inlineInput,
+                      { width: 100, marginBottom: 0 },
+                    ]}
+                    value={editFormData.toll?.toString()}
+                    onChangeText={(text) =>
+                      setEditFormData({
+                        ...editFormData,
+                        toll: parseFloat(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <Text style={styles.detailValue}>
+                    RM {item.toll.toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Parking:</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={[
+                      styles.inlineInput,
+                      { width: 100, marginBottom: 0 },
+                    ]}
+                    value={editFormData.parking?.toString()}
+                    onChangeText={(text) =>
+                      setEditFormData({
+                        ...editFormData,
+                        parking: parseFloat(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <Text style={styles.detailValue}>
+                    RM {item.parking.toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.detailRow,
+                  {
+                    marginTop: 4,
+                    borderTopWidth: 1,
+                    borderTopColor: "#eee",
+                    paddingTop: 4,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.detailLabel,
+                    { fontWeight: "bold", color: "#333" },
+                  ]}
+                >
+                  Total Cost:
+                </Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    { fontWeight: "bold", color: "#2196F3" },
+                  ]}
+                >
+                  RM{" "}
+                  {isEditing
+                    ? (
+                        (editFormData.mileage || 0) +
+                        (editFormData.parking || 0) +
+                        (editFormData.toll || 0)
+                      ).toFixed(2)
+                    : item.cost.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+
+            {item.business_card_url && (
+              <>
+                <Text style={styles.sectionHeader}>Business Card</Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(item.business_card_url || null);
+                  }}
+                >
+                  <Image
+                    source={{ uri: item.business_card_url }}
+                    style={styles.businessCardImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+
+            {item.approval_status === 0 && (
+              <View style={styles.actionButtonsContainer}>
+                {isEditing ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.approveButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleSaveEdit();
+                      }}
+                    >
+                      <Text style={styles.approveButtonText}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rejectButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleCancelEdit();
+                      }}
+                    >
+                      <Text style={styles.rejectButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleEdit(item);
+                    }}
+                  >
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDelete(item.id);
+                  }}
+                >
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {role === 0 && item.approval_status === 0 && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.approveButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleStatus(item.id, 1);
+                  }}
+                >
+                  <Text style={styles.approveButtonText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.rejectButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleStatus(item.id, 2);
+                  }}
+                >
+                  <Text style={styles.rejectButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }; */
+
+  const renderHeader = () => (
+    <View
+      style={[
+        styles.reportSummaryCard,
+        { padding: isDashboardVisible ? 20 : 10 },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => setIsDashboardVisible(!isDashboardVisible)}
+        style={{
+          alignSelf: "flex-end",
+          padding: 4,
+          marginBottom: isDashboardVisible ? 10 : 0,
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 12, opacity: 0.8 }}>
+          {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
+        </Text>
+      </TouchableOpacity>
+      {isDashboardVisible && (
+        <>
+          {/* <Text style={styles.reportSummaryTitle}>
+            {role === 0 ? "Organization" : "My"} Expense Report
+          </Text> */}
+          {/* <View style={styles.reportSummaryRow}>
+            <View style={styles.reportSummaryItem}>
+              <Text style={styles.reportSummaryLabel}>Total Reimbursement</Text>
+              <Text style={styles.reportSummaryValue}>
+                RM {expenses.reduce((sum, e) => sum + e.cost, 0).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.reportSummaryItem}>
+              <Text style={styles.reportSummaryLabel}>Total Distance</Text>
+              <Text style={styles.reportSummaryValue}>
+                {expenses.reduce((sum, e) => sum + e.distance, 0).toFixed(2)} km
+              </Text>
+            </View>
+          </View> */}
+          {Platform.OS === "web" && (
+            <View
+              style={{
+                backgroundColor: "transparent",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 12,
+                  marginBottom: 16,
+                  backgroundColor: "transparent",
+                  alignItems: "flex-end",
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    marginRight: 12,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      marginBottom: 4,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Start Date
+                  </Text>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      border: "none",
+                      fontSize: "13px",
+                      outline: "none",
+                    }}
+                  />
+                </View>
+                <View
+                  style={{
+                    flex: 1,
+                    marginRight: 12,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      marginBottom: 4,
+                      fontWeight: "600",
+                    }}
+                  >
+                    End Date
+                  </Text>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      border: "none",
+                      fontSize: "13px",
+                      outline: "none",
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                  }}
+                  onPress={() => {
+                    setAppliedStartDate(startDate);
+                    setAppliedEndDate(endDate);
+                  }}
+                >
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
+                    Apply
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                  }}
+                  onPress={() => {
+                    setStartDate("");
+                    setEndDate("");
+                    setAppliedStartDate("");
+                    setAppliedEndDate("");
+                  }}
+                >
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
+                    Reset
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.exportButton}
+                onPress={exportToHTML}
+              >
+                <Text style={styles.exportButtonText}>
+                  Generate HTML Report
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -943,16 +1458,46 @@ export default function ExpensesScreen() {
   return (
     <View style={styles.container}>
       {Platform.OS !== "web" && <MapDisplay />}
-      <FlatList
-        data={expenses}
-        renderItem={renderItem}
-        ListHeaderComponent={renderHeader}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No expenses submitted yet.</Text>
-        }
-      />
+      {Platform.OS === "web" ? (
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {renderHeader()}
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              backgroundColor: "#fff",
+              borderRadius: "8px",
+              overflow: "hidden",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: "#f5f5f5", textAlign: "left" }}>
+                <th style={webTableStyles.th}>Date</th>
+                <th style={webTableStyles.th}>Time</th>
+                <th style={webTableStyles.th}>Purpose</th>
+                <th style={webTableStyles.th}>Company</th>
+                <th style={webTableStyles.th}>Name</th>
+                <th style={webTableStyles.th}>Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredExpenses.map((item) => renderItem({ item }))}
+            </tbody>
+          </table>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredExpenses}
+          renderItem={renderItem}
+          ListHeaderComponent={renderHeader}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No expenses submitted yet.</Text>
+          }
+        />
+      )}
       <Modal
         visible={!!selectedImage}
         transparent={true}
@@ -1129,7 +1674,6 @@ const styles = StyleSheet.create({
   rejectButtonText: { color: "#fff", fontWeight: "bold" },
   reportSummaryCard: {
     backgroundColor: "#2196F3",
-    padding: 20,
     borderRadius: 12,
     marginBottom: 20,
     shadowColor: "#000",
@@ -1172,3 +1716,15 @@ const styles = StyleSheet.create({
   },
   exportButtonText: { color: "#2196F3", fontWeight: "bold", fontSize: 14 },
 });
+
+const webTableStyles = {
+  th: {
+    padding: "12px 15px",
+    borderBottom: "2px solid #ddd",
+    color: "#666",
+  },
+  td: {
+    padding: "12px 15px",
+    fontSize: "14px",
+  },
+};
