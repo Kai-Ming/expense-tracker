@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import { Button, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseWebScreen() {
@@ -44,6 +44,7 @@ export default function SubmitExpenseWebScreen() {
   const [formTripReport, setFormTripReport] = useState<string>("");
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState<boolean>(true);
 
   useEffect(() => {
     const loadScript = () => {
@@ -346,8 +347,11 @@ export default function SubmitExpenseWebScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.mapWrapper}>
-        <View style={styles.header}>
+      <View style={[
+        styles.mapWrapper,
+        { display: showMap ? 'flex' : 'none' }
+      ]}>
+        {/* <View style={styles.header}>
           <View style={styles.searchSection}>
             <input
               ref={inputARef}
@@ -374,26 +378,49 @@ export default function SubmitExpenseWebScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </View> */}
         {/* @ts-ignore */}
         <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
       </View>
 
       <View style={styles.detailsContainer}>
+        <TouchableOpacity 
+          onPress={() => setShowMap(!showMap)} 
+          style={styles.arrowButton}
+          activeOpacity={0.6}
+        >
+          <Text style={styles.arrowText}>
+            {showMap ? "❮" : "❯"}
+          </Text>
+        </TouchableOpacity>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
             <Text style={styles.formLabel}>Submit Travel Expense</Text>
             <View style={styles.inputRow}>
               <Text style={styles.fieldLabel}>From:</Text>
-              <Text style={styles.fieldValue} numberOfLines={1}>
-                {fromAddress || "Not set"}
-              </Text>
+              <input
+                ref={inputARef}
+                placeholder="From..."
+                style={{
+                  ...webStyles.input,
+                  flex: 1,
+                  maxWidth: 400,
+                  marginBottom: 0,
+                }}
+              />
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To:</Text>
-              <Text style={styles.fieldValue} numberOfLines={1}>
-                {toAddress || "Not set"}
-              </Text>
+              <input
+                ref={inputBRef}
+                placeholder="To..."
+                style={{
+                  ...webStyles.input,
+                  flex: 1,
+                  maxWidth: 400,
+                  marginBottom: 0,
+                }}
+              />
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Distance:</Text>
@@ -733,7 +760,7 @@ const webStyles = {
 };
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: "row" },
-  mapWrapper: { width: "50%", height: "100%" },
+  mapWrapper: { width: "30%", height: "100%" },
   scrollContent: { paddingBottom: 40 },
   header: {
     position: "absolute",
@@ -745,7 +772,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 8,
   },
-  formContainer: { padding: 20 },
+  formContainer: { paddingLeft: 20, paddingRight: 20, paddingBottom: 20, paddingTop: 5 },
   formLabel: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
   button: { backgroundColor: "#2196F3", padding: 10, borderRadius: 5 },
   buttonText: { color: "white" },
@@ -790,4 +817,22 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
   },
+  toggleColumn: {
+    marginLeft: 10,
+    width: 10,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  arrowButton: {
+    paddingTop: 5,
+    paddingLeft: 20,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  arrowText: {
+    fontSize: 15,
+    color: '#666', // Subtle gray
+    fontWeight: 'bold',
+  }
 });
