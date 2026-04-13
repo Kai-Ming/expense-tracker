@@ -1,7 +1,9 @@
+import React, { useEffect, useRef, useState } from "react";
 import MapDisplay from "@/components/MapDisplay"; // Check if this should be { MapDisplay }
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { Dropdown } from 'react-native-paper-dropdown';
 import {
   collection,
   deleteDoc,
@@ -13,7 +15,6 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -26,7 +27,8 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db } from "../../firebaseConfig"; // Assuming firebaseConfig is correctly set up
+import { db, storage } from "../../firebaseConfig";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 interface Expense {
   id: string;
@@ -48,6 +50,7 @@ interface Expense {
   cost: number;
   user_id: string;
   business_card_url?: string;
+  route_image_url?: string;
   approval_status: number;
   createdAt: any;
 }
@@ -65,7 +68,36 @@ export default function ExpensesScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
+  const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
+  const [tempPoints, setTempPoints] = useState<(google.maps.LatLngLiteral | null)[]>([null, null]);
+  const [tempPolyline, setTempPolyline] = useState<string | null>(null);
   const router = useRouter();
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const editInputARef = useRef<any>(null);
+  const editInputBRef = useRef<any>(null);
+  const directionsService = useRef<google.maps.DirectionsService | null>(null);
+
+  const purposeList = [
+    { label: "Application support", value: "Application support" },
+    { label: "Attending seminar/training", value: "Attending seminar/training" },
+    { label: "Breakfast/Lunch/Dinner meeting", value: "Breakfast/Lunch/Dinner meeting" },
+    { label: "Documents submission", value: "Documents submission" },
+    { label: "Documents submission with meeting", value: "Documents submission with meeting" },
+    { label: "Door knocking", value: "Door knocking" },
+    { label: "Goods delivery", value: "Goods delivery" },
+    { label: "Initial meeting and introduction", value: "Initial meeting and introduction" },
+    { label: "Meeting and follow-up", value: "Meeting and follow-up" },
+    { label: "Presentation", value: "Presentation" },
+    { label: "Product demonstration", value: "Product demonstration" },
+    { label: "Service and support", value: "Service and support" },
+    { label: "Site inspection", value: "Site inspection" },
+    { label: "Site survey", value: "Site survey" },
+    { label: "Site visitation", value: "Site visitation" },
+    { label: "Tea break meeting", value: "Tea break meeting" },
+    { label: "Tender submission", value: "Tender submission" },
+    { label: "Tender submission with meeting", value: "Tender submission with meeting" },
+    { label: "Training and commissioning", value: "Training and commissioning" },
+  ];
 
   useEffect(() => {
     const auth = getAuth();
@@ -105,6 +137,96 @@ export default function ExpensesScreen() {
 
     return () => unsubscribe();
   }, [userId]);
+
+  // Load Google Maps script for Web Autocomplete
+  useEffect(() => {
+    if (Platform.OS !== "web" || !apiKey || (window as any).google) return;
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+    script.async = true;
+    script.onload = () => {
+      directionsService.current = new (window as any).google.maps.DirectionsService();
+    };
+    document.head.appendChild(script);
+  }, []);
+
+  const calculateRoute = (
+    p1: google.maps.LatLngLiteral,
+    p2: google.maps.LatLngLiteral,
+    parking: number,
+    toll: number
+  ) => {
+    if (!directionsService.current) return;
+    directionsService.current.route(
+      {
+        origin: p1,
+        destination: p2,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === "OK" && result) {
+          const distStr = result.routes[0].legs[0].distance?.text || "0";
+          const distNum = parseFloat(distStr.replace(/[^0-9.]/g, ""));
+          const mileage = parseFloat((distNum * 0.8).toFixed(2));
+          const cost = parseFloat((mileage + parking + toll).toFixed(2));
+          const polyline = result.routes[0].overview_polyline;
+          const encodedPath = typeof polyline === "string" ? polyline : (polyline as any)?.points;
+
+          setTempPolyline(encodedPath || null);
+          setEditFormData((prev) => ({
+            ...prev,
+            distance: distNum,
+            mileage: mileage,
+            cost: cost,
+          }));
+        }
+      }
+    );
+  };
+
+  // Initialize Autocomplete when editing starts
+  useEffect(() => {
+    if (Platform.OS !== "web" || !editingId) return;
+
+    const timer = setTimeout(() => {
+      const setup = (ref: React.RefObject<any>, key: "from_address" | "to_address", index: number) => {
+        const el = ref.current;
+        if (!el || !(window as any).google) return;
+
+        // TextInput ref on web is the DOM node or contains the input
+        const inputElement = el instanceof HTMLInputElement ? el : el.querySelector?.("input");
+        if (!inputElement) return;
+
+        const autocomplete = new (window as any).google.maps.places.Autocomplete(inputElement, {
+          fields: ["formatted_address", "geometry"],
+        });
+
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (place.formatted_address && place.geometry?.location) {
+            const latLng = place.geometry.location.toJSON();
+            setTempPoints((prevPoints) => {
+              const nextPoints = [...prevPoints];
+              nextPoints[index] = latLng;
+              setEditFormData((prevForm) => {
+                const nextForm = { ...prevForm, [key]: place.formatted_address };
+                if (nextPoints[0] && nextPoints[1]) {
+                  calculateRoute(nextPoints[0], nextPoints[1], nextForm.parking || 0, nextForm.toll || 0);
+                }
+                return nextForm;
+              });
+              return nextPoints;
+            });
+          }
+        });
+      };
+
+      setup(editInputARef, "from_address", 0);
+      setup(editInputBRef, "to_address", 1);
+    }, 500); // Small delay to ensure the TextInput has rendered in the DOM
+
+    return () => clearTimeout(timer);
+  }, [editingId]);
 
   const filteredExpenses = expenses.filter((e) => {
     if (!e.date) return true;
@@ -147,9 +269,24 @@ export default function ExpensesScreen() {
     }
   };
 
-  const handleEdit = (expense: Expense) => {
+  const handleEdit = async (expense: Expense) => {
     setEditingId(expense.id);
     setEditFormData({ ...expense });
+    setTempPolyline(null);
+    setTempPoints([null, null]);
+
+    // Try to pre-populate coordinates for existing addresses
+    if (Platform.OS === "web" && (window as any).google) {
+      const geocoder = new (window as any).google.maps.Geocoder();
+      const geocode = (addr: string) =>
+        new Promise<google.maps.LatLngLiteral | null>((res) => {
+          geocoder.geocode({ address: addr }, (results, status) => {
+            res(status === "OK" ? results?.[0]?.geometry?.location?.toJSON() || null : null);
+          });
+        });
+      const [p0, p1] = await Promise.all([geocode(expense.from_address), geocode(expense.to_address)]);
+      setTempPoints([p0, p1]);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -160,6 +297,7 @@ export default function ExpensesScreen() {
   const handleSaveEdit = async () => {
     if (!editingId) return;
     try {
+      let routeImageUrl = editFormData.route_image_url || "";
       const docRef = doc(db, "expenses", editingId);
 
       // Recalculate total cost
@@ -180,8 +318,25 @@ export default function ExpensesScreen() {
         }
       }
 
+      // Update route image if polyline changed
+      if (tempPolyline && tempPoints[0] && tempPoints[1]) {
+        try {
+          const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${tempPolyline}&markers=color:red|label:A|${tempPoints[0].lat},${tempPoints[0].lng}&markers=color:blue|label:B|${tempPoints[1].lat},${tempPoints[1].lng}&key=${apiKey}`;
+          const response = await fetch(staticMapUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const routeRef = ref(storage, `route-images/${Date.now()}.png`);
+            const uploadResult = await uploadBytes(routeRef, blob);
+            routeImageUrl = await getDownloadURL(uploadResult.ref);
+          }
+        } catch (mapErr) {
+          console.error("Failed to update route image:", mapErr);
+        }
+      }
+
       const updatedData = {
         ...editFormData,
+        route_image_url: routeImageUrl,
         cost: updatedCost,
         duration: updatedDuration,
       };
@@ -309,6 +464,16 @@ export default function ExpensesScreen() {
         <p><strong>Cost (RM):</strong> ${e.cost.toFixed(2)}</p>
         <p><strong>Trip Report:</strong> ${e.trip_report}</p>
         ${
+          e.route_image_url
+            ? `
+          <div class="image-container">
+            <strong>Route Map:</strong><br/>
+            <img src="${e.route_image_url}" alt="Route Map" />
+          </div>
+        `
+            : ""
+        }
+        ${
           e.business_card_url
             ? `
           <div class="image-container">
@@ -409,7 +574,7 @@ export default function ExpensesScreen() {
                 color: "#2196F3",
               }}
             >
-              RM {item.cost.toFixed(2)}
+              RM {isEditing ? (editFormData.cost || 0).toFixed(2) : item.cost.toFixed(2)}
             </td>
           </tr>
           {isExpanded && (
@@ -421,25 +586,243 @@ export default function ExpensesScreen() {
                 <View style={styles.expandedContent}>
                   <View style={styles.section}>
                     <Text style={styles.descriptionLabel}>Route:</Text>
-                    <Text style={styles.descriptionText}>
-                      {item.from_address} → {item.to_address}
+                    {isEditing ? (
+                      <View style={{ backgroundColor: "transparent" }}>
+                        <TextInput
+                          ref={editInputARef}
+                          style={styles.inlineInput}
+                          value={editFormData.from_address}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              from_address: text,
+                            })
+                          }
+                          placeholder="From Address"
+                        />
+                        <TextInput
+                          ref={editInputBRef}
+                          style={styles.inlineInput}
+                          value={editFormData.to_address}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              to_address: text,
+                            })
+                          }
+                          placeholder="To Address"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {item.from_address} → {item.to_address}
+                      </Text>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>Date:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.date}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, date: text })
+                        }
+                        placeholder="YYYY-MM-DD"
+                      />
+                    ) :
+                      <></>
+                    }
+
+                    <Text style={styles.descriptionLabel}>Purpose:</Text>
+                    {isEditing ? (
+                      <select
+                        value={editFormData.purpose}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            purpose: e.target.value,
+                          })
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          backgroundColor: "#f9f9f9",
+                          fontSize: "14px",
+                          width: "100%",
+                          maxWidth: 400,
+                          marginBottom: 10,
+                          height: "auto",
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select a purpose...
+                        </option>
+                        {purposeList.map((p) => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </select>
+                    ) :
+                      <></>
+                    }
+
+                    <Text style={styles.descriptionLabel}>Company:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.company}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, company: text })
+                        }
+                        placeholder="Company"
+                      />
+                    ) : 
+                      <></>
+                    }
+
+                    <Text style={styles.descriptionLabel}>Name:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.name}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, name: text })
+                        }
+                        placeholder="Name"
+                      />
+                    ) : 
+                      <></>
+                    }
+
+                    <Text style={styles.descriptionLabel}>
+                      Time and Duration:
                     </Text>
+                    {isEditing ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        <TextInput
+                          style={[styles.inlineInput, { flex: 1 }]}
+                          value={editFormData.from_time}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              from_time: text,
+                            })
+                          }
+                          placeholder="Start (e.g. 09:00)"
+                        />
+                        <TextInput
+                          style={[styles.inlineInput, { flex: 1 }]}
+                          value={editFormData.to_time}
+                          onChangeText={(text) =>
+                            setEditFormData({ ...editFormData, to_time: text })
+                          }
+                          placeholder="End (e.g. 17:00)"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {format12Hour(item.from_time)} -{" "}
+                        {format12Hour(item.to_time)} ({item.duration})
+                      </Text>
+                    )}
+
                     <Text style={styles.descriptionLabel}>Parking:</Text>
-                    <Text style={styles.descriptionText}>
-                      RM {item.parking.toFixed(2)}
-                    </Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { width: 100 }]}
+                        value={editFormData.parking?.toString()}
+                        onChangeText={(text) =>
+                          setEditFormData((prev) => {
+                            const parking = parseFloat(text) || 0;
+                            return {
+                              ...prev,
+                              parking,
+                              cost: (prev.mileage || 0) + parking + (prev.toll || 0),
+                            };
+                          })
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        RM {item.parking.toFixed(2)}
+                      </Text>
+                    )}
+
                     <Text style={styles.descriptionLabel}>Toll:</Text>
-                    <Text style={styles.descriptionText}>
-                      RM {item.toll.toFixed(2)}
-                    </Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { width: 100 }]}
+                        value={editFormData.toll?.toString()}
+                        onChangeText={(text) =>
+                          setEditFormData((prev) => {
+                            const toll = parseFloat(text) || 0;
+                            return {
+                              ...prev,
+                              toll,
+                              cost: (prev.mileage || 0) + (prev.parking || 0) + toll,
+                            };
+                          })
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        RM {item.toll.toFixed(2)}
+                      </Text>
+                    )}
+
                     <Text style={styles.descriptionLabel}>Mileage:</Text>
                     <Text style={styles.descriptionText}>
-                      RM {item.mileage.toFixed(2)}
+                      RM {isEditing ? (editFormData.mileage || 0).toFixed(2) : item.mileage.toFixed(2)}
                     </Text>
+
                     <Text style={styles.descriptionLabel}>Trip Report:</Text>
-                    <Text style={styles.descriptionText}>
-                      {item.trip_report || "N/A"}
-                    </Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { minHeight: 60 }]}
+                        value={editFormData.trip_report}
+                        onChangeText={(text) =>
+                          setEditFormData({
+                            ...editFormData,
+                            trip_report: text,
+                          })
+                        }
+                        multiline
+                        placeholder="Trip Summary"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {item.trip_report || "N/A"}
+                      </Text>
+                    )}
+
+                    {item.route_image_url && !isEditing && (
+                      <>
+                        <Text style={styles.descriptionLabel}>
+                          Route Map:
+                        </Text>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage(item.route_image_url || null);
+                          }}
+                        >
+                          <Image
+                            source={{ uri: item.route_image_url }}
+                            style={styles.businessCardImage}
+                            resizeMode="contain"
+                          />
+                        </TouchableOpacity>
+                      </>
+                    )}
+
                     {item.business_card_url && (
                       <>
                         <Text style={styles.descriptionLabel}>
@@ -461,12 +844,38 @@ export default function ExpensesScreen() {
                     )}
                   </View>
                   <View style={styles.actionButtonsContainer}>
+                    {isEditing ? (
+                      <>
+                        <TouchableOpacity
+                          style={styles.approveButton}
+                          onPress={() => handleSaveEdit()}
+                        >
+                          <Text style={styles.approveButtonText}>Save</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.rejectButton}
+                          onPress={() => handleCancelEdit()}
+                        >
+                          <Text style={styles.rejectButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      item.approval_status === 0 && (
+                        <TouchableOpacity
+                          style={styles.editButton}
+                          onPress={() => handleEdit(item)}
+                        >
+                          <Text style={styles.editButtonText}>Edit</Text>
+                        </TouchableOpacity>
+                      )
+                    )}
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => handleDelete(item.id)}
                     >
                       <Text style={styles.deleteButtonText}>Delete</Text>
                     </TouchableOpacity>
+
                     {role === 0 && item.approval_status === 0 && (
                       <>
                         <TouchableOpacity
@@ -535,9 +944,10 @@ export default function ExpensesScreen() {
 
             <View style={styles.section}>
               <Text style={styles.descriptionLabel}>Route:</Text>
-              {/* {isEditing ? (
+              {isEditing ? (
                 <View style={{ backgroundColor: "transparent" }}>
                   <TextInput
+                    ref={editInputARef}
                     style={styles.inlineInput}
                     value={editFormData.from_address}
                     onChangeText={(text) =>
@@ -548,6 +958,7 @@ export default function ExpensesScreen() {
                     onTouchStart={(e) => e.stopPropagation()}
                   />
                   <TextInput
+                    ref={editInputBRef}
                     style={styles.inlineInput}
                     value={editFormData.to_address}
                     onChangeText={(text) =>
@@ -562,13 +973,46 @@ export default function ExpensesScreen() {
                 <Text style={styles.descriptionText}>
                   {item.from_address || "N/A"} → {item.to_address || "N/A"}
                 </Text>
-              )} */}
-              <Text style={styles.descriptionText}>
-                {item.from_address || "N/A"} → {item.to_address || "N/A"}
-              </Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Date:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.date}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, date: text })
+                  }
+                  placeholder="YYYY-MM-DD"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.date || "N/A"}
+                </Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Purpose:</Text>
+              {isEditing ? (
+                <Dropdown
+                  label={"Purpose"}
+                  mode={"outlined"}
+                  visible={showPurposeDropDown}
+                  showDropDown={() => setShowPurposeDropDown(true)}
+                  onDismiss={() => setShowPurposeDropDown(false)}
+                  value={editFormData.purpose}
+                  setValue={(val) =>
+                    setEditFormData({ ...editFormData, purpose: val })
+                  }
+                  list={purposeList}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>{item.purpose}</Text>
+              )}
 
               <Text style={styles.descriptionLabel}>Time and Duration:</Text>
-              {/* {isEditing ? (
+              {isEditing ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -605,11 +1049,7 @@ export default function ExpensesScreen() {
                     {format12Hour(item.to_time)} ({item.duration})
                   </Text>
                 )
-              )} */}
-              <Text style={styles.descriptionText}>
-                {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
-                {item.duration})
-              </Text>
+              )}
 
               <Text style={styles.descriptionLabel}>Trip Summary:</Text>
               {isEditing ? (
@@ -683,22 +1123,6 @@ export default function ExpensesScreen() {
                   {item.contact_number || "N/A"}
                 </Text>
               )}
-
-              {isEditing && (
-                <>
-                  <Text style={styles.descriptionLabel}>Company / Site:</Text>
-                  <TextInput
-                    style={styles.inlineInput}
-                    value={editFormData.company}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, company: text })
-                    }
-                    placeholder="Company"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </>
-              )}
             </View>
 
             <View style={styles.section}>
@@ -718,9 +1142,13 @@ export default function ExpensesScreen() {
                     ]}
                     value={editFormData.toll?.toString()}
                     onChangeText={(text) =>
-                      setEditFormData({
-                        ...editFormData,
-                        toll: parseFloat(text) || 0,
+                      setEditFormData((prev) => {
+                        const toll = parseFloat(text) || 0;
+                        return {
+                          ...prev,
+                          toll,
+                          cost: (prev.mileage || 0) + (prev.parking || 0) + toll,
+                        };
                       })
                     }
                     keyboardType="numeric"
@@ -742,12 +1170,16 @@ export default function ExpensesScreen() {
                       { width: 100, marginBottom: 0 },
                     ]}
                     value={editFormData.parking?.toString()}
-                    onChangeText={(text) =>
-                      setEditFormData({
-                        ...editFormData,
-                        parking: parseFloat(text) || 0,
-                      })
-                    }
+                  onChangeText={(text) =>
+                    setEditFormData((prev) => {
+                      const parking = parseFloat(text) || 0;
+                      return {
+                        ...prev,
+                        parking,
+                        cost: (prev.mileage || 0) + parking + (prev.toll || 0),
+                      };
+                    })
+                  }
                     keyboardType="numeric"
                     onStartShouldSetResponder={() => true}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -794,6 +1226,24 @@ export default function ExpensesScreen() {
                 </Text>
               </View>
             </View>
+
+            {item.route_image_url && !isEditing && (
+              <>
+                <Text style={styles.sectionHeader}>Route Map</Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(item.route_image_url || null);
+                  }}
+                >
+                  <Image
+                    source={{ uri: item.route_image_url }}
+                    style={styles.businessCardImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              </>
+            )}
 
             {item.business_card_url && (
               <>

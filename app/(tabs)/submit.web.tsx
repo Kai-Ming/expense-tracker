@@ -23,6 +23,7 @@ export default function SubmitExpenseWebScreen() {
   const geocoder = useRef<google.maps.Geocoder | null>(null);
 
   const [distance, setDistance] = useState<string | null>(null);
+  const [routePolyline, setRoutePolyline] = useState<string | null>(null);
   const [points, setPoints] = useState<(google.maps.LatLngLiteral | null)[]>([
     null,
     null,
@@ -155,6 +156,7 @@ export default function SubmitExpenseWebScreen() {
     directionsRenderer.current?.setDirections({ routes: [] });
     setPoints([null, null]);
     setDistance(null);
+    setRoutePolyline(null);
     setFormPurpose("");
     setFormDate(new Date().toISOString().split("T")[0]);
     setFormCompany("");
@@ -208,6 +210,10 @@ export default function SubmitExpenseWebScreen() {
           // Extract road distance text (e.g. "12.5 km")
           const routeDistance = result.routes[0].legs[0].distance?.text;
           setDistance(routeDistance || null);
+
+          const polyline = result.routes[0].overview_polyline;
+          const encodedPath = typeof polyline === "string" ? polyline : (polyline as any)?.points;
+          setRoutePolyline(encodedPath || null);
         }
       },
     );
@@ -264,6 +270,24 @@ export default function SubmitExpenseWebScreen() {
 
     try {
       let businessCardUrl = "";
+      let routeImageUrl = "";
+
+      // Capture route image from Static Maps API
+      if (routePolyline && points[0] && points[1]) {
+        try {
+          const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${routePolyline}&markers=color:red|label:A|${points[0].lat},${points[0].lng}&markers=color:blue|label:B|${points[1].lat},${points[1].lng}&key=${apiKey}`;
+          const response = await fetch(staticMapUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const routeRef = ref(storage, `route-images/${Date.now()}.png`);
+            const uploadResult = await uploadBytes(routeRef, blob);
+            routeImageUrl = await getDownloadURL(uploadResult.ref);
+          }
+        } catch (mapErr) {
+          console.error("Failed to capture static route image:", mapErr);
+        }
+      }
+
       if (businessCardFile) {
         console.log("Uploading to bucket:", storage.app.options.storageBucket);
         const storageRef = ref(
@@ -289,6 +313,7 @@ export default function SubmitExpenseWebScreen() {
         distance: dist,
         tripReport: formTripReport,
         business_card_url: businessCardUrl,
+        route_image_url: routeImageUrl,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
         mileage: mileage,
