@@ -1,14 +1,14 @@
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useRef, useState } from "react";
-import { Button, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Button, ScrollView, StyleSheet, TouchableOpacity, TextInput } from "react-native";
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseWebScreen() {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<View>(null);
   const googleMap = useRef<google.maps.Map | null>(null);
   const markers = useRef<(google.maps.marker.AdvancedMarkerElement | null)[]>([
     null,
@@ -18,8 +18,8 @@ export default function SubmitExpenseWebScreen() {
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(
     null,
   );
-  const inputARef = useRef<HTMLInputElement>(null);
-  const inputBRef = useRef<HTMLInputElement>(null);
+  const inputARef = useRef<any>(null);
+  const inputBRef = useRef<any>(null);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
 
   const [distance, setDistance] = useState<string | null>(null);
@@ -45,6 +45,38 @@ export default function SubmitExpenseWebScreen() {
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showMap, setShowMap] = useState<boolean>(true);
+  const [mileageRate, setMileageRate] = useState<number>(0.8);
+  const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
+
+  useEffect(() => {
+    if (mileageRate !== undefined) {
+      setFormMileageRate(mileageRate);
+    }
+  }, [mileageRate]);
+  
+  useEffect(() => {
+    const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
+
+    // If configId is undefined, don't run the listener
+    if (!configId) {
+      console.error("Firebase Config ID is missing from environment variables.");
+      return;
+    }
+
+    const unsubscribe = onSnapshot(doc(db, "config", "7HTZfcBtebPsm0zlZB3c"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+
+        if (data.mileage_rate) {
+          setMileageRate(data.mileage_rate);
+        }
+      }
+      else {
+        console.error("Config document not found.");
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const loadScript = () => {
@@ -78,11 +110,15 @@ export default function SubmitExpenseWebScreen() {
       geocoder.current = new google.maps.Geocoder();
 
       const setupAutocomplete = (
-        input: HTMLInputElement | null,
+        inputContainer: any,
         index: number,
       ) => {
-        if (!input) return;
-        const autocomplete = new google.maps.places.Autocomplete(input, {
+        if (!inputContainer) return;
+        // RN-Web TextInput renders a wrapper; find the actual input element
+        const inputEl = inputContainer.querySelector?.('input') || inputContainer;
+        if (!inputEl) return;
+
+        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
           fields: ["geometry", "formatted_address"],
         });
         autocomplete.addListener("place_changed", () => {
@@ -140,8 +176,6 @@ export default function SubmitExpenseWebScreen() {
     geocoder.current.geocode({ location: latLng }, (results, status) => {
       if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
         const address = results[0].formatted_address;
-        if (index === 0 && inputARef.current) inputARef.current.value = address;
-        if (index === 1 && inputBRef.current) inputBRef.current.value = address;
         index === 0
           ? setFromAddress(address || "")
           : setToAddress(address || "");
@@ -171,8 +205,6 @@ export default function SubmitExpenseWebScreen() {
     setFormToll("0.00");
     setFormTripReport("");
     setBusinessCardFile(null);
-    if (inputARef.current) inputARef.current.value = "";
-    if (inputBRef.current) inputBRef.current.value = "";
   };
 
   // Separate Effect to handle calculation when points update
@@ -219,15 +251,22 @@ export default function SubmitExpenseWebScreen() {
       },
     );
   };
-
-  const mileage = 0.8;
+  
+  const getDistance = () => {
+    if (!distance) return 0.0;
+    return parseFloat(distance.replace(/[^0-9.]/g, ""));
+  };
 
   // Robust calculation that handles distance strings (removing commas and units)
-  const calculateMileage = () => {
-    return (getDistance() * mileage).toFixed(2);
-  };
+  const calculateMileage = useCallback(() => {
+    console.log(getDistance());
+    console.log(mileageRate)
+    return (getDistance() * mileageRate).toFixed(2);
+  }, [mileageRate, getDistance]);
+
+
   const calculateCost = () => {
-    const travelCost = getDistance() * mileage;
+    const travelCost = getDistance() * mileageRate;
     const parking = parseFloat(formParking) || 0;
     const toll = parseFloat(formToll) || 0;
     return (travelCost + parking + toll).toFixed(2);
@@ -242,11 +281,6 @@ export default function SubmitExpenseWebScreen() {
     const hours = Math.floor(diff / 60);
     const mins = diff % 60;
     return `${hours}h ${mins}m`;
-  };
-
-  const getDistance = () => {
-    if (!distance) return 0.0;
-    return parseFloat(distance.replace(/[^0-9.]/g, ""));
   };
 
   const handleSubmit = async () => {
@@ -345,42 +379,36 @@ export default function SubmitExpenseWebScreen() {
     }
   };
 
+  const updateMileageRate = async () => {
+    const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
+
+    if (!configId) {
+      console.error("No Config ID found in environment variables");
+      return;
+    }
+
+    const docRef = doc(db, "config", configId);
+
+    try {
+      await updateDoc(docRef, {
+        mileage_rate: formMileageRate
+      });
+      console.log("Rate updated successfully!");
+    } catch (error) {
+      console.error("Error updating document:", error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={[
         styles.mapWrapper,
         { display: showMap ? 'flex' : 'none' }
       ]}>
-        {/* <View style={styles.header}>
-          <View style={styles.searchSection}>
-            <input
-              ref={inputARef}
-              placeholder="From..."
-              style={webStyles.input}
-            />
-            <input
-              ref={inputBRef}
-              placeholder="To..."
-              style={webStyles.input}
-            />
-          </View>
-
-          <View style={styles.infoSection}>
-            <Text style={styles.instructions}>
-              {!points[0] && "Set Origin"}
-              {points[0] && !points[1] && "Set Destination"}
-              {points[0] && points[1] && `Road Distance: ${distance}`}
-            </Text>
-
-            {(points[0] || points[1]) && (
-              <TouchableOpacity onPress={resetAll} style={styles.button}>
-                <Text style={styles.buttonText}>Clear</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View> */}
-        {/* @ts-ignore */}
-        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+        <View 
+          ref={mapRef} 
+          style={{ width: "100%", height: "100%" }} 
+        />
       </View>
 
       <View style={styles.detailsContainer}>
@@ -398,28 +426,22 @@ export default function SubmitExpenseWebScreen() {
             <Text style={styles.formLabel}>Submit Travel Expense</Text>
             <View style={styles.inputRow}>
               <Text style={styles.fieldLabel}>From:</Text>
-              <input
+              <TextInput
                 ref={inputARef}
                 placeholder="From..."
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
+                value={fromAddress}
+                onChangeText={setFromAddress}
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
               />
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To:</Text>
-              <input
+              <TextInput
                 ref={inputBRef}
                 placeholder="To..."
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
+                value={toAddress}
+                onChangeText={setToAddress}
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
               />
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -432,62 +454,35 @@ export default function SubmitExpenseWebScreen() {
                 { marginTop: 10, alignItems: "flex-start" },
               ]}
             >
-              {" "}
-              {/* Changed to Purpose */}
               <Text style={styles.fieldLabel}>Purpose:</Text>
-              <select
-                value={formPurpose}
-                onChange={(e) => setFormPurpose(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 10,
-                  height: "auto",
-                  padding: "8px 12px",
-                }}
-              >
-                <option value="" disabled>
-                  Select a purpose...
-                </option>
-                <option value="Application support">Application support</option>
-                <option value="Attending seminar/training">
-                  Attending seminar/training
-                </option>
-                <option value="Breakfast/Lunch/Dinner meeting">
-                  Breakfast/Lunch/Dinner meeting
-                </option>
-                <option value="Documents submission">
-                  Documents submission
-                </option>
-                <option value="Documents submission with meeting">
-                  Documents submission with meeting
-                </option>
-                <option value="Door knocking">Door knocking</option>
-                <option value="Goods delivery">Goods delivery</option>
-                <option value="Initial meeting and introduction">
-                  Initial meeting and introduction
-                </option>
-                <option value="Meeting and follow-up">
-                  Meeting and follow-up
-                </option>
-                <option value="Presentation">Presentation</option>
-                <option value="Product demonstration">
-                  Product demonstration
-                </option>
-                <option value="Service and support">Service and support</option>
-                <option value="Site inspection">Site inspection</option>
-                <option value="Site survey">Site survey</option>
-                <option value="Site visitation">Site visitation</option>
-                <option value="Tea break meeting">Tea break meeting</option>
-                <option value="Tender submission">Tender submission</option>
-                <option value="Tender submission with meeting">
-                  Tender submission with meeting
-                </option>
-                <option value="Training and commissioning">
-                  Training and commissioning
-                </option>
-              </select>
+              <View style={{ flex: 1, maxWidth: 400 }}>
+                <select
+                  value={formPurpose}
+                  onChange={(e) => setFormPurpose(e.target.value)}
+                  style={htmlSelectStyle}
+                >
+                  <option value="" disabled>Select a purpose...</option>
+                  <option value="Application support">Application support</option>
+                  <option value="Attending seminar/training">Attending seminar/training</option>
+                  <option value="Breakfast/Lunch/Dinner meeting">Breakfast/Lunch/Dinner meeting</option>
+                  <option value="Documents submission">Documents submission</option>
+                  <option value="Documents submission with meeting">Documents submission with meeting</option>
+                  <option value="Door knocking">Door knocking</option>
+                  <option value="Goods delivery">Goods delivery</option>
+                  <option value="Initial meeting and introduction">Initial meeting and introduction</option>
+                  <option value="Meeting and follow-up">Meeting and follow-up</option>
+                  <option value="Presentation">Presentation</option>
+                  <option value="Product demonstration">Product demonstration</option>
+                  <option value="Service and support">Service and support</option>
+                  <option value="Site inspection">Site inspection</option>
+                  <option value="Site survey">Site survey</option>
+                  <option value="Site visitation">Site visitation</option>
+                  <option value="Tea break meeting">Tea break meeting</option>
+                  <option value="Tender submission">Tender submission</option>
+                  <option value="Tender submission with meeting">Tender submission with meeting</option>
+                  <option value="Training and commissioning">Training and commissioning</option>
+                </select>
+              </View>
             </View>
             <View
               style={[
@@ -496,16 +491,10 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Comapany/Site:</Text>
-              <input
-                type="text"
+              <TextInput
                 value={formCompany}
-                onChange={(e) => setFormCompany(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
+                onChangeText={setFormCompany}
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="Company/Site"
               />
             </View>
@@ -516,16 +505,10 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Name:</Text>
-              <input
-                type="text"
+              <TextInput
                 value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
+                onChangeText={setFormName}
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="Name"
               />
             </View>
@@ -536,18 +519,10 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Contact:</Text>
-              <input
-                type="text"
+              <TextInput
                 value={formContactNumber}
-                onChange={(e) =>
-                  setFormContactNumber(e.target.value.replace(/[^0-9]/g, ""))
-                }
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
+                onChangeText={(text) => setFormContactNumber(text.replace(/[^0-9]/g, ""))}
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="Contact Number"
               />
             </View>
@@ -558,17 +533,14 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Date:</Text>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-              />
+              <View style={{ flex: 1, maxWidth: 400 }}>
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  style={htmlInputStyle}
+                />
+              </View>
             </View>
             <View
               style={[
@@ -577,17 +549,14 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>From Time:</Text>
-              <input
-                type="time"
-                value={formFromTime} // e.g., "14:30"
-                onChange={(e) => setFormFromTime(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-              />
+              <View style={{ flex: 1, maxWidth: 400 }}>
+                <input
+                  type="time"
+                  value={formFromTime}
+                  onChange={(e) => setFormFromTime(e.target.value)}
+                  style={htmlInputStyle}
+                />
+              </View>
             </View>
             <View
               style={[
@@ -596,17 +565,14 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>To Time:</Text>
-              <input
-                type="time"
-                value={formToTime}
-                onChange={(e) => setFormToTime(e.target.value)}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-              />
+              <View style={{ flex: 1, maxWidth: 400 }}>
+                <input
+                  type="time"
+                  value={formToTime}
+                  onChange={(e) => setFormToTime(e.target.value)}
+                  style={htmlInputStyle}
+                />
+              </View>
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Duration:</Text>
@@ -619,21 +585,11 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Parking:</Text>
-              <input
-                type="number"
+              <TextInput
                 value={parseFloat(formParking).toFixed(2)}
-                onChange={(e) =>
-                  setFormParking(
-                    Math.max(0, parseFloat(e.target.value || "0")).toFixed(2),
-                  )
-                }
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-                step="0.01"
+                onChangeText={(text) => setFormParking(Math.max(0, parseFloat(text || "0")).toFixed(2))}
+                keyboardType="numeric"
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="0.00"
               />
             </View>
@@ -644,21 +600,11 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Toll:</Text>
-              <input
-                type="number"
+              <TextInput
                 value={parseFloat(formToll).toFixed(2)}
-                onChange={(e) =>
-                  setFormToll(
-                    Math.max(0, parseFloat(e.target.value || "0")).toFixed(2),
-                  )
-                }
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-                step="0.01"
+                onChangeText={(text) => setFormToll(Math.max(0, parseFloat(text || "0")).toFixed(2))}
+                keyboardType="numeric"
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="0.00"
               />
             </View>
@@ -669,18 +615,12 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Trip Report:</Text>
-              <textarea
+              <TextInput
                 value={formTripReport}
-                onChange={(e) => setFormTripReport(e.target.value)}
+                onChangeText={setFormTripReport}
                 maxLength={2000}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                  minHeight: 80,
-                  fontFamily: "inherit",
-                }}
+                multiline
+                style={[styles.webTextInput, { flex: 1, maxWidth: 400, minHeight: 80 }]}
                 placeholder="Trip Report"
               />
             </View>
@@ -688,21 +628,16 @@ export default function SubmitExpenseWebScreen() {
               style={[styles.inputRow, { marginTop: 10, alignItems: "center" }]}
             >
               <Text style={styles.fieldLabel}>Business Card:</Text>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    setBusinessCardFile(e.target.files[0]);
-                  }
-                }}
-                style={{
-                  ...webStyles.input,
-                  flex: 1,
-                  maxWidth: 400,
-                  marginBottom: 0,
-                }}
-              />
+              <View style={{ flex: 1, maxWidth: 400 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) setBusinessCardFile(e.target.files[0]);
+                  }}
+                  style={htmlInputStyle}
+                />
+              </View>
             </View>
             <View
               style={[
@@ -742,26 +677,47 @@ export default function SubmitExpenseWebScreen() {
               <Text style={styles.buttonText}>Submit Expense</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.mileageUpdateContainer}>
+            <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>Mileage Rate</Text>
+            <select
+              value={formMileageRate}
+              onChange={(e) => setFormMileageRate(parseFloat(e.target.value))}
+              style={htmlSelectStyle}
+            >
+              <option value={0.6}>0.6</option>
+              <option value={0.8}>0.8</option>
+              <option value={1.0}>1.0</option>
+            </select>
+            <TouchableOpacity
+              onPress={updateMileageRate}
+              style={[styles.button, { marginTop: 10 }]}
+            >
+              <Text style={styles.buttonText}>Update Mileage</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
+        
       </View>
     </View>
   );
 }
 
-const webStyles = {
-  input: {
-    padding: "8px 12px",
-    border: "1px solid #ccc",
-    width: "100%",
-    boxSizing: "border-box" as const,
-    marginBottom: "8px",
-    fontSize: "14px",
-  },
+// Fallback styles for HTML elements that don't have direct RN equivalents (like date pickers)
+const htmlInputStyle = {
+  padding: "8px 12px",
+  border: "1px solid #ccc",
+  width: "100%",
+  boxSizing: "border-box" as const,
+  fontSize: "14px",
 };
+
+const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
+
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: "row" },
   mapWrapper: { width: "30%", height: "100%" },
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: { paddingBottom: 40, flexDirection: "row" },
+  webTextInput: { padding: 10, borderWidth: 1, borderColor: '#ccc', fontSize: 14, backgroundColor: '#fff' },
   header: {
     position: "absolute",
     top: 10,
@@ -772,7 +728,8 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 8,
   },
-  formContainer: { paddingLeft: 20, paddingRight: 20, paddingBottom: 20, paddingTop: 5 },
+  formContainer: { paddingLeft: 20, paddingRight: 20, paddingBottom: 20, paddingTop: 5, flex: 1 },
+  mileageUpdateContainer: { padding: 20, width: 200, alignItems: 'flex-start' },
   formLabel: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
   button: { backgroundColor: "#2196F3", padding: 10, borderRadius: 5 },
   buttonText: { color: "white" },

@@ -4,6 +4,7 @@ import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Dropdown } from 'react-native-paper-dropdown';
+import * as FileSystem from 'expo-file-system';
 import {
   collection,
   deleteDoc,
@@ -67,6 +68,7 @@ export default function ExpensesScreen() {
   const [appliedEndDate, setAppliedEndDate] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
+  const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
   const [tempPoints, setTempPoints] = useState<(google.maps.LatLngLiteral | null)[]>([null, null]);
@@ -138,6 +140,18 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, [userId]);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "config", "settings"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.mileage_rate) {
+          setMileageRate(data.mileage_rate);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Load Google Maps script for Web Autocomplete
   useEffect(() => {
     if (Platform.OS !== "web" || !apiKey || (window as any).google) return;
@@ -167,7 +181,7 @@ export default function ExpensesScreen() {
         if (status === "OK" && result) {
           const distStr = result.routes[0].legs[0].distance?.text || "0";
           const distNum = parseFloat(distStr.replace(/[^0-9.]/g, ""));
-          const mileage = parseFloat((distNum * 0.8).toFixed(2));
+          const mileage = parseFloat((distNum * mileageRate).toFixed(2));
           const cost = parseFloat((mileage + parking + toll).toFixed(2));
           const polyline = result.routes[0].overview_polyline;
           const encodedPath = typeof polyline === "string" ? polyline : (polyline as any)?.points;
@@ -554,7 +568,7 @@ export default function ExpensesScreen() {
 
     if (Platform.OS === "web") {
       return (
-        <React.Fragment>
+        <React.Fragment key={item.id}>
           <tr
             style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
             onClick={() => setExpandedId(isExpanded ? null : item.id)}
@@ -1805,18 +1819,11 @@ export default function ExpensesScreen() {
                   >
                     Start Date
                   </Text>
-                  <input
-                    type="date"
+                <TextInput
+                  placeholder="YYYY-MM-DD"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px",
-                      borderRadius: "6px",
-                      border: "none",
-                      fontSize: "13px",
-                      outline: "none",
-                    }}
+                  onChangeText={setStartDate}
+                  style={styles.filterInput}
                   />
                 </View>
                 <View
@@ -1836,18 +1843,11 @@ export default function ExpensesScreen() {
                   >
                     End Date
                   </Text>
-                  <input
-                    type="date"
+                <TextInput
+                  placeholder="YYYY-MM-DD"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px",
-                      borderRadius: "6px",
-                      border: "none",
-                      fontSize: "13px",
-                      outline: "none",
-                    }}
+                  onChangeText={setEndDate}
+                  style={styles.filterInput}
                   />
                 </View>
                 <TouchableOpacity
@@ -1911,30 +1911,23 @@ export default function ExpensesScreen() {
       {Platform.OS === "web" ? (
         <ScrollView contentContainerStyle={styles.listContent}>
           {renderHeader()}
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              backgroundColor: "#fff",
-              borderRadius: "8px",
-              overflow: "hidden",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: "#f5f5f5", textAlign: "left" }}>
-                <th style={webTableStyles.th}>Date</th>
-                <th style={webTableStyles.th}>Time</th>
-                <th style={webTableStyles.th}>Purpose</th>
-                <th style={webTableStyles.th}>Company</th>
-                <th style={webTableStyles.th}>Name</th>
-                <th style={webTableStyles.th}>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExpenses.map((item) => renderItem({ item }))}
-            </tbody>
-          </table>
+          <div style={webTableStyles.container}>
+            <table style={webTableStyles.table}>
+              <thead>
+                <tr style={webTableStyles.headerRow}>
+                  <th style={{ ...webTableStyles.th, width: '10%' }}>Date</th>
+                  <th style={{ ...webTableStyles.th, width: '20%' }}>Time</th>
+                  <th style={{ ...webTableStyles.th, width: '20%' }}>Purpose</th>
+                  <th style={{ ...webTableStyles.th, width: '20%' }}>Company</th>
+                  <th style={{ ...webTableStyles.th, width: '20%' }}>Name</th>
+                  <th style={{ ...webTableStyles.th, width: '10%' }}>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.map((item) => renderItem({ item }))}
+              </tbody>
+            </table>
+          </div>
         </ScrollView>
       ) : (
         <FlatList
@@ -2155,6 +2148,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+  filterInput: {
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 6,
+    fontSize: 13,
+  },
   inlineInput: {
     backgroundColor: "#f9f9f9",
     borderWidth: 1,
@@ -2164,14 +2163,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 14,
   },
+  webTableContainer: { backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden' },
+  webTableHeader: { flexDirection: 'row', backgroundColor: '#f5f5f5', padding: 12, borderBottomWidth: 2, borderBottomColor: '#ddd' },
+  webTableHeaderCell: { fontWeight: 'bold', color: '#666', fontSize: 14 },
   exportButtonText: { color: "#2196F3", fontWeight: "bold", fontSize: 14 },
 });
 
 const webTableStyles = {
+  container: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    overflow: 'hidden' as const,
+    width: '100%',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse' as const,
+  },
+  headerRow: {
+    backgroundColor: '#f5f5f5',
+    textAlign: 'left' as const,
+  },
   th: {
     padding: "12px 15px",
     borderBottom: "2px solid #ddd",
     color: "#666",
+    fontSize: '14px',
+    fontWeight: 'bold' as const,
   },
   td: {
     padding: "12px 15px",

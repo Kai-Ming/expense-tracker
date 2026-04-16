@@ -8,6 +8,9 @@ import { View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import * as FileSystem from 'expo-file-system';
+import { db } from '../../firebaseConfig';
 import '../../firebaseConfig';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -30,6 +33,25 @@ export default function TabLayout() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsAuthenticated(true);
+        
+        // Fetch config from Firestore and store as JSON file
+        const syncConfig = async () => {
+          try {
+            const configDoc = await getDoc(doc(db, "config", "settings")); // Adjust doc ID as needed
+            if (configDoc.exists()) {
+              const configData = JSON.stringify(configDoc.data(), null, 2);
+              if (Platform.OS !== 'web') {
+                const fileUri = FileSystem.documentDirectory + 'config.json';
+                await FileSystem.writeAsStringAsync(fileUri, configData);
+              } else {
+                localStorage.setItem('app_config', configData);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to store config JSON:", err);
+          }
+        };
+        syncConfig();
       } else {
         setIsAuthenticated(false);
         router.replace('/login');

@@ -2,9 +2,9 @@ import MapDisplay from "@/components/MapDisplay";
 import { Text, View } from "@/components/Themed";
 import * as ImagePicker from "expo-image-picker";
 import { getAuth } from "firebase/auth";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -26,6 +26,19 @@ export default function SubmitExpenseScreen() {
   const [toll, setToll] = useState("0.00");
   const [businessCard, setBusinessCard] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mileageRate, setMileageRate] = useState<number>(0.8);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "config", "settings"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.mileage_rate) {
+          setMileageRate(data.mileage_rate);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const pickBusinessCard = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();

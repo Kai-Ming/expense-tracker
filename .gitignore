@@ -10,3 +10,5 @@ node_modules
 .vscode
 .expo
 dist
+.idea
+android/
