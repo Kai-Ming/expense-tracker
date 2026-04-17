@@ -107,9 +107,10 @@ const styles = StyleSheet.create({
     width: "80%",
     padding: 15,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#888",
     borderRadius: 8,
     marginBottom: 15,
+    color: "#000",
   },
   loginButton: {
     backgroundColor: "#2196F3",
