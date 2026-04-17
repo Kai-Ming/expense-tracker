@@ -1,61 +1,77 @@
-import React, { useState } from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { Link, useRouter } from 'expo-router';
-import { db } from '../firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { Text, View } from "@/components/Themed";
+import { Link, useRouter } from "expo-router";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  updateProfile,
+} from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import React, { useState } from "react";
+import { Alert, StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import { db } from "../firebaseConfig";
 
 export default function SignupPage() {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const router = useRouter();
 
   const handleSignup = async () => {
-    if (username.trim() === '' || email.trim() === '' || password.trim() === '' || confirmPassword.trim() === '') {
-      Alert.alert('Signup Error', 'Please fill in all fields.');
+    if (
+      username.trim() === "" ||
+      email.trim() === "" ||
+      password.trim() === "" ||
+      confirmPassword.trim() === ""
+    ) {
+      Alert.alert("Signup Error", "Please fill in all fields.");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Signup Error', 'Passwords do not match.');
+      Alert.alert("Signup Error", "Passwords do not match.");
       return;
     }
 
     try {
       const auth = getAuth();
-      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
       // Set the display name in Firebase Auth
-      await updateProfile(userCredential.user, { displayName: username.trim() });
+      await updateProfile(userCredential.user, {
+        displayName: username.trim(),
+      });
 
       // Store additional user data in Firestore
-      await addDoc(collection(db, "users"), {
+      await setDoc(doc(db, "users", userCredential.user.uid), {
         uid: userCredential.user.uid,
         username: username.trim(),
         email: email.trim(),
         createdAt: serverTimestamp(),
-        role: 1,
+        role: 1, // Regular user
       });
 
-      Alert.alert('Signup Success', `Account created for ${username}!`);
-      router.replace('/submit');
+      Alert.alert("Signup Success", `Account created for ${username}!`);
+      router.replace("/submit");
     } catch (error) {
       const err = error as any;
       console.error("Signup error:", err.code, err.message);
-      let errorMessage = 'An error occurred during signup.';
+      let errorMessage = "An error occurred during signup.";
 
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered.';
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'The password is too weak.';
-      } else if (err.code === 'auth/configuration-not-found') {
-        errorMessage = 'Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.';
+      if (err.code === "auth/email-already-in-use") {
+        errorMessage = "This email is already registered.";
+      } else if (err.code === "auth/weak-password") {
+        errorMessage = "The password is too weak.";
+      } else if (err.code === "auth/configuration-not-found") {
+        errorMessage =
+          "Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.";
       }
 
-      Alert.alert('Signup Failed', errorMessage);
+      Alert.alert("Signup Failed", errorMessage);
     }
   };
 
@@ -116,14 +132,29 @@ export default function SignupPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
+    backgroundColor: "#fff",
   },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 30 },
-  input: { width: '80%', padding: 15, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginBottom: 15 },
-  signupButton: { backgroundColor: '#2196F3', padding: 15, borderRadius: 8, width: '80%', alignItems: 'center', marginTop: 10 },
-  signupButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  title: { fontSize: 28, fontWeight: "bold", marginBottom: 30, color: "#000" },
+  input: {
+    width: "80%",
+    padding: 15,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  signupButton: {
+    backgroundColor: "#2196F3",
+    padding: 15,
+    borderRadius: 8,
+    width: "80%",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  signupButtonText: { color: "white", fontSize: 18, fontWeight: "bold" },
   link: { marginTop: 20 },
-  linkText: { color: '#2196F3', fontSize: 16 },
+  linkText: { color: "#2196F3", fontSize: 16 },
 });
