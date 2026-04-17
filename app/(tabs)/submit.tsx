@@ -1,8 +1,14 @@
-import MapDisplay from "@/components/MapDisplay";
 import { Text, View } from "@/components/Themed";
+import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { getAuth } from "firebase/auth";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+} from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
@@ -16,17 +22,62 @@ import {
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseScreen() {
+  const [fromAddress, setFromAddress] = useState("");
+  const [toAddress, setToAddress] = useState("");
+  const [distance, setDistance] = useState("0");
   const [purpose, setPurpose] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [company, setCompany] = useState("");
   const [name, setName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
-  const [tripSummary, setTripSummary] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [fromTime, setFromTime] = useState("");
+  const [toTime, setToTime] = useState("");
   const [parking, setParking] = useState("0.00");
   const [toll, setToll] = useState("0.00");
+  const [tripReport, setTripReport] = useState("");
   const [businessCard, setBusinessCard] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mileageRate, setMileageRate] = useState<number>(0.8);
+
+  const purposeList = [
+    { label: "Application support", value: "Application support" },
+    {
+      label: "Attending seminar/training",
+      value: "Attending seminar/training",
+    },
+    {
+      label: "Breakfast/Lunch/Dinner meeting",
+      value: "Breakfast/Lunch/Dinner meeting",
+    },
+    { label: "Documents submission", value: "Documents submission" },
+    {
+      label: "Documents submission with meeting",
+      value: "Documents submission with meeting",
+    },
+    { label: "Door knocking", value: "Door knocking" },
+    { label: "Goods delivery", value: "Goods delivery" },
+    {
+      label: "Initial meeting and introduction",
+      value: "Initial meeting and introduction",
+    },
+    { label: "Meeting and follow-up", value: "Meeting and follow-up" },
+    { label: "Presentation", value: "Presentation" },
+    { label: "Product demonstration", value: "Product demonstration" },
+    { label: "Service and support", value: "Service and support" },
+    { label: "Site inspection", value: "Site inspection" },
+    { label: "Site survey", value: "Site survey" },
+    { label: "Site visitation", value: "Site visitation" },
+    { label: "Tea break meeting", value: "Tea break meeting" },
+    { label: "Tender submission", value: "Tender submission" },
+    {
+      label: "Tender submission with meeting",
+      value: "Tender submission with meeting",
+    },
+    {
+      label: "Training and commissioning",
+      value: "Training and commissioning",
+    },
+  ];
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "config", "settings"), (docSnap) => {
@@ -78,6 +129,22 @@ export default function SubmitExpenseScreen() {
     }
 
     setLoading(true);
+
+    const distNum = parseFloat(distance) || 0;
+    const mileage = distNum * mileageRate;
+    const parkingVal = parseFloat(parking) || 0;
+    const tollVal = parseFloat(toll) || 0;
+    const totalCost = mileage + parkingVal + tollVal;
+
+    let duration = "0h 0m";
+    if (fromTime && toTime) {
+      const [h1, m1] = fromTime.split(":").map(Number);
+      const [h2, m2] = toTime.split(":").map(Number);
+      let diff = h2 * 60 + m2 - (h1 * 60 + m1);
+      if (diff < 0) diff += 1440;
+      duration = `${Math.floor(diff / 60)}h ${diff % 60}m`;
+    }
+
     try {
       let businessCardUrl = "";
       if (businessCard) {
@@ -92,30 +159,40 @@ export default function SubmitExpenseScreen() {
         user_id: user.uid,
         date,
         purpose,
+        from_address: fromAddress,
+        to_address: toAddress,
         company,
         name,
         contact_number: contactNumber,
-        trip_summary: tripSummary,
-        parking: parseFloat(parking) || 0,
-        toll: parseFloat(toll) || 0,
+        from_time: fromTime,
+        to_time: toTime,
+        duration: duration,
+        distance: distNum,
+        tripReport: tripReport,
+        parking: parkingVal,
+        toll: tollVal,
+        mileage: mileage,
+        cost: totalCost,
         business_card_url: businessCardUrl,
         approval_status: 0,
         createdAt: serverTimestamp(),
-        distance: 0,
-        from_address: "",
-        to_address: "",
-        cost: 0,
+        type: 1,
       });
 
       Alert.alert("Success", "Expense entry submitted for approval.");
+      setFromAddress("");
+      setToAddress("");
+      setDistance("0");
       setPurpose("");
-      setDate(new Date().toISOString().split("T")[0]);
       setCompany("");
       setName("");
       setContactNumber("");
-      setTripSummary("");
+      setDate(new Date().toISOString().split("T")[0]);
+      setFromTime("");
+      setToTime("");
       setParking("0.00");
       setToll("0.00");
+      setTripReport("");
       setBusinessCard(null);
     } catch (error) {
       console.error("Submission error: ", error);
@@ -133,28 +210,50 @@ export default function SubmitExpenseScreen() {
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
     >
-      <View style={styles.mapWrapper}>
-        <MapDisplay />
-      </View>
+      <View style={styles.mapWrapper}></View>
 
       <View style={styles.formContainer}>
         <Text style={styles.title}>Submit Travel Expense</Text>
 
-        <Text style={styles.label}>Date *</Text>
+        <Text style={styles.label}>From Address *</Text>
         <TextInput
           style={styles.input}
-          placeholder="YYYY-MM-DD"
-          value={date}
-          onChangeText={setDate}
+          placeholder="From..."
+          value={fromAddress}
+          onChangeText={setFromAddress}
         />
 
-        <Text style={styles.label}>Purpose of Travel *</Text>
+        <Text style={styles.label}>To Address *</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. Client Meeting"
-          value={purpose}
-          onChangeText={setPurpose}
+          placeholder="To..."
+          value={toAddress}
+          onChangeText={setToAddress}
         />
+
+        <Text style={styles.label}>Distance (km) *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="0.00"
+          value={distance}
+          onChangeText={setDistance}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Purpose *</Text>
+        <Picker
+          selectedValue={purpose}
+          onValueChange={(itemValue) => setPurpose(itemValue)}
+          style={styles.picker}
+        >
+          {purposeList.map((option) => (
+            <Picker.Item
+              key={option.value}
+              label={option.label}
+              value={option.value}
+            />
+          ))}
+        </Picker>
 
         <Text style={styles.label}>Company / Site</Text>
         <TextInput
@@ -177,16 +276,45 @@ export default function SubmitExpenseScreen() {
           style={styles.input}
           placeholder="e.g. 012-3456789"
           value={contactNumber}
-          onChangeText={setContactNumber}
+          onChangeText={(text) => setContactNumber(text.replace(/[^0-9]/g, ""))}
           keyboardType="phone-pad"
         />
 
-        <Text style={styles.label}>Trip Summary</Text>
+        <Text style={styles.label}>Date *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD"
+          value={date}
+          onChangeText={setDate}
+        />
+
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>From Time</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="HH:MM"
+              value={fromTime}
+              onChangeText={setFromTime}
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>To Time</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="HH:MM"
+              value={toTime}
+              onChangeText={setToTime}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.label}>Trip Report</Text>
         <TextInput
           style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
           placeholder="Enter key outcomes or trip summary"
-          value={tripSummary}
-          onChangeText={setTripSummary}
+          value={tripReport}
+          onChangeText={setTripReport}
           multiline
           numberOfLines={10}
         />
@@ -297,4 +425,9 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#aaa" },
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  picker: {
+    height: 50,
+    width: "100%",
+    color: "#333",
+  },
 });

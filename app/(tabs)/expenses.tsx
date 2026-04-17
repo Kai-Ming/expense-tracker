@@ -1,10 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import MapDisplay from "@/components/MapDisplay"; // Check if this should be { MapDisplay }
+import MapDisplay from "@/components/MapDisplay";
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { Dropdown } from 'react-native-paper-dropdown';
-import * as FileSystem from 'expo-file-system';
 import {
   collection,
   deleteDoc,
@@ -16,20 +13,20 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
   Image,
   Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import { Dropdown } from "react-native-paper-dropdown";
 import { db, storage } from "../../firebaseConfig";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 interface Expense {
   id: string;
@@ -71,23 +68,34 @@ export default function ExpensesScreen() {
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
-  const [tempPoints, setTempPoints] = useState<(google.maps.LatLngLiteral | null)[]>([null, null]);
+  const [tempPoints, setTempPoints] = useState<(any | null)[]>([null, null]);
   const [tempPolyline, setTempPolyline] = useState<string | null>(null);
   const router = useRouter();
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const editInputARef = useRef<any>(null);
   const editInputBRef = useRef<any>(null);
-  const directionsService = useRef<google.maps.DirectionsService | null>(null);
 
   const purposeList = [
     { label: "Application support", value: "Application support" },
-    { label: "Attending seminar/training", value: "Attending seminar/training" },
-    { label: "Breakfast/Lunch/Dinner meeting", value: "Breakfast/Lunch/Dinner meeting" },
+    {
+      label: "Attending seminar/training",
+      value: "Attending seminar/training",
+    },
+    {
+      label: "Breakfast/Lunch/Dinner meeting",
+      value: "Breakfast/Lunch/Dinner meeting",
+    },
     { label: "Documents submission", value: "Documents submission" },
-    { label: "Documents submission with meeting", value: "Documents submission with meeting" },
+    {
+      label: "Documents submission with meeting",
+      value: "Documents submission with meeting",
+    },
     { label: "Door knocking", value: "Door knocking" },
     { label: "Goods delivery", value: "Goods delivery" },
-    { label: "Initial meeting and introduction", value: "Initial meeting and introduction" },
+    {
+      label: "Initial meeting and introduction",
+      value: "Initial meeting and introduction",
+    },
     { label: "Meeting and follow-up", value: "Meeting and follow-up" },
     { label: "Presentation", value: "Presentation" },
     { label: "Product demonstration", value: "Product demonstration" },
@@ -97,8 +105,14 @@ export default function ExpensesScreen() {
     { label: "Site visitation", value: "Site visitation" },
     { label: "Tea break meeting", value: "Tea break meeting" },
     { label: "Tender submission", value: "Tender submission" },
-    { label: "Tender submission with meeting", value: "Tender submission with meeting" },
-    { label: "Training and commissioning", value: "Training and commissioning" },
+    {
+      label: "Tender submission with meeting",
+      value: "Tender submission with meeting",
+    },
+    {
+      label: "Training and commissioning",
+      value: "Training and commissioning",
+    },
   ];
 
   useEffect(() => {
@@ -152,96 +166,6 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, []);
 
-  // Load Google Maps script for Web Autocomplete
-  useEffect(() => {
-    if (Platform.OS !== "web" || !apiKey || (window as any).google) return;
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
-    script.async = true;
-    script.onload = () => {
-      directionsService.current = new (window as any).google.maps.DirectionsService();
-    };
-    document.head.appendChild(script);
-  }, []);
-
-  const calculateRoute = (
-    p1: google.maps.LatLngLiteral,
-    p2: google.maps.LatLngLiteral,
-    parking: number,
-    toll: number
-  ) => {
-    if (!directionsService.current) return;
-    directionsService.current.route(
-      {
-        origin: p1,
-        destination: p2,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === "OK" && result) {
-          const distStr = result.routes[0].legs[0].distance?.text || "0";
-          const distNum = parseFloat(distStr.replace(/[^0-9.]/g, ""));
-          const mileage = parseFloat((distNum * mileageRate).toFixed(2));
-          const cost = parseFloat((mileage + parking + toll).toFixed(2));
-          const polyline = result.routes[0].overview_polyline;
-          const encodedPath = typeof polyline === "string" ? polyline : (polyline as any)?.points;
-
-          setTempPolyline(encodedPath || null);
-          setEditFormData((prev) => ({
-            ...prev,
-            distance: distNum,
-            mileage: mileage,
-            cost: cost,
-          }));
-        }
-      }
-    );
-  };
-
-  // Initialize Autocomplete when editing starts
-  useEffect(() => {
-    if (Platform.OS !== "web" || !editingId) return;
-
-    const timer = setTimeout(() => {
-      const setup = (ref: React.RefObject<any>, key: "from_address" | "to_address", index: number) => {
-        const el = ref.current;
-        if (!el || !(window as any).google) return;
-
-        // TextInput ref on web is the DOM node or contains the input
-        const inputElement = el instanceof HTMLInputElement ? el : el.querySelector?.("input");
-        if (!inputElement) return;
-
-        const autocomplete = new (window as any).google.maps.places.Autocomplete(inputElement, {
-          fields: ["formatted_address", "geometry"],
-        });
-
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          if (place.formatted_address && place.geometry?.location) {
-            const latLng = place.geometry.location.toJSON();
-            setTempPoints((prevPoints) => {
-              const nextPoints = [...prevPoints];
-              nextPoints[index] = latLng;
-              setEditFormData((prevForm) => {
-                const nextForm = { ...prevForm, [key]: place.formatted_address };
-                if (nextPoints[0] && nextPoints[1]) {
-                  calculateRoute(nextPoints[0], nextPoints[1], nextForm.parking || 0, nextForm.toll || 0);
-                }
-                return nextForm;
-              });
-              return nextPoints;
-            });
-          }
-        });
-      };
-
-      setup(editInputARef, "from_address", 0);
-      setup(editInputBRef, "to_address", 1);
-    }, 500); // Small delay to ensure the TextInput has rendered in the DOM
-
-    return () => clearTimeout(timer);
-  }, [editingId]);
-
   const filteredExpenses = expenses.filter((e) => {
     if (!e.date) return true;
     if (!appliedStartDate && !appliedEndDate) return true;
@@ -259,28 +183,17 @@ export default function ExpensesScreen() {
         await deleteDoc(doc(db, "expenses", id));
       } catch (error) {
         console.error("Error deleting expense:", error);
-        if (Platform.OS === "web") {
-          window.alert("Error deleting expense. Please try again.");
-        } else {
-          Alert.alert("Error", "Could not delete the expense.");
-        }
+        Alert.alert("Error", "Could not delete the expense.");
       }
     };
-
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this expense?")) {
-        performDelete();
-      }
-    } else {
-      Alert.alert(
-        "Delete Expense",
-        "Are you sure you want to delete this expense?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: performDelete },
-        ],
-      );
-    }
+    Alert.alert(
+      "Delete Expense",
+      "Are you sure you want to delete this expense?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: performDelete },
+      ],
+    );
   };
 
   const handleEdit = async (expense: Expense) => {
@@ -288,19 +201,6 @@ export default function ExpensesScreen() {
     setEditFormData({ ...expense });
     setTempPolyline(null);
     setTempPoints([null, null]);
-
-    // Try to pre-populate coordinates for existing addresses
-    if (Platform.OS === "web" && (window as any).google) {
-      const geocoder = new (window as any).google.maps.Geocoder();
-      const geocode = (addr: string) =>
-        new Promise<google.maps.LatLngLiteral | null>((res) => {
-          geocoder.geocode({ address: addr }, (results, status) => {
-            res(status === "OK" ? results?.[0]?.geometry?.location?.toJSON() || null : null);
-          });
-        });
-      const [p0, p1] = await Promise.all([geocode(expense.from_address), geocode(expense.to_address)]);
-      setTempPoints([p0, p1]);
-    }
   };
 
   const handleCancelEdit = () => {
@@ -373,185 +273,6 @@ export default function ExpensesScreen() {
     }
   };
 
-  const exportToHTML = () => {
-    if (Platform.OS !== "web") return;
-
-    const filteredExpenses = expenses.filter((e) => {
-      if (!e.date) return true;
-      const dateVal = e.date;
-      if (appliedStartDate && dateVal < appliedStartDate) return false;
-      if (appliedEndDate && dateVal > appliedEndDate) return false;
-      return true;
-    });
-
-    if (filteredExpenses.length === 0) {
-      alert("No expenses found for the selected date range.");
-      return;
-    }
-
-    // 1. Updated Headers Order
-    const headers = [
-      "Date",
-      "From",
-      "To",
-      "Purpose",
-      "Company/Site",
-      "Name",
-      "Contact No.",
-      "From Time",
-      "To Time",
-      "Duration",
-      "Parking (RM)",
-      "Toll (RM)",
-      "Mileage (RM)",
-      "Cost (RM)",
-    ];
-
-    // 2. Updated Row Mapping Order
-    const rows = filteredExpenses
-      .map(
-        (e) => `
-      <tr>
-        <td>${e.date}</td>
-        <td>${e.from_address}</td>
-        <td>${e.to_address}</td>
-        <td>${e.purpose}</td>
-        <td>${e.company || ""}</td>
-        <td>${e.name}</td>
-        <td>${e.contact_number || ""}</td>
-        <td>${e.from_time || ""}</td>
-        <td>${e.to_time || ""}</td>
-        <td>${e.duration || ""}</td>
-        <td>${e.parking.toFixed(2)}</td>
-        <td>${e.toll.toFixed(2)}</td>
-        <td>${e.mileage.toFixed(2)}</td>
-        <td>${e.cost.toFixed(2)}</td>
-      </tr>
-    `,
-      )
-      .join("");
-
-    const totalParking = filteredExpenses.reduce(
-      (sum, e) => sum + (e.parking || 0),
-      0,
-    );
-    const totalToll = filteredExpenses.reduce(
-      (sum, e) => sum + (e.toll || 0),
-      0,
-    );
-    const totalMileage = filteredExpenses.reduce(
-      (sum, e) => sum + (e.mileage || 0),
-      0,
-    );
-    const totalCost = filteredExpenses.reduce(
-      (sum, e) => sum + (e.cost || 0),
-      0,
-    );
-
-    const footerRow = `
-      <tr style="font-weight: bold; background-color: #eee;">
-        <td colspan="10" style="text-align: right;">TOTAL:</td>
-        <td>${totalParking.toFixed(2)}</td>
-        <td>${totalToll.toFixed(2)}</td>
-        <td>${totalMileage.toFixed(2)}</td>
-        <td>${totalCost.toFixed(2)}</td>
-      </tr>
-    `;
-
-    const detailsHtml = filteredExpenses
-      .map(
-        (e) => `
-      <div class="expense-detail">
-        <h3>${e.company}, ${e.name} - ${e.purpose} (${e.date || "N/A"} ${e.from_time}-${e.to_time})</h3>
-        <p><strong>From:</strong> ${e.from_address}</p>
-        <p><strong>To:</strong> ${e.to_address}</p>
-        <p><strong>Purpose:</strong> ${e.purpose}</p>
-        <p><strong>Company/Site:</strong> ${e.company}</p>
-        <p><strong>Name:</strong> ${e.name}</p>
-        <p><strong>Contact No.:</strong> ${e.contact_number}</p>
-        <p><strong>From Time:</strong> ${e.from_time}</p>
-        <p><strong>To Time:</strong> ${e.to_time}</p>
-        <p><strong>Duration:</strong> ${e.duration}</p>
-        <p><strong>Parking (RM):</strong> ${e.parking.toFixed(2)}</p>
-        <p><strong>Toll (RM):</strong> ${e.toll.toFixed(2)}</p>
-        <p><strong>Mileage (RM):</strong> ${e.mileage.toFixed(2)}</p>
-        <p><strong>Cost (RM):</strong> ${e.cost.toFixed(2)}</p>
-        <p><strong>Trip Report:</strong> ${e.trip_report}</p>
-        ${
-          e.route_image_url
-            ? `
-          <div class="image-container">
-            <strong>Route Map:</strong><br/>
-            <img src="${e.route_image_url}" alt="Route Map" />
-          </div>
-        `
-            : ""
-        }
-        ${
-          e.business_card_url
-            ? `
-          <div class="image-container">
-            <strong>Business Card:</strong><br/>
-            <img src="${e.business_card_url}" alt="Business Card" />
-          </div>
-        `
-            : "<p><em>No business card attached</em></p>"
-        }
-      </div>
-    `,
-      )
-      .join(
-        "<hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;' />",
-      );
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Expense Report</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; color: #333; }
-          table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 40px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #808080; color: white; text-transform: uppercase; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-          h2 { color: #808080; }
-          .expense-detail { margin-top: 20px; page-break-inside: avoid; }
-          .expense-detail h3 { border-bottom: 2px solid #808080; padding-bottom: 5px; color: #808080; }
-          .image-container img { max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px; }
-        </style>
-      </head>
-      <body>
-        <h2>Expense Report - Generated on ${new Date().toLocaleDateString()}</h2>
-        <table>
-          <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-          <tbody>
-            ${rows}
-            ${footerRow}
-          </tbody>
-        </table>
-
-        <h2 style="margin-top: 60px;">Detailed Records</h2>
-        ${detailsHtml}
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `expenses_report_${new Date().toISOString().split("T")[0]}.html`,
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const format12Hour = (timeStr?: string) => {
     if (!timeStr) return "";
     const [hours24, minutes] = timeStr.split(":").map(Number);
@@ -565,356 +286,6 @@ export default function ExpensesScreen() {
   const renderItem = ({ item }: { item: Expense }) => {
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
-
-    if (Platform.OS === "web") {
-      return (
-        <React.Fragment key={item.id}>
-          <tr
-            style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
-            onClick={() => setExpandedId(isExpanded ? null : item.id)}
-          >
-            <td style={webTableStyles.td}>{item.date || "N/A"}</td>
-            <td style={webTableStyles.td}>
-              {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
-              {item.duration})
-            </td>
-            <td style={webTableStyles.td}>{item.purpose}</td>
-            <td style={webTableStyles.td}>{item.company}</td>
-            <td style={webTableStyles.td}>{item.name}</td>
-            <td
-              style={{
-                ...webTableStyles.td,
-                fontWeight: "bold",
-                color: "#2196F3",
-              }}
-            >
-              RM {isEditing ? (editFormData.cost || 0).toFixed(2) : item.cost.toFixed(2)}
-            </td>
-          </tr>
-          {isExpanded && (
-            <tr>
-              <td
-                colSpan={6}
-                style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
-              >
-                <View style={styles.expandedContent}>
-                  <View style={styles.section}>
-                    <Text style={styles.descriptionLabel}>Route:</Text>
-                    {isEditing ? (
-                      <View style={{ backgroundColor: "transparent" }}>
-                        <TextInput
-                          ref={editInputARef}
-                          style={styles.inlineInput}
-                          value={editFormData.from_address}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              from_address: text,
-                            })
-                          }
-                          placeholder="From Address"
-                        />
-                        <TextInput
-                          ref={editInputBRef}
-                          style={styles.inlineInput}
-                          value={editFormData.to_address}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              to_address: text,
-                            })
-                          }
-                          placeholder="To Address"
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {item.from_address} → {item.to_address}
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Date:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.date}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, date: text })
-                        }
-                        placeholder="YYYY-MM-DD"
-                      />
-                    ) :
-                      <></>
-                    }
-
-                    <Text style={styles.descriptionLabel}>Purpose:</Text>
-                    {isEditing ? (
-                      <select
-                        value={editFormData.purpose}
-                        onChange={(e) =>
-                          setEditFormData({
-                            ...editFormData,
-                            purpose: e.target.value,
-                          })
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          backgroundColor: "#f9f9f9",
-                          fontSize: "14px",
-                          width: "100%",
-                          maxWidth: 400,
-                          marginBottom: 10,
-                          height: "auto",
-                        }}
-                      >
-                        <option value="" disabled>
-                          Select a purpose...
-                        </option>
-                        {purposeList.map((p) => (
-                          <option key={p.value} value={p.value}>{p.label}</option>
-                        ))}
-                      </select>
-                    ) :
-                      <></>
-                    }
-
-                    <Text style={styles.descriptionLabel}>Company:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.company}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, company: text })
-                        }
-                        placeholder="Company"
-                      />
-                    ) : 
-                      <></>
-                    }
-
-                    <Text style={styles.descriptionLabel}>Name:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.name}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, name: text })
-                        }
-                        placeholder="Name"
-                      />
-                    ) : 
-                      <></>
-                    }
-
-                    <Text style={styles.descriptionLabel}>
-                      Time and Duration:
-                    </Text>
-                    {isEditing ? (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          gap: 10,
-                          backgroundColor: "transparent",
-                        }}
-                      >
-                        <TextInput
-                          style={[styles.inlineInput, { flex: 1 }]}
-                          value={editFormData.from_time}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              from_time: text,
-                            })
-                          }
-                          placeholder="Start (e.g. 09:00)"
-                        />
-                        <TextInput
-                          style={[styles.inlineInput, { flex: 1 }]}
-                          value={editFormData.to_time}
-                          onChangeText={(text) =>
-                            setEditFormData({ ...editFormData, to_time: text })
-                          }
-                          placeholder="End (e.g. 17:00)"
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {format12Hour(item.from_time)} -{" "}
-                        {format12Hour(item.to_time)} ({item.duration})
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Parking:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { width: 100 }]}
-                        value={editFormData.parking?.toString()}
-                        onChangeText={(text) =>
-                          setEditFormData((prev) => {
-                            const parking = parseFloat(text) || 0;
-                            return {
-                              ...prev,
-                              parking,
-                              cost: (prev.mileage || 0) + parking + (prev.toll || 0),
-                            };
-                          })
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        RM {item.parking.toFixed(2)}
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Toll:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { width: 100 }]}
-                        value={editFormData.toll?.toString()}
-                        onChangeText={(text) =>
-                          setEditFormData((prev) => {
-                            const toll = parseFloat(text) || 0;
-                            return {
-                              ...prev,
-                              toll,
-                              cost: (prev.mileage || 0) + (prev.parking || 0) + toll,
-                            };
-                          })
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        RM {item.toll.toFixed(2)}
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Mileage:</Text>
-                    <Text style={styles.descriptionText}>
-                      RM {isEditing ? (editFormData.mileage || 0).toFixed(2) : item.mileage.toFixed(2)}
-                    </Text>
-
-                    <Text style={styles.descriptionLabel}>Trip Report:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { minHeight: 60 }]}
-                        value={editFormData.trip_report}
-                        onChangeText={(text) =>
-                          setEditFormData({
-                            ...editFormData,
-                            trip_report: text,
-                          })
-                        }
-                        multiline
-                        placeholder="Trip Summary"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {item.trip_report || "N/A"}
-                      </Text>
-                    )}
-
-                    {item.route_image_url && !isEditing && (
-                      <>
-                        <Text style={styles.descriptionLabel}>
-                          Route Map:
-                        </Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setSelectedImage(item.route_image_url || null);
-                          }}
-                        >
-                          <Image
-                            source={{ uri: item.route_image_url }}
-                            style={styles.businessCardImage}
-                            resizeMode="contain"
-                          />
-                        </TouchableOpacity>
-                      </>
-                    )}
-
-                    {item.business_card_url && (
-                      <>
-                        <Text style={styles.descriptionLabel}>
-                          Business Card:
-                        </Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setSelectedImage(item.business_card_url || null);
-                          }}
-                        >
-                          <Image
-                            source={{ uri: item.business_card_url }}
-                            style={styles.businessCardImage}
-                            resizeMode="contain"
-                          />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                  <View style={styles.actionButtonsContainer}>
-                    {isEditing ? (
-                      <>
-                        <TouchableOpacity
-                          style={styles.approveButton}
-                          onPress={() => handleSaveEdit()}
-                        >
-                          <Text style={styles.approveButtonText}>Save</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          onPress={() => handleCancelEdit()}
-                        >
-                          <Text style={styles.rejectButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      item.approval_status === 0 && (
-                        <TouchableOpacity
-                          style={styles.editButton}
-                          onPress={() => handleEdit(item)}
-                        >
-                          <Text style={styles.editButtonText}>Edit</Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(item.id)}
-                    >
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
-
-                    {role === 0 && item.approval_status === 0 && (
-                      <>
-                        <TouchableOpacity
-                          style={styles.approveButton}
-                          onPress={() => handleStatus(item.id, 1)}
-                        >
-                          <Text style={styles.approveButtonText}>Approve</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          onPress={() => handleStatus(item.id, 2)}
-                        >
-                          <Text style={styles.rejectButtonText}>Reject</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </td>
-            </tr>
-          )}
-        </React.Fragment>
-      );
-    }
-
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -1002,9 +373,7 @@ export default function ExpensesScreen() {
                   onTouchStart={(e) => e.stopPropagation()}
                 />
               ) : (
-                <Text style={styles.descriptionText}>
-                  {item.date || "N/A"}
-                </Text>
+                <Text style={styles.descriptionText}>{item.date || "N/A"}</Text>
               )}
 
               <Text style={styles.descriptionLabel}>Purpose:</Text>
@@ -1161,7 +530,8 @@ export default function ExpensesScreen() {
                         return {
                           ...prev,
                           toll,
-                          cost: (prev.mileage || 0) + (prev.parking || 0) + toll,
+                          cost:
+                            (prev.mileage || 0) + (prev.parking || 0) + toll,
                         };
                       })
                     }
@@ -1184,16 +554,17 @@ export default function ExpensesScreen() {
                       { width: 100, marginBottom: 0 },
                     ]}
                     value={editFormData.parking?.toString()}
-                  onChangeText={(text) =>
-                    setEditFormData((prev) => {
-                      const parking = parseFloat(text) || 0;
-                      return {
-                        ...prev,
-                        parking,
-                        cost: (prev.mileage || 0) + parking + (prev.toll || 0),
-                      };
-                    })
-                  }
+                    onChangeText={(text) =>
+                      setEditFormData((prev) => {
+                        const parking = parseFloat(text) || 0;
+                        return {
+                          ...prev,
+                          parking,
+                          cost:
+                            (prev.mileage || 0) + parking + (prev.toll || 0),
+                        };
+                      })
+                    }
                     keyboardType="numeric"
                     onStartShouldSetResponder={() => true}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -1749,198 +1120,35 @@ export default function ExpensesScreen() {
     );
   }; */
 
-  const renderHeader = () => (
-    <View
-      style={[
-        styles.reportSummaryCard,
-        { padding: isDashboardVisible ? 20 : 10 },
-      ]}
-    >
-      <TouchableOpacity
-        onPress={() => setIsDashboardVisible(!isDashboardVisible)}
-        style={{
-          alignSelf: "flex-end",
-          padding: 4,
-          marginBottom: isDashboardVisible ? 10 : 0,
-        }}
-      >
-        <Text style={{ color: "#fff", fontSize: 12, opacity: 0.8 }}>
-          {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
-        </Text>
-      </TouchableOpacity>
-      {isDashboardVisible && (
-        <>
-          {/* <Text style={styles.reportSummaryTitle}>
-            {role === 0 ? "Organization" : "My"} Expense Report
-          </Text> */}
-          {/* <View style={styles.reportSummaryRow}>
-            <View style={styles.reportSummaryItem}>
-              <Text style={styles.reportSummaryLabel}>Total Reimbursement</Text>
-              <Text style={styles.reportSummaryValue}>
-                RM {expenses.reduce((sum, e) => sum + e.cost, 0).toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.reportSummaryItem}>
-              <Text style={styles.reportSummaryLabel}>Total Distance</Text>
-              <Text style={styles.reportSummaryValue}>
-                {expenses.reduce((sum, e) => sum + e.distance, 0).toFixed(2)} km
-              </Text>
-            </View>
-          </View> */}
-          {Platform.OS === "web" && (
-            <View
-              style={{
-                backgroundColor: "transparent",
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 12,
-                  marginBottom: 16,
-                  backgroundColor: "transparent",
-                  alignItems: "flex-end",
-                }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    marginRight: 12,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: 11,
-                      marginBottom: 4,
-                      fontWeight: "600",
-                    }}
-                  >
-                    Start Date
-                  </Text>
-                <TextInput
-                  placeholder="YYYY-MM-DD"
-                    value={startDate}
-                  onChangeText={setStartDate}
-                  style={styles.filterInput}
-                  />
-                </View>
-                <View
-                  style={{
-                    flex: 1,
-                    marginRight: 12,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: 11,
-                      marginBottom: 4,
-                      fontWeight: "600",
-                    }}
-                  >
-                    End Date
-                  </Text>
-                <TextInput
-                  placeholder="YYYY-MM-DD"
-                    value={endDate}
-                  onChangeText={setEndDate}
-                  style={styles.filterInput}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.15)",
-                    paddingVertical: 8,
-                    paddingHorizontal: 12,
-                    borderRadius: 6,
-                  }}
-                  onPress={() => {
-                    setAppliedStartDate(startDate);
-                    setAppliedEndDate(endDate);
-                  }}
-                >
-                  <Text
-                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
-                  >
-                    Apply
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.15)",
-                    paddingVertical: 8,
-                    paddingHorizontal: 12,
-                    borderRadius: 6,
-                  }}
-                  onPress={() => {
-                    setStartDate("");
-                    setEndDate("");
-                    setAppliedStartDate("");
-                    setAppliedEndDate("");
-                  }}
-                >
-                  <Text
-                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
-                  >
-                    Reset
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={styles.exportButton}
-                onPress={exportToHTML}
-              >
-                <Text style={styles.exportButtonText}>
-                  Generate HTML Report
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </>
-      )}
-    </View>
-  );
-
   return (
     <View style={styles.container}>
-      {Platform.OS !== "web" && <MapDisplay />}
-      {Platform.OS === "web" ? (
-        <ScrollView contentContainerStyle={styles.listContent}>
-          {renderHeader()}
-          <div style={webTableStyles.container}>
-            <table style={webTableStyles.table}>
-              <thead>
-                <tr style={webTableStyles.headerRow}>
-                  <th style={{ ...webTableStyles.th, width: '10%' }}>Date</th>
-                  <th style={{ ...webTableStyles.th, width: '20%' }}>Time</th>
-                  <th style={{ ...webTableStyles.th, width: '20%' }}>Purpose</th>
-                  <th style={{ ...webTableStyles.th, width: '20%' }}>Company</th>
-                  <th style={{ ...webTableStyles.th, width: '20%' }}>Name</th>
-                  <th style={{ ...webTableStyles.th, width: '10%' }}>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredExpenses.map((item) => renderItem({ item }))}
-              </tbody>
-            </table>
-          </div>
-        </ScrollView>
-      ) : (
-        <FlatList
-          data={filteredExpenses}
-          renderItem={renderItem}
-          ListHeaderComponent={renderHeader}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No expenses submitted yet.</Text>
-          }
-        />
-      )}
+      <MapDisplay />
+      <FlatList
+        data={filteredExpenses}
+        renderItem={renderItem}
+        ListHeaderComponent={() => (
+          <View
+            style={[
+              styles.reportSummaryCard,
+              { padding: isDashboardVisible ? 20 : 10 },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => setIsDashboardVisible(!isDashboardVisible)}
+              style={{ alignSelf: "flex-end", padding: 4 }}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, opacity: 0.8 }}>
+                {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={styles.empty}>No expenses submitted yet.</Text>
+        }
+      />
       <Modal
         visible={!!selectedImage}
         transparent={true}
@@ -2149,7 +1357,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   filterInput: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 8,
     borderRadius: 6,
     fontSize: 13,
@@ -2163,34 +1371,44 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 14,
   },
-  webTableContainer: { backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden' },
-  webTableHeader: { flexDirection: 'row', backgroundColor: '#f5f5f5', padding: 12, borderBottomWidth: 2, borderBottomColor: '#ddd' },
-  webTableHeaderCell: { fontWeight: 'bold', color: '#666', fontSize: 14 },
+  webTableContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  webTableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#f5f5f5",
+    padding: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#ddd",
+  },
+  webTableHeaderCell: { fontWeight: "bold", color: "#666", fontSize: 14 },
   exportButtonText: { color: "#2196F3", fontWeight: "bold", fontSize: 14 },
 });
 
 const webTableStyles = {
   container: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    overflow: 'hidden' as const,
-    width: '100%',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    backgroundColor: "#fff",
+    borderRadius: "8px",
+    overflow: "hidden" as const,
+    width: "100%",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
   },
   table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
+    width: "100%",
+    borderCollapse: "collapse" as const,
   },
   headerRow: {
-    backgroundColor: '#f5f5f5',
-    textAlign: 'left' as const,
+    backgroundColor: "#f5f5f5",
+    textAlign: "left" as const,
   },
   th: {
     padding: "12px 15px",
     borderBottom: "2px solid #ddd",
     color: "#666",
-    fontSize: '14px',
-    fontWeight: 'bold' as const,
+    fontSize: "14px",
+    fontWeight: "bold" as const,
   },
   td: {
     padding: "12px 15px",
