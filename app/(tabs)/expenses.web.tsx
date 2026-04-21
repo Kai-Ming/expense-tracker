@@ -1,27 +1,28 @@
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    onSnapshot,
-    orderBy,
-    query,
-    updateDoc,
-    where,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 import { db, storage } from "../../firebaseConfig";
 
@@ -256,6 +257,36 @@ export default function ExpensesWebScreen() {
     );
   });
 
+  const handleDelete = async (id: string) => {
+    const performDelete = async () => {
+      try {
+        await deleteDoc(doc(db, "expenses", id));
+      } catch (error) {
+        console.error("Error deleting expense:", error);
+        if (Platform.OS === "web") {
+          window.alert("Error deleting expense. Please try again.");
+        } else {
+          Alert.alert("Error", "Could not delete the expense.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to delete this expense?")) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Delete Expense",
+        "Are you sure you want to delete this expense?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: performDelete },
+        ],
+      );
+    }
+  };
+
   const handleEdit = async (expense: Expense) => {
     setEditingId(expense.id);
     setEditFormData({ ...expense });
@@ -307,261 +338,1161 @@ export default function ExpensesWebScreen() {
     }
   };
 
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditFormData({});
+  };
+
+  const handleStatus = async (id: string, status: number) => {
+    try {
+      const docRef = doc(db, "expenses", id);
+      await updateDoc(docRef, { approval_status: status });
+    } catch (error) {
+      console.error("Error approving expense:", error);
+    }
+  };
+
   const exportToHTML = () => {
-    const filtered = expenses.filter(
-      (e) =>
-        (!appliedStartDate || e.date! >= appliedStartDate) &&
-        (!appliedEndDate || e.date! <= appliedEndDate),
-    );
-    if (filtered.length === 0) return alert("No expenses found.");
-    const rows = filtered
+    if (Platform.OS !== "web") return;
+
+    const filteredExpenses = expenses.filter((e) => {
+      if (!e.date) return true;
+      const dateVal = e.date;
+      if (appliedStartDate && dateVal < appliedStartDate) return false;
+      if (appliedEndDate && dateVal > appliedEndDate) return false;
+      return true;
+    });
+
+    if (filteredExpenses.length === 0) {
+      alert("No expenses found for the selected date range.");
+      return;
+    }
+
+    // 1. Updated Headers Order
+    const headers = [
+      "Date",
+      "From",
+      "To",
+      "Purpose",
+      "Company/Site",
+      "Name",
+      "Contact No.",
+      "From Time",
+      "To Time",
+      "Duration",
+      "Parking (RM)",
+      "Toll (RM)",
+      "Mileage (RM)",
+      "Cost (RM)",
+    ];
+
+    // 2. Updated Row Mapping Order
+    const rows = filteredExpenses
       .map(
-        (e) =>
-          `<tr><td>${e.date}</td><td>${e.from_address}</td><td>${e.to_address}</td><td>${e.purpose}</td><td>${e.company || ""}</td><td>${e.name}</td><td>${e.contact_number || ""}</td><td>${e.from_time || ""}</td><td>${e.to_time || ""}</td><td>${e.duration || ""}</td><td>${e.parking.toFixed(2)}</td><td>${e.toll.toFixed(2)}</td><td>${e.mileage.toFixed(2)}</td><td>${e.cost.toFixed(2)}</td></tr>`,
+        (e) => `
+      <tr>
+        <td>${e.date}</td>
+        <td>${e.from_address}</td>
+        <td>${e.to_address}</td>
+        <td>${e.purpose}</td>
+        <td>${e.company || ""}</td>
+        <td>${e.name}</td>
+        <td>${e.contact_number || ""}</td>
+        <td>${e.from_time || ""}</td>
+        <td>${e.to_time || ""}</td>
+        <td>${e.duration || ""}</td>
+        <td>${e.parking.toFixed(2)}</td>
+        <td>${e.toll.toFixed(2)}</td>
+        <td>${e.mileage.toFixed(2)}</td>
+        <td>${e.cost.toFixed(2)}</td>
+      </tr>
+    `,
       )
       .join("");
-    const totals = filtered.reduce(
-      (acc, e) => ({
-        p: acc.p + e.parking,
-        t: acc.t + e.toll,
-        m: acc.m + e.mileage,
-        c: acc.c + e.cost,
-      }),
-      { p: 0, t: 0, m: 0, c: 0 },
+
+    const totalParking = filteredExpenses.reduce(
+      (sum, e) => sum + (e.parking || 0),
+      0,
     );
-    const html = `<html><head><style>table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #ddd;padding:8px;}th{background:#808080;color:white;}</style></head><body><h2>Expense Report - ${new Date().toLocaleDateString()}</h2><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Purpose</th><th>Site</th><th>Name</th><th>Contact</th><th>Start</th><th>End</th><th>Duration</th><th>Parking</th><th>Toll</th><th>Mileage</th><th>Cost</th></tr></thead><tbody>${rows}<tr style="font-weight:bold;background:#eee;"><td colspan="10" style="text-align:right">TOTAL:</td><td>${totals.p.toFixed(2)}</td><td>${totals.t.toFixed(2)}</td><td>${totals.m.toFixed(2)}</td><td>${totals.c.toFixed(2)}</td></tr></tbody></table></body></html>`;
+    const totalToll = filteredExpenses.reduce(
+      (sum, e) => sum + (e.toll || 0),
+      0,
+    );
+    const totalMileage = filteredExpenses.reduce(
+      (sum, e) => sum + (e.mileage || 0),
+      0,
+    );
+    const totalCost = filteredExpenses.reduce(
+      (sum, e) => sum + (e.cost || 0),
+      0,
+    );
+
+    const footerRow = `
+      <tr style="font-weight: bold; background-color: #eee;">
+        <td colspan="10" style="text-align: right;">TOTAL:</td>
+        <td>${totalParking.toFixed(2)}</td>
+        <td>${totalToll.toFixed(2)}</td>
+        <td>${totalMileage.toFixed(2)}</td>
+        <td>${totalCost.toFixed(2)}</td>
+      </tr>
+    `;
+
+    const detailsHtml = filteredExpenses
+      .map(
+        (e) => `
+      <div class="expense-detail">
+        <h3>${e.company}, ${e.name} - ${e.purpose} (${e.date || "N/A"} ${e.from_time}-${e.to_time})</h3>
+        <p><strong>From:</strong> ${e.from_address}</p>
+        <p><strong>To:</strong> ${e.to_address}</p>
+        <p><strong>Purpose:</strong> ${e.purpose}</p>
+        <p><strong>Company/Site:</strong> ${e.company}</p>
+        <p><strong>Name:</strong> ${e.name}</p>
+        <p><strong>Contact No.:</strong> ${e.contact_number}</p>
+        <p><strong>From Time:</strong> ${e.from_time}</p>
+        <p><strong>To Time:</strong> ${e.to_time}</p>
+        <p><strong>Duration:</strong> ${e.duration}</p>
+        <p><strong>Parking (RM):</strong> ${e.parking.toFixed(2)}</p>
+        <p><strong>Toll (RM):</strong> ${e.toll.toFixed(2)}</p>
+        <p><strong>Mileage (RM):</strong> ${e.mileage.toFixed(2)}</p>
+        <p><strong>Cost (RM):</strong> ${e.cost.toFixed(2)}</p>
+        <p><strong>Trip Report:</strong> ${e.trip_report}</p>
+        ${
+          e.route_image_url
+            ? `
+          <div class="image-container">
+            <strong>Route Map:</strong><br/>
+            <img src="${e.route_image_url}" alt="Route Map" />
+          </div>
+        `
+            : ""
+        }
+        ${
+          e.business_card_url
+            ? `
+          <div class="image-container">
+            <strong>Business Card:</strong><br/>
+            <img src="${e.business_card_url}" alt="Business Card" />
+          </div>
+        `
+            : "<p><em>No business card attached</em></p>"
+        }
+      </div>
+    `,
+      )
+      .join(
+        "<hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;' />",
+      );
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Expense Report</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; color: #333; }
+          table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 40px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #808080; color: white; text-transform: uppercase; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+          h2 { color: #808080; }
+          .expense-detail { margin-top: 20px; page-break-inside: avoid; }
+          .expense-detail h3 { border-bottom: 2px solid #808080; padding-bottom: 5px; color: #808080; }
+          .image-container img { max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <h2>Expense Report - Generated on ${new Date().toLocaleDateString()}</h2>
+        <table>
+          <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows}
+            ${footerRow}
+          </tbody>
+        </table>
+
+        <h2 style="margin-top: 60px;">Detailed Records</h2>
+        ${detailsHtml}
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-    link.download = `expenses_${new Date().toISOString().split("T")[0]}.html`;
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `expenses_report_${new Date().toISOString().split("T")[0]}.html`,
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
-  const format12Hour = (t?: string) => {
-    if (!t) return "";
-    const [h, m] = t.split(":").map(Number);
-    return `${(h % 12 || 12).toString().padStart(2, "0")}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  const format12Hour = (timeStr?: string) => {
+    if (!timeStr) return "";
+    const [hours24, minutes] = timeStr.split(":").map(Number);
+    const period = hours24 >= 12 ? "PM" : "AM";
+    const hours12 = hours24 % 12 || 12;
+    const hoursStr = hours12.toString().padStart(2, "0");
+    const minutesStr = minutes.toString().padStart(2, "0");
+    return `${hoursStr}:${minutesStr} ${period}`;
   };
 
-  const renderItem = (item: Expense) => {
+  const renderItem = ({ item }: { item: Expense }) => {
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
-    return (
-      <React.Fragment key={item.id}>
-        <tr
-          style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
-          onClick={() => setExpandedId(isExpanded ? null : item.id)}
-        >
-          <td style={webTableStyles.td}>{item.date || "N/A"}</td>
-          <td style={webTableStyles.td}>
-            {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
-            {item.duration})
-          </td>
-          <td style={webTableStyles.td}>{item.purpose}</td>
-          <td style={webTableStyles.td}>{item.company}</td>
-          <td style={webTableStyles.td}>{item.name}</td>
-          <td
-            style={{
-              ...webTableStyles.td,
-              fontWeight: "bold",
-              color: "#2196F3",
-            }}
+
+    if (Platform.OS === "web") {
+      return (
+        <React.Fragment key={item.id}>
+          <tr
+            style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
+            onClick={() => setExpandedId(isExpanded ? null : item.id)}
           >
-            RM {(isEditing ? editFormData.cost || 0 : item.cost).toFixed(2)}
-          </td>
-        </tr>
-        {isExpanded && (
-          <tr>
+            <td style={webTableStyles.td}>{item.date || "N/A"}</td>
+            <td style={webTableStyles.td}>
+              {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
+              {item.duration})
+            </td>
+            <td style={webTableStyles.td}>{item.purpose}</td>
+            <td style={webTableStyles.td}>{item.company}</td>
+            <td style={webTableStyles.td}>{item.name}</td>
             <td
-              colSpan={6}
-              style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
+              style={{
+                ...webTableStyles.td,
+                fontWeight: "bold",
+                color: "#2196F3",
+              }}
             >
-              <View style={styles.expandedContent}>
-                <View style={styles.section}>
-                  <Text style={styles.descriptionLabel}>Route:</Text>
-                  {isEditing ? (
-                    <View style={{ backgroundColor: "transparent" }}>
-                      <TextInput
-                        ref={editInputARef}
-                        style={styles.inlineInput}
-                        value={editFormData.from_address}
-                        onChangeText={(t) =>
-                          setEditFormData({ ...editFormData, from_address: t })
-                        }
-                        placeholder="From"
-                      />
-                      <TextInput
-                        ref={editInputBRef}
-                        style={styles.inlineInput}
-                        value={editFormData.to_address}
-                        onChangeText={(t) =>
-                          setEditFormData({ ...editFormData, to_address: t })
-                        }
-                        placeholder="To"
-                      />
-                    </View>
-                  ) : (
-                    <Text style={styles.descriptionText}>
-                      {item.from_address} → {item.to_address}
-                    </Text>
-                  )}
-                  <Text style={styles.descriptionLabel}>Purpose:</Text>
-                  {isEditing ? (
-                    <select
-                      value={editFormData.purpose}
-                      onChange={(e) =>
-                        setEditFormData({
-                          ...editFormData,
-                          purpose: e.target.value,
-                        })
-                      }
-                      style={htmlSelectStyle}
-                    >
-                      <option value="" disabled>
-                        Select...
-                      </option>
-                      {purposeList.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Text style={styles.descriptionText}>{item.purpose}</Text>
-                  )}
-                  <Text style={styles.descriptionLabel}>Parking & Toll:</Text>
-                  {isEditing ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        gap: 10,
-                        backgroundColor: "transparent",
-                      }}
-                    >
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.parking?.toString()}
-                        onChangeText={(t) =>
-                          setEditFormData((p) => ({
-                            ...p,
-                            parking: parseFloat(t) || 0,
-                            cost:
-                              (p.mileage || 0) +
-                              (parseFloat(t) || 0) +
-                              (p.toll || 0),
-                          }))
-                        }
-                        keyboardType="numeric"
-                        placeholder="Parking"
-                      />
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.toll?.toString()}
-                        onChangeText={(t) =>
-                          setEditFormData((p) => ({
-                            ...p,
-                            toll: parseFloat(t) || 0,
-                            cost:
-                              (p.mileage || 0) +
-                              (p.parking || 0) +
-                              (parseFloat(t) || 0),
-                          }))
-                        }
-                        keyboardType="numeric"
-                        placeholder="Toll"
-                      />
-                    </View>
-                  ) : (
-                    <Text style={styles.descriptionText}>
-                      RM {item.parking.toFixed(2)} / RM {item.toll.toFixed(2)}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.actionButtonsContainer}>
-                  {isEditing ? (
-                    <>
-                      <TouchableOpacity
-                        style={styles.approveButton}
-                        onPress={handleSaveEdit}
-                      >
-                        <Text style={styles.approveButtonText}>Save</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.rejectButton}
-                        onPress={() => setEditingId(null)}
-                      >
-                        <Text style={styles.rejectButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    item.approval_status === 0 && (
-                      <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => handleEdit(item)}
-                      >
-                        <Text style={styles.editButtonText}>Edit</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={async () => {
-                      if (window.confirm("Delete?"))
-                        await deleteDoc(doc(db, "expenses", item.id));
-                    }}
-                  >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              RM{" "}
+              {isEditing
+                ? (editFormData.cost || 0).toFixed(2)
+                : item.cost.toFixed(2)}
             </td>
           </tr>
+          {isExpanded && (
+            <tr>
+              <td
+                colSpan={6}
+                style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
+              >
+                <View style={styles.expandedContent}>
+                  <View style={styles.section}>
+                    <Text style={styles.descriptionLabel}>Route:</Text>
+                    {isEditing ? (
+                      <View style={{ backgroundColor: "transparent" }}>
+                        <TextInput
+                          ref={editInputARef}
+                          style={styles.inlineInput}
+                          value={editFormData.from_address}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              from_address: text,
+                            })
+                          }
+                          placeholder="From Address"
+                        />
+                        <TextInput
+                          ref={editInputBRef}
+                          style={styles.inlineInput}
+                          value={editFormData.to_address}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              to_address: text,
+                            })
+                          }
+                          placeholder="To Address"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {item.from_address} → {item.to_address}
+                      </Text>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>Date:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.date}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, date: text })
+                        }
+                        placeholder="YYYY-MM-DD"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>{item.date}</Text>
+                    )}
+
+                    {isEditing ? (
+                      <Text style={styles.descriptionLabel}>Purpose:</Text>
+                    ) : (
+                      <></>
+                    )}
+                    {isEditing ? (
+                      <select
+                        value={editFormData.purpose}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            purpose: e.target.value,
+                          })
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          backgroundColor: "#f9f9f9",
+                          fontSize: "14px",
+                          width: "100%",
+                          maxWidth: 400,
+                          marginBottom: 10,
+                          height: "auto",
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select a purpose...
+                        </option>
+                        {purposeList.map((p) => (
+                          <option key={p.value} value={p.value}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <></>
+                    )}
+
+                    {isEditing ? (
+                      <Text style={styles.descriptionLabel}>Company:</Text>
+                    ) : (
+                      <></>
+                    )}
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.company}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, company: text })
+                        }
+                        placeholder="Company"
+                      />
+                    ) : (
+                      <></>
+                    )}
+
+                    {isEditing ? (
+                      <Text style={styles.descriptionLabel}>Name:</Text>
+                    ) : (
+                      <></>
+                    )}
+                    {isEditing ? (
+                      <TextInput
+                        style={styles.inlineInput}
+                        value={editFormData.name}
+                        onChangeText={(text) =>
+                          setEditFormData({ ...editFormData, name: text })
+                        }
+                        placeholder="Name"
+                      />
+                    ) : (
+                      <></>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>
+                      Time and Duration:
+                    </Text>
+                    {isEditing ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        <TextInput
+                          style={[styles.inlineInput, { flex: 1 }]}
+                          value={editFormData.from_time}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              from_time: text,
+                            })
+                          }
+                          placeholder="Start (e.g. 09:00)"
+                        />
+                        <TextInput
+                          style={[styles.inlineInput, { flex: 1 }]}
+                          value={editFormData.to_time}
+                          onChangeText={(text) =>
+                            setEditFormData({ ...editFormData, to_time: text })
+                          }
+                          placeholder="End (e.g. 17:00)"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {format12Hour(item.from_time)} -{" "}
+                        {format12Hour(item.to_time)} ({item.duration})
+                      </Text>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>Parking:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { width: 100 }]}
+                        value={editFormData.parking?.toString()}
+                        onChangeText={(text) =>
+                          setEditFormData((prev) => {
+                            const parking = parseFloat(text) || 0;
+                            return {
+                              ...prev,
+                              parking,
+                              cost:
+                                (prev.mileage || 0) +
+                                parking +
+                                (prev.toll || 0),
+                            };
+                          })
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        RM {item.parking.toFixed(2)}
+                      </Text>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>Toll:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { width: 100 }]}
+                        value={editFormData.toll?.toString()}
+                        onChangeText={(text) =>
+                          setEditFormData((prev) => {
+                            const toll = parseFloat(text) || 0;
+                            return {
+                              ...prev,
+                              toll,
+                              cost:
+                                (prev.mileage || 0) +
+                                (prev.parking || 0) +
+                                toll,
+                            };
+                          })
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        RM {item.toll.toFixed(2)}
+                      </Text>
+                    )}
+
+                    <Text style={styles.descriptionLabel}>Mileage:</Text>
+                    <Text style={styles.descriptionText}>
+                      RM{" "}
+                      {isEditing
+                        ? (editFormData.mileage || 0).toFixed(2)
+                        : item.mileage.toFixed(2)}
+                    </Text>
+
+                    <Text style={styles.descriptionLabel}>Trip Report:</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.inlineInput, { minHeight: 60 }]}
+                        value={editFormData.trip_report}
+                        onChangeText={(text) =>
+                          setEditFormData({
+                            ...editFormData,
+                            trip_report: text,
+                          })
+                        }
+                        multiline
+                        placeholder="Trip Summary"
+                      />
+                    ) : (
+                      <Text style={styles.descriptionText}>
+                        {item.trip_report || "N/A"}
+                      </Text>
+                    )}
+
+                    {item.route_image_url && !isEditing && (
+                      <>
+                        <Text style={styles.descriptionLabel}>Route Map:</Text>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage(item.route_image_url || null);
+                          }}
+                        >
+                          <Image
+                            source={{ uri: item.route_image_url }}
+                            style={styles.businessCardImage}
+                            resizeMode="contain"
+                          />
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {item.business_card_url && (
+                      <>
+                        <Text style={styles.descriptionLabel}>
+                          Business Card:
+                        </Text>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage(item.business_card_url || null);
+                          }}
+                        >
+                          <Image
+                            source={{ uri: item.business_card_url }}
+                            style={styles.businessCardImage}
+                            resizeMode="contain"
+                          />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                  <View style={styles.actionButtonsContainer}>
+                    {isEditing ? (
+                      <>
+                        <TouchableOpacity
+                          style={styles.approveButton}
+                          onPress={() => handleSaveEdit()}
+                        >
+                          <Text style={styles.approveButtonText}>Save</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.rejectButton}
+                          onPress={() => handleCancelEdit()}
+                        >
+                          <Text style={styles.rejectButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      item.approval_status === 0 && (
+                        <TouchableOpacity
+                          style={styles.editButton}
+                          onPress={() => handleEdit(item)}
+                        >
+                          <Text style={styles.editButtonText}>Edit</Text>
+                        </TouchableOpacity>
+                      )
+                    )}
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(item.id)}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+
+                    {role === 0 && item.approval_status === 0 && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.approveButton}
+                          onPress={() => handleStatus(item.id, 1)}
+                        >
+                          <Text style={styles.approveButtonText}>Approve</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.rejectButton}
+                          onPress={() => handleStatus(item.id, 2)}
+                        >
+                          <Text style={styles.rejectButtonText}>Reject</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </td>
+            </tr>
+          )}
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          if (isEditing) {
+            return;
+          }
+          setExpandedId(isExpanded ? null : item.id);
+        }}
+        style={styles.card}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.name} numberOfLines={1}>
+            {item.purpose}
+          </Text>
+          <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
+        </View>
+        <View style={styles.cardFooter}>
+          <Text style={styles.companyText} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.date}>{item.date || "N/A"}</Text>
+        </View>
+        <View style={[styles.cardFooter, { marginTop: 2 }]}>
+          <Text
+            style={[styles.companyText, { fontSize: 13 }]}
+            numberOfLines={1}
+          >
+            {item.company}
+          </Text>
+          {item.from_time && item.to_time && (
+            <Text style={[styles.date, { fontSize: 13 }]}>
+              {format12Hour(item.from_time)} - {format12Hour(item.to_time)}
+            </Text>
+          )}
+        </View>
+
+        {isExpanded && (
+          <View style={styles.expandedContent}>
+            <View style={styles.separator} />
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>Route:</Text>
+              {isEditing ? (
+                <View style={{ backgroundColor: "transparent" }}>
+                  <TextInput
+                    ref={editInputARef}
+                    style={styles.inlineInput}
+                    value={editFormData.from_address}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, from_address: text })
+                    }
+                    placeholder="From Address"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                  <TextInput
+                    ref={editInputBRef}
+                    style={styles.inlineInput}
+                    value={editFormData.to_address}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, to_address: text })
+                    }
+                    placeholder="To Address"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                </View>
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.from_address || "N/A"} → {item.to_address || "N/A"}
+                </Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Date:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.date}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, date: text })
+                  }
+                  placeholder="YYYY-MM-DD"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>{item.date || "N/A"}</Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Purpose:</Text>
+              {isEditing ? (
+                <Dropdown
+                  label={"Purpose"}
+                  mode={"outlined"}
+                  visible={showPurposeDropDown}
+                  showDropDown={() => setShowPurposeDropDown(true)}
+                  onDismiss={() => setShowPurposeDropDown(false)}
+                  value={editFormData.purpose}
+                  setValue={(val) =>
+                    setEditFormData({ ...editFormData, purpose: val })
+                  }
+                  list={purposeList}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>{item.purpose}</Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Time and Duration:</Text>
+              {isEditing ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <TextInput
+                    style={[styles.inlineInput, { flex: 1 }]}
+                    value={editFormData.from_time}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, from_time: text })
+                    }
+                    placeholder="Start (e.g. 09:00)"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                  <TextInput
+                    style={[styles.inlineInput, { flex: 1 }]}
+                    value={editFormData.to_time}
+                    onChangeText={(text) =>
+                      setEditFormData({ ...editFormData, to_time: text })
+                    }
+                    placeholder="End (e.g. 17:00)"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                </View>
+              ) : (
+                item.from_time &&
+                item.to_time && (
+                  <Text style={styles.descriptionText}>
+                    {format12Hour(item.from_time)} -{" "}
+                    {format12Hour(item.to_time)} ({item.duration})
+                  </Text>
+                )
+              )}
+
+              <Text style={styles.descriptionLabel}>Trip Summary:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.inlineInput, { minHeight: 60 }]}
+                  value={editFormData.trip_report}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, trip_report: text })
+                  }
+                  multiline
+                  placeholder="Trip Summary"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.trip_report || "N/A"}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>Company/Site:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.company}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, company: text })
+                  }
+                  placeholder="Company/Site"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.company || "N/A"}
+                </Text>
+              )}
+              <Text style={styles.descriptionLabel}>Name:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.name}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, name: text })
+                  }
+                  placeholder="Name"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>{item.name || "N/A"}</Text>
+              )}
+
+              <Text style={styles.descriptionLabel}>Contact Number:</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.contact_number}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, contact_number: text })
+                  }
+                  keyboardType="phone-pad"
+                  placeholder="Contact Number"
+                  onStartShouldSetResponder={() => true}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Text style={styles.descriptionText}>
+                  {item.contact_number || "N/A"}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Mileage:</Text>
+                <Text style={styles.detailValue}>
+                  RM {item.mileage.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Toll:</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={[
+                      styles.inlineInput,
+                      { width: 100, marginBottom: 0 },
+                    ]}
+                    value={editFormData.toll?.toString()}
+                    onChangeText={(text) =>
+                      setEditFormData((prev) => {
+                        const toll = parseFloat(text) || 0;
+                        return {
+                          ...prev,
+                          toll,
+                          cost:
+                            (prev.mileage || 0) + (prev.parking || 0) + toll,
+                        };
+                      })
+                    }
+                    keyboardType="numeric"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <Text style={styles.detailValue}>
+                    RM {item.toll.toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Parking:</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={[
+                      styles.inlineInput,
+                      { width: 100, marginBottom: 0 },
+                    ]}
+                    value={editFormData.parking?.toString()}
+                    onChangeText={(text) =>
+                      setEditFormData((prev) => {
+                        const parking = parseFloat(text) || 0;
+                        return {
+                          ...prev,
+                          parking,
+                          cost:
+                            (prev.mileage || 0) + parking + (prev.toll || 0),
+                        };
+                      })
+                    }
+                    keyboardType="numeric"
+                    onStartShouldSetResponder={() => true}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <Text style={styles.detailValue}>
+                    RM {item.parking.toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.detailRow,
+                  {
+                    marginTop: 4,
+                    borderTopWidth: 1,
+                    borderTopColor: "#eee",
+                    paddingTop: 4,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.detailLabel,
+                    { fontWeight: "bold", color: "#333" },
+                  ]}
+                >
+                  Total Cost:
+                </Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    { fontWeight: "bold", color: "#2196F3" },
+                  ]}
+                >
+                  RM{" "}
+                  {isEditing
+                    ? (
+                        (editFormData.mileage || 0) +
+                        (editFormData.parking || 0) +
+                        (editFormData.toll || 0)
+                      ).toFixed(2)
+                    : item.cost.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+
+            {item.route_image_url && !isEditing && (
+              <>
+                <Text style={styles.sectionHeader}>Route Map</Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(item.route_image_url || null);
+                  }}
+                >
+                  <Image
+                    source={{ uri: item.route_image_url }}
+                    style={styles.businessCardImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+
+            {item.business_card_url && (
+              <>
+                <Text style={styles.sectionHeader}>Business Card</Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(item.business_card_url || null);
+                  }}
+                >
+                  <Image
+                    source={{ uri: item.business_card_url }}
+                    style={styles.businessCardImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+
+            {item.approval_status === 0 && (
+              <View style={styles.actionButtonsContainer}>
+                {isEditing ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.approveButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleSaveEdit();
+                      }}
+                    >
+                      <Text style={styles.approveButtonText}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rejectButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleCancelEdit();
+                      }}
+                    >
+                      <Text style={styles.rejectButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleEdit(item);
+                    }}
+                  >
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDelete(item.id);
+                  }}
+                >
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {role === 0 && item.approval_status === 0 && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.approveButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleStatus(item.id, 1);
+                  }}
+                >
+                  <Text style={styles.approveButtonText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.rejectButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleStatus(item.id, 2);
+                  }}
+                >
+                  <Text style={styles.rejectButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         )}
-      </React.Fragment>
+      </TouchableOpacity>
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.listContent}>
-        <View style={styles.reportSummaryCard}>
-          <TouchableOpacity
-            onPress={() => setIsDashboardVisible(!isDashboardVisible)}
-            style={{ alignSelf: "flex-end", padding: 10 }}
-          >
-            <Text style={{ color: "#fff" }}>
-              {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
-            </Text>
-          </TouchableOpacity>
-          {isDashboardVisible && (
-            <View style={{ padding: 20, backgroundColor: "transparent" }}>
+  const renderHeader = () => (
+    <View
+      style={[
+        styles.reportSummaryCard,
+        { padding: isDashboardVisible ? 20 : 10 },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => setIsDashboardVisible(!isDashboardVisible)}
+        style={{
+          alignSelf: "flex-end",
+          padding: 4,
+          marginBottom: isDashboardVisible ? 10 : 0,
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 12, opacity: 0.8 }}>
+          {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
+        </Text>
+      </TouchableOpacity>
+      {isDashboardVisible && (
+        <>
+          {/* <Text style={styles.reportSummaryTitle}>
+            {role === 0 ? "Organization" : "My"} Expense Report
+          </Text> */}
+          {/* <View style={styles.reportSummaryRow}>
+            <View style={styles.reportSummaryItem}>
+              <Text style={styles.reportSummaryLabel}>Total Reimbursement</Text>
+              <Text style={styles.reportSummaryValue}>
+                RM {expenses.reduce((sum, e) => sum + e.cost, 0).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.reportSummaryItem}>
+              <Text style={styles.reportSummaryLabel}>Total Distance</Text>
+              <Text style={styles.reportSummaryValue}>
+                {expenses.reduce((sum, e) => sum + e.distance, 0).toFixed(2)} km
+              </Text>
+            </View>
+          </View> */}
+          {Platform.OS === "web" && (
+            <View
+              style={{
+                backgroundColor: "transparent",
+              }}
+            >
               <View
                 style={{
                   flexDirection: "row",
                   gap: 12,
                   marginBottom: 16,
                   backgroundColor: "transparent",
+                  alignItems: "flex-end",
                 }}
               >
-                <TextInput
-                  placeholder="Start: YYYY-MM-DD"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                  style={styles.filterInput}
-                />
-                <TextInput
-                  placeholder="End: YYYY-MM-DD"
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  style={styles.filterInput}
-                />
+                <View
+                  style={{
+                    flex: 1,
+                    marginRight: 12,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      marginBottom: 4,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Start Date
+                  </Text>
+                  <TextInput
+                    placeholder="YYYY-MM-DD"
+                    value={startDate}
+                    onChangeText={setStartDate}
+                    style={styles.filterInput}
+                  />
+                </View>
+                <View
+                  style={{
+                    flex: 1,
+                    marginRight: 12,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      marginBottom: 4,
+                      fontWeight: "600",
+                    }}
+                  >
+                    End Date
+                  </Text>
+                  <TextInput
+                    placeholder="YYYY-MM-DD"
+                    value={endDate}
+                    onChangeText={setEndDate}
+                    style={styles.filterInput}
+                  />
+                </View>
                 <TouchableOpacity
-                  style={styles.exportButton}
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                  }}
                   onPress={() => {
                     setAppliedStartDate(startDate);
                     setAppliedEndDate(endDate);
                   }}
                 >
-                  <Text>Apply</Text>
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
+                    Apply
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                  }}
+                  onPress={() => {
+                    setStartDate("");
+                    setEndDate("");
+                    setAppliedStartDate("");
+                    setAppliedEndDate("");
+                  }}
+                >
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
+                    Reset
+                  </Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
@@ -574,37 +1505,76 @@ export default function ExpensesWebScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </View>
-        <div style={webTableStyles.container}>
-          <table style={webTableStyles.table}>
-            <thead>
-              <tr style={webTableStyles.headerRow}>
-                <th style={webTableStyles.th}>Date</th>
-                <th style={webTableStyles.th}>Time</th>
-                <th style={webTableStyles.th}>Purpose</th>
-                <th style={webTableStyles.th}>Company</th>
-                <th style={webTableStyles.th}>Name</th>
-                <th style={webTableStyles.th}>Cost</th>
-              </tr>
-            </thead>
-            <tbody>{filteredExpenses.map(renderItem)}</tbody>
-          </table>
-        </div>
-      </ScrollView>
+        </>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {Platform.OS !== "web" && <MapDisplay />}
+      {Platform.OS === "web" ? (
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {renderHeader()}
+          <div style={webTableStyles.container}>
+            <table style={webTableStyles.table}>
+              <thead>
+                <tr style={webTableStyles.headerRow}>
+                  <th style={{ ...webTableStyles.th, width: "10%" }}>Date</th>
+                  <th style={{ ...webTableStyles.th, width: "20%" }}>Time</th>
+                  <th style={{ ...webTableStyles.th, width: "20%" }}>
+                    Purpose
+                  </th>
+                  <th style={{ ...webTableStyles.th, width: "20%" }}>
+                    Company
+                  </th>
+                  <th style={{ ...webTableStyles.th, width: "20%" }}>Name</th>
+                  <th style={{ ...webTableStyles.th, width: "10%" }}>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.map((item) => renderItem({ item }))}
+              </tbody>
+            </table>
+          </div>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredExpenses}
+          renderItem={renderItem}
+          ListHeaderComponent={renderHeader}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No expenses submitted yet.</Text>
+          }
+        />
+      )}
       <Modal
         visible={!!selectedImage}
-        transparent
+        transparent={true}
         onRequestClose={() => setSelectedImage(null)}
+        animationType="fade"
       >
         <Pressable
           style={styles.modalOverlay}
           onPress={() => setSelectedImage(null)}
         >
-          <Image
-            source={{ uri: selectedImage! }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
+          <View style={styles.modalContent}>
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setSelectedImage(null)}
+            >
+              <Text style={styles.closeButtonText}>Close Preview</Text>
+            </TouchableOpacity>
+          </View>
         </Pressable>
       </Modal>
     </View>
@@ -626,7 +1596,40 @@ const htmlSelectStyle = {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { padding: 16 },
+  card: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+    backgroundColor: "transparent",
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    flex: 1,
+    marginRight: 8,
+  },
+  cost: { fontSize: 16, fontWeight: "bold", color: "#2196F3" },
   expandedContent: { marginTop: 12, backgroundColor: "transparent" },
+  separator: { height: 1, backgroundColor: "#eee", marginBottom: 12 },
   descriptionLabel: {
     fontSize: 12,
     color: "#999",
@@ -634,7 +1637,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   descriptionText: { fontSize: 14, color: "#444", marginBottom: 4 },
+  date: { fontSize: 14, color: "#999" },
+  companyText: { fontSize: 14, color: "#666", flex: 1, marginRight: 8 },
   section: { marginBottom: 16 },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#2196F3",
+    textTransform: "uppercase",
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+    backgroundColor: "transparent",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)",
@@ -664,6 +1684,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteButtonText: { color: "#fff", fontWeight: "bold" },
+  detailLabel: { fontSize: 14, color: "#777" },
+  detailValue: { fontSize: 14, color: "#333" },
+  empty: { textAlign: "center", marginTop: 50, color: "#999" },
+  modalContent: {
+    width: "90%",
+    height: "80%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#2196F3",
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+  },
+  closeButtonText: { color: "white", fontWeight: "bold" },
+  buttonContainer: {
+    flexDirection: "row",
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 12,
+    backgroundColor: "transparent",
+    maxWidth: 250,
+  },
   approveButton: {
     backgroundColor: "#4CAF50",
     padding: 12,
@@ -706,6 +1753,13 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 8,
     fontSize: 14,
+  },
+  businessCardImage: {
+    width: "100%",
+    height: 200,
+    marginTop: 4,
+    borderRadius: 4,
+    backgroundColor: "#f9f9f9",
   },
 });
 
