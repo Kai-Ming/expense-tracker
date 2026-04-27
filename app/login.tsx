@@ -22,6 +22,7 @@ export default function LoginPage() {
       Alert.alert("Login Error", "Please enter email and password.");
       return;
     }
+    console.log("logging in");
 
     setIsLoading(true);
     try {

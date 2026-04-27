@@ -1,9 +1,22 @@
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Button, ScrollView, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseWebScreen() {
@@ -44,6 +57,7 @@ export default function SubmitExpenseWebScreen() {
   const [formTripReport, setFormTripReport] = useState<string>("");
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string>("");
   const [showMap, setShowMap] = useState<boolean>(true);
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
@@ -53,28 +67,32 @@ export default function SubmitExpenseWebScreen() {
       setFormMileageRate(mileageRate);
     }
   }, [mileageRate]);
-  
+
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
 
     // If configId is undefined, don't run the listener
     if (!configId) {
-      console.error("Firebase Config ID is missing from environment variables.");
+      console.error(
+        "Firebase Config ID is missing from environment variables.",
+      );
       return;
     }
 
-    const unsubscribe = onSnapshot(doc(db, "config", "7HTZfcBtebPsm0zlZB3c"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+    const unsubscribe = onSnapshot(
+      doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
 
-        if (data.mileage_rate) {
-          setMileageRate(data.mileage_rate);
+          if (data.mileage_rate) {
+            setMileageRate(data.mileage_rate);
+          }
+        } else {
+          console.error("Config document not found.");
         }
-      }
-      else {
-        console.error("Config document not found.");
-      }
-    });
+      },
+    );
     return () => unsubscribe();
   }, []);
 
@@ -109,13 +127,11 @@ export default function SubmitExpenseWebScreen() {
       });
       geocoder.current = new google.maps.Geocoder();
 
-      const setupAutocomplete = (
-        inputContainer: any,
-        index: number,
-      ) => {
+      const setupAutocomplete = (inputContainer: any, index: number) => {
         if (!inputContainer) return;
         // RN-Web TextInput renders a wrapper; find the actual input element
-        const inputEl = inputContainer.querySelector?.('input') || inputContainer;
+        const inputEl =
+          inputContainer.querySelector?.("input") || inputContainer;
         if (!inputEl) return;
 
         const autocomplete = new google.maps.places.Autocomplete(inputEl, {
@@ -138,8 +154,21 @@ export default function SubmitExpenseWebScreen() {
     };
 
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUserId(user?.uid || null);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUsername(
+            userDoc.data().name ||
+              userDoc.data().username ||
+              user.displayName ||
+              "User",
+          );
+        }
+      } else {
+        setUserId(null);
+      }
     });
     loadScript();
     return () => unsubscribe();
@@ -245,13 +274,14 @@ export default function SubmitExpenseWebScreen() {
           setDistance(routeDistance || null);
 
           const polyline = result.routes[0].overview_polyline;
-          const encodedPath = typeof polyline === "string" ? polyline : (polyline as any)?.points;
+          const encodedPath =
+            typeof polyline === "string" ? polyline : (polyline as any)?.points;
           setRoutePolyline(encodedPath || null);
         }
       },
     );
   };
-  
+
   const getDistance = () => {
     if (!distance) return 0.0;
     return parseFloat(distance.replace(/[^0-9.]/g, ""));
@@ -260,10 +290,9 @@ export default function SubmitExpenseWebScreen() {
   // Robust calculation that handles distance strings (removing commas and units)
   const calculateMileage = useCallback(() => {
     console.log(getDistance());
-    console.log(mileageRate)
+    console.log(mileageRate);
     return (getDistance() * mileageRate).toFixed(2);
   }, [mileageRate, getDistance]);
-
 
   const calculateCost = () => {
     const travelCost = getDistance() * mileageRate;
@@ -335,6 +364,7 @@ export default function SubmitExpenseWebScreen() {
 
       const docRef = await addDoc(collection(db, "expenses"), {
         user_id: userId,
+        user_name: username,
         date: formDate,
         purpose: formPurpose,
         from_address: fromAddress,
@@ -367,8 +397,6 @@ export default function SubmitExpenseWebScreen() {
       setFromAddress("");
       setToAddress("");
       setBusinessCardFile(null);
-      console.log(docRef.id);
-      console.log(docRef);
       alert("Expense submitted successfully!");
     } catch (e) {
       if (e && typeof e === "object" && "code" in e) {
@@ -391,7 +419,7 @@ export default function SubmitExpenseWebScreen() {
 
     try {
       await updateDoc(docRef, {
-        mileage_rate: formMileageRate
+        mileage_rate: formMileageRate,
       });
       console.log("Rate updated successfully!");
     } catch (error) {
@@ -401,25 +429,17 @@ export default function SubmitExpenseWebScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[
-        styles.mapWrapper,
-        { display: showMap ? 'flex' : 'none' }
-      ]}>
-        <View 
-          ref={mapRef} 
-          style={{ width: "100%", height: "100%" }} 
-        />
+      <View style={[styles.mapWrapper, { display: showMap ? "flex" : "none" }]}>
+        <View ref={mapRef} style={{ width: "100%", height: "100%" }} />
       </View>
 
       <View style={styles.detailsContainer}>
-        <TouchableOpacity 
-          onPress={() => setShowMap(!showMap)} 
+        <TouchableOpacity
+          onPress={() => setShowMap(!showMap)}
           style={styles.arrowButton}
           activeOpacity={0.6}
         >
-          <Text style={styles.arrowText}>
-            {showMap ? "❮" : "❯"}
-          </Text>
+          <Text style={styles.arrowText}>{showMap ? "❮" : "❯"}</Text>
         </TouchableOpacity>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
@@ -461,26 +481,50 @@ export default function SubmitExpenseWebScreen() {
                   onChange={(e) => setFormPurpose(e.target.value)}
                   style={htmlSelectStyle}
                 >
-                  <option value="" disabled>Select a purpose...</option>
-                  <option value="Application support">Application support</option>
-                  <option value="Attending seminar/training">Attending seminar/training</option>
-                  <option value="Breakfast/Lunch/Dinner meeting">Breakfast/Lunch/Dinner meeting</option>
-                  <option value="Documents submission">Documents submission</option>
-                  <option value="Documents submission with meeting">Documents submission with meeting</option>
+                  <option value="" disabled>
+                    Select a purpose...
+                  </option>
+                  <option value="Application support">
+                    Application support
+                  </option>
+                  <option value="Attending seminar/training">
+                    Attending seminar/training
+                  </option>
+                  <option value="Breakfast/Lunch/Dinner meeting">
+                    Breakfast/Lunch/Dinner meeting
+                  </option>
+                  <option value="Documents submission">
+                    Documents submission
+                  </option>
+                  <option value="Documents submission with meeting">
+                    Documents submission with meeting
+                  </option>
                   <option value="Door knocking">Door knocking</option>
                   <option value="Goods delivery">Goods delivery</option>
-                  <option value="Initial meeting and introduction">Initial meeting and introduction</option>
-                  <option value="Meeting and follow-up">Meeting and follow-up</option>
+                  <option value="Initial meeting and introduction">
+                    Initial meeting and introduction
+                  </option>
+                  <option value="Meeting and follow-up">
+                    Meeting and follow-up
+                  </option>
                   <option value="Presentation">Presentation</option>
-                  <option value="Product demonstration">Product demonstration</option>
-                  <option value="Service and support">Service and support</option>
+                  <option value="Product demonstration">
+                    Product demonstration
+                  </option>
+                  <option value="Service and support">
+                    Service and support
+                  </option>
                   <option value="Site inspection">Site inspection</option>
                   <option value="Site survey">Site survey</option>
                   <option value="Site visitation">Site visitation</option>
                   <option value="Tea break meeting">Tea break meeting</option>
                   <option value="Tender submission">Tender submission</option>
-                  <option value="Tender submission with meeting">Tender submission with meeting</option>
-                  <option value="Training and commissioning">Training and commissioning</option>
+                  <option value="Tender submission with meeting">
+                    Tender submission with meeting
+                  </option>
+                  <option value="Training and commissioning">
+                    Training and commissioning
+                  </option>
                 </select>
               </View>
             </View>
@@ -521,7 +565,9 @@ export default function SubmitExpenseWebScreen() {
               <Text style={styles.fieldLabel}>Contact:</Text>
               <TextInput
                 value={formContactNumber}
-                onChangeText={(text) => setFormContactNumber(text.replace(/[^0-9]/g, ""))}
+                onChangeText={(text) =>
+                  setFormContactNumber(text.replace(/[^0-9]/g, ""))
+                }
                 style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="Contact Number"
               />
@@ -587,7 +633,11 @@ export default function SubmitExpenseWebScreen() {
               <Text style={styles.fieldLabel}>Parking:</Text>
               <TextInput
                 value={parseFloat(formParking).toFixed(2)}
-                onChangeText={(text) => setFormParking(Math.max(0, parseFloat(text || "0")).toFixed(2))}
+                onChangeText={(text) =>
+                  setFormParking(
+                    Math.max(0, parseFloat(text || "0")).toFixed(2),
+                  )
+                }
                 keyboardType="numeric"
                 style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="0.00"
@@ -602,7 +652,9 @@ export default function SubmitExpenseWebScreen() {
               <Text style={styles.fieldLabel}>Toll:</Text>
               <TextInput
                 value={parseFloat(formToll).toFixed(2)}
-                onChangeText={(text) => setFormToll(Math.max(0, parseFloat(text || "0")).toFixed(2))}
+                onChangeText={(text) =>
+                  setFormToll(Math.max(0, parseFloat(text || "0")).toFixed(2))
+                }
                 keyboardType="numeric"
                 style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
                 placeholder="0.00"
@@ -620,7 +672,10 @@ export default function SubmitExpenseWebScreen() {
                 onChangeText={setFormTripReport}
                 maxLength={2000}
                 multiline
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400, minHeight: 80 }]}
+                style={[
+                  styles.webTextInput,
+                  { flex: 1, maxWidth: 400, minHeight: 80 },
+                ]}
                 placeholder="Trip Report"
               />
             </View>
@@ -633,7 +688,8 @@ export default function SubmitExpenseWebScreen() {
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) setBusinessCardFile(e.target.files[0]);
+                    if (e.target.files && e.target.files[0])
+                      setBusinessCardFile(e.target.files[0]);
                   }}
                   style={htmlInputStyle}
                 />
@@ -678,7 +734,9 @@ export default function SubmitExpenseWebScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.mileageUpdateContainer}>
-            <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>Mileage Rate</Text>
+            <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>
+              Mileage Rate
+            </Text>
             <select
               value={formMileageRate}
               onChange={(e) => setFormMileageRate(parseFloat(e.target.value))}
@@ -696,7 +754,6 @@ export default function SubmitExpenseWebScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-        
       </View>
     </View>
   );
@@ -717,7 +774,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: "row" },
   mapWrapper: { width: "30%", height: "100%" },
   scrollContent: { paddingBottom: 40, flexDirection: "row" },
-  webTextInput: { padding: 10, borderWidth: 1, borderColor: '#ccc', fontSize: 14, backgroundColor: '#fff' },
+  webTextInput: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    fontSize: 14,
+    backgroundColor: "#fff",
+  },
   header: {
     position: "absolute",
     top: 10,
@@ -728,8 +791,14 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 8,
   },
-  formContainer: { paddingLeft: 20, paddingRight: 20, paddingBottom: 20, paddingTop: 5, flex: 1 },
-  mileageUpdateContainer: { padding: 20, width: 200, alignItems: 'flex-start' },
+  formContainer: {
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingBottom: 20,
+    paddingTop: 5,
+    flex: 1,
+  },
+  mileageUpdateContainer: { padding: 20, width: 200, alignItems: "flex-start" },
   formLabel: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
   button: { backgroundColor: "#2196F3", padding: 10, borderRadius: 5 },
   buttonText: { color: "white" },
@@ -777,19 +846,19 @@ const styles = StyleSheet.create({
   toggleColumn: {
     marginLeft: 10,
     width: 10,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "flex-start",
   },
   arrowButton: {
     paddingTop: 5,
     paddingLeft: 20,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 0,
   },
   arrowText: {
     fontSize: 15,
-    color: '#666', // Subtle gray
-    fontWeight: 'bold',
-  }
+    color: "#666", // Subtle gray
+    fontWeight: "bold",
+  },
 });

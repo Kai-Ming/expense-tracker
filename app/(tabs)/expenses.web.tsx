@@ -45,6 +45,7 @@ interface Expense {
   mileage: number;
   cost: number;
   user_id: string;
+  user_name?: string;
   business_card_url?: string;
   route_image_url?: string;
   approval_status: number;
@@ -120,7 +121,9 @@ export default function ExpensesWebScreen() {
       if (user) {
         setUserId(user.uid);
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) setRole(userDoc.data().role);
+        if (userDoc.exists()) {
+          setRole(userDoc.data().role);
+        }
       } else {
         setUserId(null);
         setRole(null);
@@ -373,6 +376,7 @@ export default function ExpensesWebScreen() {
       "Date",
       "From",
       "To",
+      "Submitted By",
       "Purpose",
       "Company/Site",
       "Name",
@@ -394,6 +398,7 @@ export default function ExpensesWebScreen() {
         <td>${e.date}</td>
         <td>${e.from_address}</td>
         <td>${e.to_address}</td>
+        <td>${e.user_name || ""}</td>
         <td>${e.purpose}</td>
         <td>${e.company || ""}</td>
         <td>${e.name}</td>
@@ -429,7 +434,7 @@ export default function ExpensesWebScreen() {
 
     const footerRow = `
       <tr style="font-weight: bold; background-color: #eee;">
-        <td colspan="10" style="text-align: right;">TOTAL:</td>
+        <td colspan="11" style="text-align: right;">TOTAL:</td>
         <td>${totalParking.toFixed(2)}</td>
         <td>${totalToll.toFixed(2)}</td>
         <td>${totalMileage.toFixed(2)}</td>
@@ -560,6 +565,7 @@ export default function ExpensesWebScreen() {
             <td style={webTableStyles.td}>{item.purpose}</td>
             <td style={webTableStyles.td}>{item.company}</td>
             <td style={webTableStyles.td}>{item.name}</td>
+            <td style={webTableStyles.td}>{item.user_name || "N/A"}</td>
             <td
               style={{
                 ...webTableStyles.td,
@@ -576,10 +582,17 @@ export default function ExpensesWebScreen() {
           {isExpanded && (
             <tr>
               <td
-                colSpan={6}
+                colSpan={7}
                 style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
               >
                 <View style={styles.expandedContent}>
+                  <View style={styles.section}>
+                    <Text style={styles.descriptionLabel}>Submitted By:</Text>
+                    <Text style={styles.descriptionText}>
+                      {item.user_name || "N/A"}
+                    </Text>
+                  </View>
+
                   <View style={styles.section}>
                     <Text style={styles.descriptionLabel}>Route:</Text>
                     {isEditing ? (
@@ -1521,14 +1534,15 @@ export default function ExpensesWebScreen() {
               <thead>
                 <tr style={webTableStyles.headerRow}>
                   <th style={{ ...webTableStyles.th, width: "10%" }}>Date</th>
-                  <th style={{ ...webTableStyles.th, width: "20%" }}>Time</th>
-                  <th style={{ ...webTableStyles.th, width: "20%" }}>
+                  <th style={{ ...webTableStyles.th, width: "15%" }}>Time</th>
+                  <th style={{ ...webTableStyles.th, width: "15%" }}>
                     Purpose
                   </th>
                   <th style={{ ...webTableStyles.th, width: "20%" }}>
                     Company
                   </th>
                   <th style={{ ...webTableStyles.th, width: "20%" }}>Name</th>
+                  <th style={{ ...webTableStyles.th, width: "10%" }}>User</th>
                   <th style={{ ...webTableStyles.th, width: "10%" }}>Cost</th>
                 </tr>
               </thead>

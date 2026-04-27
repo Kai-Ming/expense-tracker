@@ -1,21 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs, useRouter } from 'expo-router';
-import { Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { Tabs, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  LogBox,
+  Platform,
+  Pressable,
+} from "react-native";
 
-import Colors from '@/constants/Colors';
-import { View } from '@/components/Themed';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import * as FileSystem from 'expo-file-system';
-import { db } from '../../firebaseConfig';
-import '../../firebaseConfig';
+import { View } from "@/components/Themed";
+import { useClientOnlyValue } from "@/components/useClientOnlyValue";
+import { useColorScheme } from "@/components/useColorScheme";
+import Colors from "@/constants/Colors";
+import * as FileSystem from "expo-file-system";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import "../../firebaseConfig";
+import { db } from "../../firebaseConfig";
+
+LogBox.ignoreLogs(["VirtualizedLists should never be nested"]);
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
+  name: React.ComponentProps<typeof FontAwesome>["name"];
   color: string;
 }) {
   return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
@@ -33,18 +41,18 @@ export default function TabLayout() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsAuthenticated(true);
-        
+
         // Fetch config from Firestore and store as JSON file
         const syncConfig = async () => {
           try {
             const configDoc = await getDoc(doc(db, "config", "settings")); // Adjust doc ID as needed
             if (configDoc.exists()) {
               const configData = JSON.stringify(configDoc.data(), null, 2);
-              if (Platform.OS !== 'web') {
-                const fileUri = FileSystem.documentDirectory + 'config.json';
+              if (Platform.OS !== "web") {
+                const fileUri = FileSystem.documentDirectory + "config.json";
                 await FileSystem.writeAsStringAsync(fileUri, configData);
               } else {
-                localStorage.setItem('app_config', configData);
+                localStorage.setItem("app_config", configData);
               }
             }
           } catch (err) {
@@ -54,7 +62,7 @@ export default function TabLayout() {
         syncConfig();
       } else {
         setIsAuthenticated(false);
-        router.replace('/login');
+        router.replace("/login");
       }
       setIsLoading(false);
     });
@@ -63,26 +71,25 @@ export default function TabLayout() {
   }, []);
 
   const handleSignOut = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to log out?')) {
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to log out?")) {
         signOut(getAuth());
       }
     } else {
-      Alert.alert(
-        'Log Out',
-        'Are you sure you want to log out?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'OK', onPress: () => signOut(getAuth()) },
-        ]
-      );
+      Alert.alert("Log Out", "Are you sure you want to log out?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "OK", onPress: () => signOut(getAuth()) },
+      ]);
     }
   };
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator
+          size="large"
+          color={Colors[colorScheme ?? "light"].tint}
+        />
       </View>
     );
   }
@@ -95,7 +102,7 @@ export default function TabLayout() {
     <Tabs
       initialRouteName="submit"
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: headerShown,
@@ -105,13 +112,14 @@ export default function TabLayout() {
               <FontAwesome
                 name="sign-out"
                 size={25}
-                color={Colors[colorScheme ?? 'light'].text}
+                color={Colors[colorScheme ?? "light"].text}
                 style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
               />
             )}
           </Pressable>
         ),
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -121,15 +129,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="submit"
         options={{
-          title: 'Submit Expense',
-          tabBarIcon: ({ color }) => <TabBarIcon name="mail-forward" color={color} />,
+          title: "Submit Expense",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="mail-forward" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
-          title: 'View Expenses',
-          tabBarIcon: ({ color }) => <TabBarIcon name="history" color={color} />,
+          title: "View Expenses",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="history" color={color} />
+          ),
           /* headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable>

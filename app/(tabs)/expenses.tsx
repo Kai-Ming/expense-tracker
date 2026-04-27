@@ -1,4 +1,4 @@
-import MapDisplay from "@/components/MapDisplay";
+/* import MapDisplay from "@/components/MapDisplay"; */
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -47,6 +47,7 @@ interface Expense {
   mileage: number;
   cost: number;
   user_id: string;
+  user_name?: string;
   business_card_url?: string;
   route_image_url?: string;
   approval_status: number;
@@ -326,6 +327,13 @@ export default function ExpensesScreen() {
         {isExpanded && (
           <View style={styles.expandedContent}>
             <View style={styles.separator} />
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>Submitted By:</Text>
+              <Text style={styles.descriptionText}>
+                {item.user_name || "N/A"}
+              </Text>
+            </View>
 
             <View style={styles.section}>
               <Text style={styles.descriptionLabel}>Route:</Text>
@@ -1122,7 +1130,7 @@ export default function ExpensesScreen() {
 
   return (
     <View style={styles.container}>
-      <MapDisplay />
+      {/* <MapDisplay /> */}
       <FlatList
         data={filteredExpenses}
         renderItem={renderItem}
@@ -1181,7 +1189,7 @@ export default function ExpensesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: "#fff" },
   listContent: { padding: 16 },
   card: {
     backgroundColor: "#fff",
