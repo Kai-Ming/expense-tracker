@@ -71,6 +71,11 @@ export default function ExpensesScreen() {
   const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
   const [tempPoints, setTempPoints] = useState<(any | null)[]>([null, null]);
   const [tempPolyline, setTempPolyline] = useState<string | null>(null);
+
+  // Filter state
+  const [filterStatus, setFilterStatus] = useState<number | null>(null);
+  const [filterSearch, setFilterSearch] = useState<string>("");
+
   const router = useRouter();
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const editInputARef = useRef<any>(null);
@@ -121,7 +126,6 @@ export default function ExpensesScreen() {
     return onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
-        // Fetch role from Firestore users collection
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           setRole(userDoc.data().role);
@@ -138,7 +142,6 @@ export default function ExpensesScreen() {
       setExpenses([]);
       return;
     }
-
     const q = query(
       collection(db, "expenses"),
       where("user_id", "==", userId),
@@ -151,7 +154,6 @@ export default function ExpensesScreen() {
       });
       setExpenses(expensesData);
     });
-
     return () => unsubscribe();
   }, [userId]);
 
@@ -167,13 +169,46 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, []);
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (!e.date) return true;
-    if (!appliedStartDate && !appliedEndDate) return true;
+  const handleApplyFilter = () => {
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
 
-    const dateVal = e.date;
-    if (appliedStartDate && dateVal < appliedStartDate) return false;
-    if (appliedEndDate && dateVal > appliedEndDate) return false;
+  const handleClearFilter = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+    setFilterStatus(null);
+    setFilterSearch("");
+  };
+
+  const activeFilterCount = [
+    appliedStartDate || appliedEndDate,
+    filterStatus !== null,
+    filterSearch.trim() !== "",
+  ].filter(Boolean).length;
+
+  const filteredExpenses = expenses.filter((e) => {
+    // Date range filter
+    if (appliedStartDate || appliedEndDate) {
+      if (!e.date) return false;
+      if (appliedStartDate && e.date < appliedStartDate) return false;
+      if (appliedEndDate && e.date > appliedEndDate) return false;
+    }
+
+    // Status filter
+    if (filterStatus !== null && e.approval_status !== filterStatus)
+      return false;
+
+    // Search filter: match name, company, or purpose
+    if (filterSearch.trim()) {
+      const q = filterSearch.toLowerCase();
+      const matchName = (e.name || "").toLowerCase().includes(q);
+      const matchCompany = (e.company || "").toLowerCase().includes(q);
+      const matchPurpose = (e.purpose || "").toLowerCase().includes(q);
+      if (!matchName && !matchCompany && !matchPurpose) return false;
+    }
 
     return true;
   });
@@ -215,7 +250,6 @@ export default function ExpensesScreen() {
       let routeImageUrl = editFormData.route_image_url || "";
       const docRef = doc(db, "expenses", editingId);
 
-      // Recalculate total cost
       const mileage = editFormData.mileage || 0;
       const parking = editFormData.parking || 0;
       const toll = editFormData.toll || 0;
@@ -233,7 +267,6 @@ export default function ExpensesScreen() {
         }
       }
 
-      // Update route image if polyline changed
       if (tempPolyline && tempPoints[0] && tempPoints[1]) {
         try {
           const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${tempPolyline}&markers=color:red|label:A|${tempPoints[0].lat},${tempPoints[0].lng}&markers=color:blue|label:B|${tempPoints[1].lat},${tempPoints[1].lng}&key=${apiKey}`;
@@ -284,16 +317,125 @@ export default function ExpensesScreen() {
     return `${hoursStr}:${minutesStr} ${period}`;
   };
 
+  const renderFilterPanel = () => (
+    <View style={filterStyles.panel}>
+      {/* Search */}
+      {/* <View style={filterStyles.row}>
+        <Text style={filterStyles.label}>🔍 Search</Text>
+        <TextInput
+          style={filterStyles.searchInput}
+          placeholder="Name, company, or purpose…"
+          placeholderTextColor="#aaa"
+          value={filterSearch}
+          onChangeText={setFilterSearch}
+        />
+      </View> */}
+
+      {/* Date Range */}
+      <View style={filterStyles.row}>
+        <Text style={filterStyles.label}>Date Range</Text>
+        <View style={filterStyles.dateRow}>
+          <TextInput
+            style={[filterStyles.dateInput, { marginRight: 8 }]}
+            placeholder="From (YYYY-MM-DD)"
+            placeholderTextColor="#aaa"
+            value={startDate}
+            onChangeText={setStartDate}
+          />
+          <TextInput
+            style={filterStyles.dateInput}
+            placeholder="To (YYYY-MM-DD)"
+            placeholderTextColor="#aaa"
+            value={endDate}
+            onChangeText={setEndDate}
+          />
+        </View>
+      </View>
+
+      {/* Status Filter */}
+      {/* <View style={filterStyles.row}>
+        <Text style={filterStyles.label}>📋 Status</Text>
+        <View style={filterStyles.statusRow}>
+          {[
+            { label: "All", value: null },
+            { label: "Pending", value: 0 },
+            { label: "Approved", value: 1 },
+            { label: "Rejected", value: 2 },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={String(opt.value)}
+              style={[
+                filterStyles.statusChip,
+                filterStatus === opt.value && filterStyles.statusChipActive,
+              ]}
+              onPress={() => setFilterStatus(opt.value)}
+            >
+              <Text
+                style={[
+                  filterStyles.statusChipText,
+                  filterStatus === opt.value &&
+                    filterStyles.statusChipTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View> */}
+
+      {/* Action Buttons */}
+      <View style={filterStyles.actionRow}>
+        <TouchableOpacity
+          style={filterStyles.applyBtn}
+          onPress={handleApplyFilter}
+        >
+          <Text style={filterStyles.applyBtnText}>Apply Filter</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={filterStyles.clearBtn}
+          onPress={handleClearFilter}
+        >
+          <Text style={filterStyles.clearBtnText}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Active filter summary */}
+      {(appliedStartDate ||
+        appliedEndDate ||
+        filterStatus !== null ||
+        filterSearch.trim()) && (
+        <View style={filterStyles.summaryRow}>
+          <Text style={filterStyles.summaryText}>
+            Showing {filteredExpenses.length} of {expenses.length} expenses
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
   const renderItem = ({ item }: { item: Expense }) => {
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
+
+    const statusColor =
+      item.approval_status === 1
+        ? "#4CAF50"
+        : item.approval_status === 2
+          ? "#F44336"
+          : "#FF9800";
+    const statusLabel =
+      item.approval_status === 1
+        ? "Approved"
+        : item.approval_status === 2
+          ? "Rejected"
+          : "Pending";
+
     return (
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
-          if (isEditing) {
-            return;
-          }
+          if (isEditing) return;
           setExpandedId(isExpanded ? null : item.id);
         }}
         style={styles.card}
@@ -302,7 +444,26 @@ export default function ExpensesScreen() {
           <Text style={styles.name} numberOfLines={1}>
             {item.purpose}
           </Text>
-          <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "transparent",
+              gap: 8,
+            }}
+          >
+            {/* <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusColor + "22" },
+              ]}
+            >
+              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                {statusLabel}
+              </Text>
+            </View> */}
+            <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
+          </View>
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.companyText} numberOfLines={1}>
@@ -730,407 +891,8 @@ export default function ExpensesScreen() {
     );
   };
 
-  /* const renderItem = ({ item }: { item: Expense }) => {
-    const isExpanded = expandedId === item.id;
-    const isEditing = editingId === item.id;
-    return (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => {
-          if (isEditing) {
-            return;
-          }
-          setExpandedId(isExpanded ? null : item.id);
-        }}
-        style={styles.card}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.purpose}
-          </Text>
-          <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
-        </View>
-        <View style={styles.cardFooter}>
-          <Text style={styles.companyText} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.date}>{item.date || "N/A"}</Text>
-        </View>
-        <View style={[styles.cardFooter, { marginTop: 2 }]}>
-          <Text
-            style={[styles.companyText, { fontSize: 13 }]}
-            numberOfLines={1}
-          >
-            {item.company}
-          </Text>
-          {item.from_time && item.to_time && (
-            <Text style={[styles.date, { fontSize: 13 }]}>
-              {format12Hour(item.from_time)} - {format12Hour(item.to_time)}
-            </Text>
-          )}
-        </View>
-
-        {isExpanded && (
-          <View style={styles.expandedContent}>
-            <View style={styles.separator} />
-
-            <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Route:</Text>
-              {isEditing ? (
-                <View style={{ backgroundColor: "transparent" }}>
-                  <TextInput
-                    style={styles.inlineInput}
-                    value={editFormData.from_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, from_address: text })
-                    }
-                    placeholder="From Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                  <TextInput
-                    style={styles.inlineInput}
-                    value={editFormData.to_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, to_address: text })
-                    }
-                    placeholder="To Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </View>
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.from_address || "N/A"} → {item.to_address || "N/A"}
-                </Text>
-              )}
-              <Text style={styles.descriptionText}>
-                {item.from_address || "N/A"} → {item.to_address || "N/A"}
-              </Text>
-
-              <Text style={styles.descriptionLabel}>Time and Duration:</Text>
-              {isEditing ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <TextInput
-                    style={[styles.inlineInput, { flex: 1 }]}
-                    value={editFormData.from_time}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, from_time: text })
-                    }
-                    placeholder="Start (e.g. 09:00)"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                  <TextInput
-                    style={[styles.inlineInput, { flex: 1 }]}
-                    value={editFormData.to_time}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, to_time: text })
-                    }
-                    placeholder="End (e.g. 17:00)"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </View>
-              ) : (
-                item.from_time &&
-                item.to_time && (
-                  <Text style={styles.descriptionText}>
-                    {format12Hour(item.from_time)} -{" "}
-                    {format12Hour(item.to_time)} ({item.duration})
-                  </Text>
-                )
-              )}
-              <Text style={styles.descriptionText}>
-                {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
-                {item.duration})
-              </Text>
-
-              <Text style={styles.descriptionLabel}>Trip Summary:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={[styles.inlineInput, { minHeight: 60 }]}
-                  value={editFormData.trip_report}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, trip_report: text })
-                  }
-                  multiline
-                  placeholder="Trip Summary"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.trip_report || "N/A"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Company/Site:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.company}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, company: text })
-                  }
-                  placeholder="Company/Site"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.company || "N/A"}
-                </Text>
-              )}
-              <Text style={styles.descriptionLabel}>Name:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.name}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, name: text })
-                  }
-                  placeholder="Name"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>{item.name || "N/A"}</Text>
-              )}
-
-              <Text style={styles.descriptionLabel}>Contact Number:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.contact_number}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, contact_number: text })
-                  }
-                  keyboardType="phone-pad"
-                  placeholder="Contact Number"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.contact_number || "N/A"}
-                </Text>
-              )}
-
-              {isEditing && (
-                <>
-                  <Text style={styles.descriptionLabel}>Company / Site:</Text>
-                  <TextInput
-                    style={styles.inlineInput}
-                    value={editFormData.company}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, company: text })
-                    }
-                    placeholder="Company"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Mileage:</Text>
-                <Text style={styles.detailValue}>
-                  RM {item.mileage.toFixed(2)}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Toll:</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={[
-                      styles.inlineInput,
-                      { width: 100, marginBottom: 0 },
-                    ]}
-                    value={editFormData.toll?.toString()}
-                    onChangeText={(text) =>
-                      setEditFormData({
-                        ...editFormData,
-                        toll: parseFloat(text) || 0,
-                      })
-                    }
-                    keyboardType="numeric"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <Text style={styles.detailValue}>
-                    RM {item.toll.toFixed(2)}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Parking:</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={[
-                      styles.inlineInput,
-                      { width: 100, marginBottom: 0 },
-                    ]}
-                    value={editFormData.parking?.toString()}
-                    onChangeText={(text) =>
-                      setEditFormData({
-                        ...editFormData,
-                        parking: parseFloat(text) || 0,
-                      })
-                    }
-                    keyboardType="numeric"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <Text style={styles.detailValue}>
-                    RM {item.parking.toFixed(2)}
-                  </Text>
-                )}
-              </View>
-              <View
-                style={[
-                  styles.detailRow,
-                  {
-                    marginTop: 4,
-                    borderTopWidth: 1,
-                    borderTopColor: "#eee",
-                    paddingTop: 4,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.detailLabel,
-                    { fontWeight: "bold", color: "#333" },
-                  ]}
-                >
-                  Total Cost:
-                </Text>
-                <Text
-                  style={[
-                    styles.detailValue,
-                    { fontWeight: "bold", color: "#2196F3" },
-                  ]}
-                >
-                  RM{" "}
-                  {isEditing
-                    ? (
-                        (editFormData.mileage || 0) +
-                        (editFormData.parking || 0) +
-                        (editFormData.toll || 0)
-                      ).toFixed(2)
-                    : item.cost.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            {item.business_card_url && (
-              <>
-                <Text style={styles.sectionHeader}>Business Card</Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedImage(item.business_card_url || null);
-                  }}
-                >
-                  <Image
-                    source={{ uri: item.business_card_url }}
-                    style={styles.businessCardImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-
-            {item.approval_status === 0 && (
-              <View style={styles.actionButtonsContainer}>
-                {isEditing ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.approveButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleSaveEdit();
-                      }}
-                    >
-                      <Text style={styles.approveButtonText}>Save</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.rejectButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleCancelEdit();
-                      }}
-                    >
-                      <Text style={styles.rejectButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleEdit(item);
-                    }}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleDelete(item.id);
-                  }}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {role === 0 && item.approval_status === 0 && (
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={styles.approveButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleStatus(item.id, 1);
-                  }}
-                >
-                  <Text style={styles.approveButtonText}>Approve</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.rejectButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleStatus(item.id, 2);
-                  }}
-                >
-                  <Text style={styles.rejectButtonText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  }; */
-
   return (
     <View style={styles.container}>
-      {/* <MapDisplay /> */}
       <FlatList
         data={filteredExpenses}
         renderItem={renderItem}
@@ -1138,23 +900,44 @@ export default function ExpensesScreen() {
           <View
             style={[
               styles.reportSummaryCard,
-              { padding: isDashboardVisible ? 20 : 10 },
+              { padding: isDashboardVisible ? 16 : 12 },
             ]}
           >
+            {/* Toggle bar */}
             <TouchableOpacity
               onPress={() => setIsDashboardVisible(!isDashboardVisible)}
-              style={{ alignSelf: "flex-end", padding: 4 }}
+              style={filterStyles.toggleBar}
             >
-              <Text style={{ color: "#fff", fontSize: 12, opacity: 0.8 }}>
-                {isDashboardVisible ? "✕ Hide Filter" : "View Filter"}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  backgroundColor: "transparent",
+                }}
+              >
+                {/* <Text style={filterStyles.toggleIcon}>⚙️</Text> */}
+                <Text style={filterStyles.toggleLabel}>Filter Expenses</Text>
+                {activeFilterCount > 0 && (
+                  <View style={filterStyles.badge}>
+                    <Text style={filterStyles.badgeText}>
+                      {activeFilterCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={filterStyles.toggleChevron}>
+                {isDashboardVisible ? "▲" : "▼"}
               </Text>
             </TouchableOpacity>
+
+            {isDashboardVisible && renderFilterPanel()}
           </View>
         )}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <Text style={styles.empty}>No expenses submitted yet.</Text>
+          <Text style={styles.empty}>No expenses found.</Text>
         }
       />
       <Modal
@@ -1188,8 +971,137 @@ export default function ExpensesScreen() {
   );
 }
 
+const filterStyles = StyleSheet.create({
+  toggleBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  toggleIcon: { fontSize: 16 },
+  toggleLabel: { fontSize: 14, fontWeight: "bold", color: "#fff" },
+  toggleChevron: { fontSize: 12, color: "#fff", opacity: 0.8 },
+  badge: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 20,
+    alignItems: "center",
+  },
+  badgeText: { fontSize: 11, fontWeight: "bold", color: "#2196F3" },
+  panel: {
+    marginTop: 14,
+    backgroundColor: "transparent",
+    gap: 12,
+  },
+  row: { backgroundColor: "transparent" },
+  label: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#e3f2fd",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  searchInput: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  dateRow: {
+    flexDirection: "row",
+    backgroundColor: "transparent",
+  },
+  dateInput: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "transparent",
+  },
+  statusChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  statusChipActive: {
+    backgroundColor: "#fff",
+    borderColor: "#fff",
+  },
+  statusChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
+  },
+  statusChipTextActive: {
+    color: "#2196F3",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: "transparent",
+    marginTop: 4,
+  },
+  applyBtn: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  applyBtnText: {
+    color: "#2196F3",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  clearBtn: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  clearBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  summaryRow: {
+    backgroundColor: "rgba(0,0,0,0.15)",
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  summaryText: {
+    color: "#e3f2fd",
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
   listContent: { padding: 16 },
   card: {
     backgroundColor: "#fff",
@@ -1224,6 +1136,15 @@ const styles = StyleSheet.create({
   },
   cost: { fontSize: 16, fontWeight: "bold", color: "#2196F3" },
   statusText: { fontSize: 14, fontWeight: "bold" },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+  },
   expandedContent: { marginTop: 12, backgroundColor: "transparent" },
   separator: { height: 1, backgroundColor: "#eee", marginBottom: 12 },
   descriptionLabel: { fontSize: 12, color: "#999", fontWeight: "bold" },
@@ -1394,32 +1315,3 @@ const styles = StyleSheet.create({
   webTableHeaderCell: { fontWeight: "bold", color: "#666", fontSize: 14 },
   exportButtonText: { color: "#2196F3", fontWeight: "bold", fontSize: 14 },
 });
-
-const webTableStyles = {
-  container: {
-    backgroundColor: "#fff",
-    borderRadius: "8px",
-    overflow: "hidden" as const,
-    width: "100%",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-  },
-  headerRow: {
-    backgroundColor: "#f5f5f5",
-    textAlign: "left" as const,
-  },
-  th: {
-    padding: "12px 15px",
-    borderBottom: "2px solid #ddd",
-    color: "#666",
-    fontSize: "14px",
-    fontWeight: "bold" as const,
-  },
-  td: {
-    padding: "12px 15px",
-    fontSize: "14px",
-  },
-};

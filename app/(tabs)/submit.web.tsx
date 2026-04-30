@@ -157,17 +157,29 @@ export default function SubmitExpenseWebScreen() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          setUsername(
-            userDoc.data().name ||
-              userDoc.data().username ||
-              user.displayName ||
-              "User",
-          );
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Log this to see what is actually coming back from Firebase
+            console.log("Fetched User Data:", userData);
+
+            const displayName =
+              userData.name || userData.username || user.displayName || "User";
+            setUsername(displayName);
+          } else {
+            // Fallback if no Firestore doc exists yet
+            setUsername(user.displayName || "User");
+          }
+        } catch (error) {
+          console.error("Error fetching user doc:", error);
+          setUsername("");
         }
       } else {
         setUserId(null);
+        setUsername(""); // Reset on logout
       }
     });
     loadScript();
@@ -376,7 +388,7 @@ export default function SubmitExpenseWebScreen() {
         to_time: formToTime,
         duration: calculateDuration(),
         distance: dist,
-        tripReport: formTripReport,
+        trip_report: formTripReport,
         business_card_url: businessCardUrl,
         route_image_url: routeImageUrl,
         parking: parseFloat(formParking),
@@ -416,7 +428,6 @@ export default function SubmitExpenseWebScreen() {
     }
 
     const docRef = doc(db, "config", configId);
-
     try {
       await updateDoc(docRef, {
         mileage_rate: formMileageRate,

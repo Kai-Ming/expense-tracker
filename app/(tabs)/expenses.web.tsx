@@ -557,6 +557,7 @@ export default function ExpensesWebScreen() {
             style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
             onClick={() => setExpandedId(isExpanded ? null : item.id)}
           >
+            <td style={webTableStyles.td}>{item.user_name || "N/A"}</td>
             <td style={webTableStyles.td}>{item.date || "N/A"}</td>
             <td style={webTableStyles.td}>
               {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
@@ -565,7 +566,6 @@ export default function ExpensesWebScreen() {
             <td style={webTableStyles.td}>{item.purpose}</td>
             <td style={webTableStyles.td}>{item.company}</td>
             <td style={webTableStyles.td}>{item.name}</td>
-            <td style={webTableStyles.td}>{item.user_name || "N/A"}</td>
             <td
               style={{
                 ...webTableStyles.td,
@@ -1525,7 +1525,6 @@ export default function ExpensesWebScreen() {
 
   return (
     <View style={styles.container}>
-      {Platform.OS !== "web" && <MapDisplay />}
       {Platform.OS === "web" ? (
         <ScrollView contentContainerStyle={styles.listContent}>
           {renderHeader()}
@@ -1533,6 +1532,9 @@ export default function ExpensesWebScreen() {
             <table style={webTableStyles.table}>
               <thead>
                 <tr style={webTableStyles.headerRow}>
+                  <th style={{ ...webTableStyles.th, width: "10%" }}>
+                    Submitted by
+                  </th>
                   <th style={{ ...webTableStyles.th, width: "10%" }}>Date</th>
                   <th style={{ ...webTableStyles.th, width: "15%" }}>Time</th>
                   <th style={{ ...webTableStyles.th, width: "15%" }}>
@@ -1542,7 +1544,6 @@ export default function ExpensesWebScreen() {
                     Company
                   </th>
                   <th style={{ ...webTableStyles.th, width: "20%" }}>Name</th>
-                  <th style={{ ...webTableStyles.th, width: "10%" }}>User</th>
                   <th style={{ ...webTableStyles.th, width: "10%" }}>Cost</th>
                 </tr>
               </thead>
