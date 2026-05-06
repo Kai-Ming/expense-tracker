@@ -1,14 +1,25 @@
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import * as Location from "expo-location";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, TouchableOpacity } from "react-native";
+import { Alert, StyleSheet, TextInput, TouchableOpacity } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import MapComponent from "../../components/MapComponent";
+import { db } from "../../firebaseConfig";
 
 export default function SubmitExpenseScreen() {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const mapRef = useRef<any>(null);
+  const remarkRef = useRef("");
+  const fromTimeRef = useRef<Date | null>(null);
 
   const [distance, setDistance] = useState<string | null>(null);
   const [routePolyline, setRoutePolyline] = useState<string | null>(null);
@@ -37,14 +48,55 @@ export default function SubmitExpenseScreen() {
     lng: number;
   } | null>(null);
 
+  const [formRemark, setFormRemark] = useState<string>("");
+  const [fromTime, setFromTime] = useState<Date | null>(null);
+  const [toTime, setToTime] = useState<Date | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string>("");
+
   // Ensure routeCoords starts as an empty array to store the breadcrumbs
   const [routeCoords, setRouteCoords] = useState<
     { latitude: number; longitude: number }[]
   >([]);
 
+  // Keep the Ref in sync with the state for formRemark
+  useEffect(() => {
+    remarkRef.current = formRemark;
+  }, [formRemark]);
+
+  // Keep the Ref in sync with the state for fromTime
+  useEffect(() => {
+    fromTimeRef.current = fromTime;
+  }, [fromTime]);
+
   const updateDestination = (latLng: { lat: number; lng: number }) => {
     setDestination(latLng);
     setPoints((prev) => [prev[0], latLng]);
+  };
+
+  const resetForm = () => {
+    // Clear Addresses
+    setFromAddress("");
+    setToAddress("");
+
+    // Clear Distance and Path
+    setDistance(null);
+    setTotalTraveledDistance(0);
+    setRouteCoords([]);
+    setLastCoords(null);
+
+    // Clear Remark
+    setFormRemark("");
+    remarkRef.current = ""; // Don't forget the ref!
+
+    // Clear Timestamps
+    setFromTime(null);
+    fromTimeRef.current = null;
+    setToTime(null);
+
+    // Reset Markers
+    setPoints([null, null]);
+    setDestination(null);
   };
 
   const fitMapToRoute = (
@@ -84,13 +136,57 @@ export default function SubmitExpenseScreen() {
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
 
-    (async () => {
-      // 1. Explicitly set loading to true so the UI knows to wait
-      setLocationLoading(true);
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
 
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Log this to see what is actually coming back from Firebase
+            console.log("Fetched User Data:", userData);
+
+            const displayName =
+              userData.name || userData.username || user.displayName || "User";
+            setUsername(displayName);
+          } else {
+            // Fallback if no Firestore doc exists yet
+            setUsername(user.displayName || "User");
+          }
+        } catch (error) {
+          console.error("Error fetching user doc:", error);
+          setUsername("");
+        }
+      } else {
+        setUserId(null);
+        setUsername(""); // Reset on logout
+      }
+    });
+
+    const getHaversineDistance = (
+      p1: { lat: number; lng: number },
+      p2: { lat: number; lng: number },
+    ) => {
+      const R = 6371;
+      const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+      const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((p1.lat * Math.PI) / 180) *
+          Math.cos((p2.lat * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    (async () => {
+      setLocationLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Location access is required.");
         setLocationLoading(false);
         return;
       }
@@ -103,35 +199,82 @@ export default function SubmitExpenseScreen() {
         async (loc) => {
           const newLat = loc.coords.latitude;
           const newLng = loc.coords.longitude;
-          const newPoint = { latitude: newLat, longitude: newLng };
+          const curr = { lat: newLat, lng: newLng };
 
-          // 2. Update coordinates
-          setCurrentLocation({ lat: newLat, lng: newLng });
-          setPoints((prev) => [{ lat: newLat, lng: newLng }, prev[1]]);
-          setRouteCoords((prev) => [...prev, newPoint]);
+          // Update UI States
+          setCurrentLocation(curr);
+          setPoints((prev) => [curr, prev[1]]);
+          setRouteCoords((prev) => [
+            ...prev,
+            { latitude: newLat, longitude: newLng },
+          ]);
 
-          // 3. CRITICAL: Reverse Geocode to get the address string immediately
-          try {
-            const geo = await Location.reverseGeocodeAsync({
-              latitude: newLat,
-              longitude: newLng,
-            });
-
-            if (geo.length > 0) {
-              const g = geo[0];
-              // Format the address clearly
-              const address = [g.name, g.street, g.city]
-                .filter(Boolean)
-                .join(", ");
-              setFromAddress(address);
-              // Turn off loading once we have a real address
-              setLocationLoading(false);
-            }
-          } catch (error) {
-            console.error("Geocoding error:", error);
+          // Fix: Update Address Field immediately
+          const geo = await Location.reverseGeocodeAsync({
+            latitude: newLat,
+            longitude: newLng,
+          });
+          if (geo.length > 0) {
+            const g = geo[0];
+            setFromAddress(
+              [g.name, g.street, g.city].filter(Boolean).join(", "),
+            );
+            setLocationLoading(false);
           }
 
-          // Map animation to keep zoomed in on the user
+          // Calculate Traveled Distance
+          setLastCoords((prev) => {
+            if (prev) {
+              const delta = getHaversineDistance(prev, curr);
+              setTotalTraveledDistance((total) => {
+                const newTotal = total + delta;
+                setDistance(`${newTotal.toFixed(2)} km`);
+                return newTotal;
+              });
+            }
+            return curr;
+          });
+
+          if (destination) {
+            const distToTarget = getHaversineDistance(curr, destination);
+
+            if (distToTarget < 0.05) {
+              // 50 meters
+              locationSubscription?.remove();
+
+              const endTime = new Date();
+              setToTime(endTime);
+
+              const saveTrip = async () => {
+                try {
+                  await addDoc(collection(db, "trips"), {
+                    user_id: userId,
+                    from_address: fromAddress,
+                    to_address: toAddress,
+                    distance: parseFloat(totalTraveledDistance.toFixed(2)),
+                    remark: formRemark,
+                    /* route_path: routeCoords, */
+                    from_time: fromTime,
+                    to_time: endTime,
+                    created_at: serverTimestamp(),
+                  });
+
+                  Alert.alert(
+                    "Trip Completed",
+                    "Your trip data has been saved.",
+                  );
+                  resetForm();
+                } catch (error) {
+                  console.error("Error saving trip:", error);
+                  Alert.alert("Error", "Failed to save trip to Firebase.");
+                }
+              };
+
+              saveTrip();
+            }
+          }
+
+          // Map Zoom Centering
           if (mapRef.current) {
             mapRef.current.animateToRegion(
               {
@@ -148,7 +291,7 @@ export default function SubmitExpenseScreen() {
     })();
 
     return () => locationSubscription?.remove();
-  }, []);
+  }, [destination]);
 
   // Recalculate route whenever origin or destination changes
   /* useEffect(() => {
@@ -236,7 +379,7 @@ export default function SubmitExpenseScreen() {
         />
 
         <View style={styles.inputPanel}>
-          <Text style={styles.title}>Select Location</Text>
+          <Text style={styles.title}>Submit Trip</Text>
 
           <Text style={styles.label}>From (Current Location):</Text>
           <View
@@ -262,18 +405,24 @@ export default function SubmitExpenseScreen() {
             }}
           />
 
+          <Text style={styles.label}>Remark (Optional):</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+            placeholder="Trip Remark..."
+            placeholderTextColor="#999"
+            value={formRemark}
+            onChangeText={setFormRemark}
+            multiline
+            numberOfLines={3}
+          />
+
           {distance && (
             <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>📍 Distance: {distance}</Text>
+              <Text style={styles.distanceText}>
+                📏 Actual Distance: {distance}
+              </Text>
               <Text style={styles.addressPreview} numberOfLines={1}>
                 {fromAddress} → {toAddress}
-              </Text>
-            </View>
-          )}
-          {routeCoords.length > 0 && (
-            <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>
-                📏 Actual Path Distance: {totalTraveledDistance.toFixed(2)} km
               </Text>
             </View>
           )}
@@ -285,7 +434,14 @@ export default function SubmitExpenseScreen() {
               (!currentLocation || !destination || locationLoading) &&
                 styles.buttonDisabled,
             ]}
-            onPress={() => Alert.alert("Location Selected", `To: ${toAddress}`)}
+            onPress={() => {
+              const startTime = new Date();
+              setFromTime(startTime);
+              Alert.alert(
+                "Trip Started",
+                `Start time: ${startTime.toLocaleTimeString()}`,
+              );
+            }}
             disabled={!currentLocation || !destination || locationLoading}
           >
             <Text style={styles.buttonText}>Confirm Location</Text>

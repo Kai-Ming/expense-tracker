@@ -397,7 +397,7 @@ export default function SubmitExpenseWebScreen() {
         cost: cost,
         type: 1,
         approval_status: 0,
-        createdAt: serverTimestamp(),
+        created_at: serverTimestamp(),
       });
       setFormPurpose("");
       setFormDate(new Date().toISOString().split("T")[0]);
