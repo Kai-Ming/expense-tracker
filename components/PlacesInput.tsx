@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -13,16 +13,22 @@ const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 function PlacesInput({
   placeholder,
   onPlaceSelected,
+  value,
 }: {
   placeholder: string;
   onPlaceSelected: (
     address: string,
     location: { lat: number; lng: number },
   ) => void;
+  value: string;
 }) {
   const [query, setQuery] = useState("");
   const [predictions, setPredictions] = useState([]);
   const timer = useRef(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
 
   const fetchPredictions = async (text: string) => {
     if (text.length < 2) return setPredictions([]);

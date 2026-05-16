@@ -6,11 +6,14 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -20,27 +23,7 @@ import {
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseWebScreen() {
-  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const mapRef = useRef<View>(null);
-  const googleMap = useRef<google.maps.Map | null>(null);
-  const markers = useRef<(google.maps.marker.AdvancedMarkerElement | null)[]>([
-    null,
-    null,
-  ]);
-  const directionsService = useRef<google.maps.DirectionsService | null>(null);
-  const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(
-    null,
-  );
-  const inputARef = useRef<any>(null);
-  const inputBRef = useRef<any>(null);
-  const geocoder = useRef<google.maps.Geocoder | null>(null);
-
-  const [distance, setDistance] = useState<string | null>(null);
-  const [routePolyline, setRoutePolyline] = useState<string | null>(null);
-  const [points, setPoints] = useState<(google.maps.LatLngLiteral | null)[]>([
-    null,
-    null,
-  ]);
+  const [distance, setDistance] = useState<string>("0.00");
   const [formPurpose, setFormPurpose] = useState<string>("");
   const [formDate, setFormDate] = useState<string>(
     new Date().toISOString().split("T")[0],
@@ -58,9 +41,52 @@ export default function SubmitExpenseWebScreen() {
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
-  const [showMap, setShowMap] = useState<boolean>(true);
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
+  const [userTrips, setUserTrips] = useState<any[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string>("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (!userId || !formDate) return;
+
+    // 1. Create JS Date objects for the start and end of the selected day
+    const startOfDay = new Date(formDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(formDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    console.log(
+      `🔍 Searching: user_id=${userId} between ${startOfDay} and ${endOfDay}`,
+    );
+
+    // 2. Query where created_at is within that 24-hour window
+    const q = query(
+      collection(db, "trips"),
+      where("user_id", "==", userId),
+      where("created_at", ">=", startOfDay),
+      where("created_at", "<=", endOfDay),
+      orderBy("created_at", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        console.log("✅ Trips found for this date:", snapshot.docs.length);
+        const tripsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUserTrips(tripsData);
+      },
+      (error) => {
+        console.error("❌ Firestore Error:", error);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [userId, formDate]);
 
   useEffect(() => {
     if (mileageRate !== undefined) {
@@ -70,26 +96,14 @@ export default function SubmitExpenseWebScreen() {
 
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
-
-    // If configId is undefined, don't run the listener
-    if (!configId) {
-      console.error(
-        "Firebase Config ID is missing from environment variables.",
-      );
-      return;
-    }
+    if (!configId) return;
 
     const unsubscribe = onSnapshot(
       doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-
-          if (data.mileage_rate) {
-            setMileageRate(data.mileage_rate);
-          }
-        } else {
-          console.error("Config document not found.");
+          if (data.mileage_rate) setMileageRate(data.mileage_rate);
         }
       },
     );
@@ -97,62 +111,6 @@ export default function SubmitExpenseWebScreen() {
   }, []);
 
   useEffect(() => {
-    const loadScript = () => {
-      if (!apiKey) {
-        console.error("Google Maps API key is missing.");
-        return;
-      }
-      if (window.google) {
-        initMap();
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places,marker`;
-      script.async = true;
-      script.onload = initMap;
-      document.head.appendChild(script);
-    };
-
-    const initMap = () => {
-      if (!mapRef.current) return;
-      googleMap.current = new google.maps.Map(mapRef.current, {
-        center: { lat: 3.0414, lng: 101.5461 },
-        mapId: "DEMO_MAP_ID",
-        zoom: 13,
-      });
-      directionsService.current = new google.maps.DirectionsService();
-      directionsRenderer.current = new google.maps.DirectionsRenderer({
-        map: googleMap.current,
-        suppressMarkers: true,
-      });
-      geocoder.current = new google.maps.Geocoder();
-
-      const setupAutocomplete = (inputContainer: any, index: number) => {
-        if (!inputContainer) return;
-        // RN-Web TextInput renders a wrapper; find the actual input element
-        const inputEl =
-          inputContainer.querySelector?.("input") || inputContainer;
-        if (!inputEl) return;
-
-        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
-          fields: ["geometry", "formatted_address"],
-        });
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          if (place.geometry?.location) {
-            const latLng = place.geometry.location.toJSON();
-            index === 0
-              ? setFromAddress(place.formatted_address || "")
-              : setToAddress(place.formatted_address || "");
-            updatePoint(index, latLng);
-            googleMap.current?.panTo(latLng);
-          }
-        });
-      };
-      setupAutocomplete(inputARef.current, 0);
-      setupAutocomplete(inputBRef.current, 1);
-    };
-
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -160,154 +118,55 @@ export default function SubmitExpenseWebScreen() {
         try {
           const userDocRef = doc(db, "users", user.uid);
           const userDoc = await getDoc(userDocRef);
-
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            // Log this to see what is actually coming back from Firebase
-            console.log("Fetched User Data:", userData);
-
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
-          } else {
-            // Fallback if no Firestore doc exists yet
-            setUsername(user.displayName || "User");
           }
         } catch (error) {
           console.error("Error fetching user doc:", error);
-          setUsername("");
         }
-      } else {
-        setUserId(null);
-        setUsername(""); // Reset on logout
       }
     });
-    loadScript();
     return () => unsubscribe();
   }, []);
 
-  const updatePoint = (index: number, latLng: google.maps.LatLngLiteral) => {
-    if (!googleMap.current || !window.google?.maps?.marker) return;
+  const handleTripSelect = (tripId: string) => {
+    setSelectedTripId(tripId);
+    const selectedTrip = userTrips.find((t) => t.id === tripId);
 
-    // Clear existing marker for this specific slot
-    if (markers.current[index]) {
-      markers.current[index]!.map = null;
-    }
+    if (selectedTrip) {
+      setFromAddress(selectedTrip.from_address || "");
+      setToAddress(selectedTrip.to_address || "");
+      setDistance(selectedTrip.distance?.toString() || "0.00");
+      setFormTripReport(selectedTrip.remark || "");
 
-    // Create a PinElement for the label
-    const pin = new google.maps.marker.PinElement({
-      glyph: index === 0 ? "A" : "B",
-    });
-
-    markers.current[index] = new google.maps.marker.AdvancedMarkerElement({
-      position: latLng,
-      map: googleMap.current,
-      content: pin.element,
-    });
-
-    setPoints((prev) => {
-      const next = [...prev];
-      next[index] = latLng;
-      return next;
-    });
-  };
-
-  const reverseGeocode = (latLng: google.maps.LatLngLiteral, index: number) => {
-    if (!geocoder.current) return;
-    geocoder.current.geocode({ location: latLng }, (results, status) => {
-      if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
-        const address = results[0].formatted_address;
-        index === 0
-          ? setFromAddress(address || "")
-          : setToAddress(address || "");
+      // Convert Firebase Timestamps to HH:mm for the HTML time inputs
+      if (selectedTrip.from_time) {
+        const start = selectedTrip.from_time.toDate
+          ? selectedTrip.from_time.toDate()
+          : new Date(selectedTrip.from_time);
+        setFormFromTime(start.toTimeString().slice(0, 5));
       }
-    });
-  };
-
-  const resetAll = () => {
-    markers.current.forEach((m) => {
-      if (m) m.map = null;
-    });
-    markers.current = [null, null];
-    directionsRenderer.current?.setDirections({ routes: [] });
-    setPoints([null, null]);
-    setDistance(null);
-    setRoutePolyline(null);
-    setFormPurpose("");
-    setFormDate(new Date().toISOString().split("T")[0]);
-    setFormCompany("");
-    setFormName("");
-    setFormContactNumber("");
-    setFromAddress("");
-    setToAddress("");
-    setFormFromTime("");
-    setFormToTime("");
-    setFormParking("0.00");
-    setFormToll("0.00");
-    setFormTripReport("");
-    setBusinessCardFile(null);
-  };
-
-  // Separate Effect to handle calculation when points update
-  useEffect(() => {
-    if (points[0] && points[1]) {
-      calculateDistance(
-        points[0] as google.maps.LatLngLiteral,
-        points[1] as google.maps.LatLngLiteral,
-      );
-      // Reset parking and toll when new points are set, assuming they might be route-dependent
-      setFormParking("0.00");
-      setFormToll("0.00");
-    } else {
-      // Clear directions if one point is removed
-      directionsRenderer.current?.setDirections({ routes: [] });
-      setDistance(null);
+      if (selectedTrip.to_time) {
+        const end = selectedTrip.to_time.toDate
+          ? selectedTrip.to_time.toDate()
+          : new Date(selectedTrip.to_time);
+        setFormToTime(end.toTimeString().slice(0, 5));
+      }
     }
-  }, [points]);
-
-  const calculateDistance = (
-    p1: google.maps.LatLngLiteral,
-    p2: google.maps.LatLngLiteral,
-  ) => {
-    if (!directionsService.current || !directionsRenderer.current) return;
-
-    directionsService.current.route(
-      {
-        origin: p1,
-        destination: p2,
-        travelMode: google.maps.TravelMode.DRIVING,
-        unitSystem: google.maps.UnitSystem.METRIC,
-      },
-      (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          directionsRenderer.current?.setDirections(result);
-          // Extract road distance text (e.g. "12.5 km")
-          const routeDistance = result.routes[0].legs[0].distance?.text;
-          setDistance(routeDistance || null);
-
-          const polyline = result.routes[0].overview_polyline;
-          const encodedPath =
-            typeof polyline === "string" ? polyline : (polyline as any)?.points;
-          setRoutePolyline(encodedPath || null);
-        }
-      },
-    );
   };
 
-  const getDistance = () => {
-    if (!distance) return 0.0;
-    return parseFloat(distance.replace(/[^0-9.]/g, ""));
-  };
+  const getDistanceValue = () =>
+    parseFloat(distance.replace(/[^0-9.]/g, "")) || 0;
 
-  // Robust calculation that handles distance strings (removing commas and units)
   const calculateMileage = useCallback(() => {
-    console.log(getDistance());
-    console.log(mileageRate);
-    return (getDistance() * mileageRate).toFixed(2);
-  }, [mileageRate, getDistance]);
+    return (getDistanceValue() * mileageRate).toFixed(2);
+  }, [mileageRate, distance]);
 
   const calculateCost = () => {
-    const travelCost = getDistance() * mileageRate;
+    const travelCost = getDistanceValue() * mileageRate;
     const parking = parseFloat(formParking) || 0;
     const toll = parseFloat(formToll) || 0;
     return (travelCost + parking + toll).toFixed(2);
@@ -318,54 +177,43 @@ export default function SubmitExpenseWebScreen() {
     const [h1, m1] = formFromTime.split(":").map(Number);
     const [h2, m2] = formToTime.split(":").map(Number);
     let diff = h2 * 60 + m2 - (h1 * 60 + m1);
-    if (diff < 0) diff += 1440; // Handle duration crossing midnight
+    if (diff < 0) diff += 1440;
     const hours = Math.floor(diff / 60);
     const mins = diff % 60;
     return `${hours}h ${mins}m`;
   };
 
+  const updateMileageRate = async () => {
+    const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
+    if (!configId) {
+      console.error("No Config ID found in environment variables");
+      return;
+    }
+    const docRef = doc(db, "config", configId);
+    try {
+      await updateDoc(docRef, { mileage_rate: formMileageRate });
+      alert("Rate updated successfully!");
+    } catch (error) {
+      console.error("Error updating document:", error);
+    }
+  };
+
   const handleSubmit = async () => {
-    const dist = getDistance();
-    const mileage = parseFloat(calculateMileage());
-    const cost = parseFloat(calculateCost());
+    const dist = getDistanceValue();
     if (
-      dist === 0.0 ||
+      dist === 0 ||
       !formPurpose.trim() ||
       !formDate ||
       !fromAddress ||
-      !toAddress ||
-      !formCompany ||
-      !formName ||
-      !formContactNumber.trim() ||
-      !formFromTime ||
-      !formToTime
+      !toAddress
     ) {
-      alert("Please ensure both addresses and a purpose are provided.");
+      alert("Please ensure all required fields are filled.");
       return;
     }
 
     try {
       let businessCardUrl = "";
-      let routeImageUrl = "";
-
-      // Capture route image from Static Maps API
-      if (routePolyline && points[0] && points[1]) {
-        try {
-          const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${routePolyline}&markers=color:red|label:A|${points[0].lat},${points[0].lng}&markers=color:blue|label:B|${points[1].lat},${points[1].lng}&key=${apiKey}`;
-          const response = await fetch(staticMapUrl);
-          if (response.ok) {
-            const blob = await response.blob();
-            const routeRef = ref(storage, `route-images/${Date.now()}.png`);
-            const uploadResult = await uploadBytes(routeRef, blob);
-            routeImageUrl = await getDownloadURL(uploadResult.ref);
-          }
-        } catch (mapErr) {
-          console.error("Failed to capture static route image:", mapErr);
-        }
-      }
-
       if (businessCardFile) {
-        console.log("Uploading to bucket:", storage.app.options.storageBucket);
         const storageRef = ref(
           storage,
           `business-cards/${Date.now()}_${businessCardFile.name}`,
@@ -374,7 +222,7 @@ export default function SubmitExpenseWebScreen() {
         businessCardUrl = await getDownloadURL(uploadResult.ref);
       }
 
-      const docRef = await addDoc(collection(db, "expenses"), {
+      await addDoc(collection(db, "expenses"), {
         user_id: userId,
         user_name: username,
         date: formDate,
@@ -390,95 +238,142 @@ export default function SubmitExpenseWebScreen() {
         distance: dist,
         trip_report: formTripReport,
         business_card_url: businessCardUrl,
-        route_image_url: routeImageUrl,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
-        mileage: mileage,
-        cost: cost,
+        mileage: parseFloat(calculateMileage()),
+        cost: parseFloat(calculateCost()),
         type: 1,
         approval_status: 0,
         created_at: serverTimestamp(),
       });
-      setFormPurpose("");
-      setFormDate(new Date().toISOString().split("T")[0]);
-      setFormCompany("");
-      setFormName("");
-      setFormContactNumber("");
-      setFormFromTime("");
-      setFormToTime("");
-      setFromAddress("");
-      setToAddress("");
-      setBusinessCardFile(null);
       alert("Expense submitted successfully!");
     } catch (e) {
-      if (e && typeof e === "object" && "code" in e) {
-        console.error("Storage/Firestore Error Code:", e.code);
-      }
-      console.error("Full error object:", e);
-      alert("Failed to save expense to database.");
-    }
-  };
-
-  const updateMileageRate = async () => {
-    const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
-
-    if (!configId) {
-      console.error("No Config ID found in environment variables");
-      return;
-    }
-
-    const docRef = doc(db, "config", configId);
-    try {
-      await updateDoc(docRef, {
-        mileage_rate: formMileageRate,
-      });
-      console.log("Rate updated successfully!");
-    } catch (error) {
-      console.error("Error updating document:", error);
+      console.error(e);
+      alert("Failed to save expense.");
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.mapWrapper, { display: showMap ? "flex" : "none" }]}>
-        <View ref={mapRef} style={{ width: "100%", height: "100%" }} />
-      </View>
-
       <View style={styles.detailsContainer}>
-        <TouchableOpacity
-          onPress={() => setShowMap(!showMap)}
-          style={styles.arrowButton}
-          activeOpacity={0.6}
-        >
-          <Text style={styles.arrowText}>{showMap ? "❮" : "❯"}</Text>
-        </TouchableOpacity>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
             <Text style={styles.formLabel}>Submit Travel Expense</Text>
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Date:</Text>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                style={htmlInputStyle}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.inputRow,
+                {
+                  marginTop: 10,
+                  marginBottom: 20,
+                  borderBottomWidth: 1,
+                  borderColor: "#eee",
+                  paddingBottom: 15,
+                  zIndex: isDropdownOpen ? 1000 : 1,
+                  elevation: isDropdownOpen ? 1000 : 1,
+                },
+              ]}
+            >
+              <Text style={styles.fieldLabel}>Import Trip:</Text>
+
+              <View
+                style={[
+                  styles.dropdownContainer,
+                  { zIndex: isDropdownOpen ? 9999 : 1 },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.dropdownHeader}
+                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  <Text style={styles.selectedText}>
+                    {selectedTripId
+                      ? "Trip Selected"
+                      : userTrips.length > 0
+                        ? `-- Select a Trip --`
+                        : "-- No Trips --"}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Use a clear ternary operator to avoid "0" or "false" being rendered as text */}
+                {isDropdownOpen === true ? (
+                  <View style={styles.dropdownListWrapper}>
+                    <ScrollView style={styles.tripList}>
+                      {userTrips.map((trip) => (
+                        <TouchableOpacity
+                          key={trip.id}
+                          onPress={() => {
+                            handleTripSelect(trip.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          style={styles.tripItem}
+                        >
+                          <Text style={styles.timeText}>
+                            {trip.created_at?.toDate().toLocaleTimeString()}
+                          </Text>
+                          <Text style={styles.addressText}>
+                            <Text style={styles.boldLabel}>Remark: </Text>
+                            {trip.remark || "No Remark"}
+                          </Text>
+
+                          <Text style={styles.addressText}>
+                            <Text style={styles.boldLabel}>From: </Text>
+                            {trip.from_address}
+                          </Text>
+
+                          <Text style={styles.addressText}>
+                            <Text style={styles.boldLabel}>To: </Text>
+                            {trip.to_address}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
             <View style={styles.inputRow}>
               <Text style={styles.fieldLabel}>From:</Text>
               <TextInput
-                ref={inputARef}
                 placeholder="From..."
                 value={fromAddress}
                 onChangeText={setFromAddress}
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
+                style={styles.webTextInput}
               />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To:</Text>
               <TextInput
-                ref={inputBRef}
                 placeholder="To..."
                 value={toAddress}
                 onChangeText={setToAddress}
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
+                style={styles.webTextInput}
               />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Distance:</Text>
-              <Text style={styles.fieldValue}>{getDistance()} km</Text>
+              <Text style={styles.fieldLabel}>Distance (km):</Text>
+              <TextInput
+                placeholder="0.00"
+                value={distance}
+                onChangeText={setDistance}
+                keyboardType="numeric"
+                style={styles.webTextInput}
+              />
             </View>
+
             <View
               style={[
                 styles.inputRow,
@@ -486,191 +381,112 @@ export default function SubmitExpenseWebScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>Purpose:</Text>
-              <View style={{ flex: 1, maxWidth: 400 }}>
-                <select
-                  value={formPurpose}
-                  onChange={(e) => setFormPurpose(e.target.value)}
-                  style={htmlSelectStyle}
-                >
-                  <option value="" disabled>
-                    Select a purpose...
-                  </option>
-                  <option value="Application support">
-                    Application support
-                  </option>
-                  <option value="Attending seminar/training">
-                    Attending seminar/training
-                  </option>
-                  <option value="Breakfast/Lunch/Dinner meeting">
-                    Breakfast/Lunch/Dinner meeting
-                  </option>
-                  <option value="Documents submission">
-                    Documents submission
-                  </option>
-                  <option value="Documents submission with meeting">
-                    Documents submission with meeting
-                  </option>
-                  <option value="Door knocking">Door knocking</option>
-                  <option value="Goods delivery">Goods delivery</option>
-                  <option value="Initial meeting and introduction">
-                    Initial meeting and introduction
-                  </option>
-                  <option value="Meeting and follow-up">
-                    Meeting and follow-up
-                  </option>
-                  <option value="Presentation">Presentation</option>
-                  <option value="Product demonstration">
-                    Product demonstration
-                  </option>
-                  <option value="Service and support">
-                    Service and support
-                  </option>
-                  <option value="Site inspection">Site inspection</option>
-                  <option value="Site survey">Site survey</option>
-                  <option value="Site visitation">Site visitation</option>
-                  <option value="Tea break meeting">Tea break meeting</option>
-                  <option value="Tender submission">Tender submission</option>
-                  <option value="Tender submission with meeting">
-                    Tender submission with meeting
-                  </option>
-                  <option value="Training and commissioning">
-                    Training and commissioning
-                  </option>
-                </select>
-              </View>
+              <select
+                value={formPurpose}
+                onChange={(e) => setFormPurpose(e.target.value)}
+                style={htmlSelectStyle}
+              >
+                <option value="" disabled>
+                  Select a purpose...
+                </option>
+                <option value="Application support">Application support</option>
+                <option value="Attending seminar/training">
+                  Attending seminar/training
+                </option>
+                <option value="Breakfast/Lunch/Dinner meeting">
+                  Breakfast/Lunch/Dinner meeting
+                </option>
+                <option value="Documents submission">
+                  Documents submission
+                </option>
+                <option value="Door knocking">Door knocking</option>
+                <option value="Meeting and follow-up">
+                  Meeting and follow-up
+                </option>
+                <option value="Presentation">Presentation</option>
+                <option value="Service and support">Service and support</option>
+                <option value="Site inspection">Site inspection</option>
+                <option value="Site visitation">Site visitation</option>
+              </select>
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={styles.fieldLabel}>Comapany/Site:</Text>
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Company/Site:</Text>
               <TextInput
                 value={formCompany}
                 onChangeText={setFormCompany}
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
+                style={styles.webTextInput}
                 placeholder="Company/Site"
               />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Name:</Text>
               <TextInput
                 value={formName}
                 onChangeText={setFormName}
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
+                style={styles.webTextInput}
                 placeholder="Name"
               />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Contact:</Text>
               <TextInput
                 value={formContactNumber}
                 onChangeText={(text) =>
                   setFormContactNumber(text.replace(/[^0-9]/g, ""))
                 }
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
+                style={styles.webTextInput}
                 placeholder="Contact Number"
               />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={styles.fieldLabel}>Date:</Text>
-              <View style={{ flex: 1, maxWidth: 400 }}>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  style={htmlInputStyle}
-                />
-              </View>
-            </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>From Time:</Text>
-              <View style={{ flex: 1, maxWidth: 400 }}>
-                <input
-                  type="time"
-                  value={formFromTime}
-                  onChange={(e) => setFormFromTime(e.target.value)}
-                  style={htmlInputStyle}
-                />
-              </View>
+              <input
+                type="time"
+                value={formFromTime}
+                onChange={(e) => setFormFromTime(e.target.value)}
+                style={htmlInputStyle}
+              />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To Time:</Text>
-              <View style={{ flex: 1, maxWidth: 400 }}>
-                <input
-                  type="time"
-                  value={formToTime}
-                  onChange={(e) => setFormToTime(e.target.value)}
-                  style={htmlInputStyle}
-                />
-              </View>
+              <input
+                type="time"
+                value={formToTime}
+                onChange={(e) => setFormToTime(e.target.value)}
+                style={htmlInputStyle}
+              />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Duration:</Text>
               <Text style={styles.fieldValue}>{calculateDuration()}</Text>
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={styles.fieldLabel}>Parking:</Text>
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Parking (RM):</Text>
               <TextInput
-                value={parseFloat(formParking).toFixed(2)}
-                onChangeText={(text) =>
-                  setFormParking(
-                    Math.max(0, parseFloat(text || "0")).toFixed(2),
-                  )
-                }
+                value={formParking}
+                onChangeText={setFormParking}
                 keyboardType="numeric"
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
-                placeholder="0.00"
+                style={styles.webTextInput}
               />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={styles.fieldLabel}>Toll:</Text>
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Toll (RM):</Text>
               <TextInput
-                value={parseFloat(formToll).toFixed(2)}
-                onChangeText={(text) =>
-                  setFormToll(Math.max(0, parseFloat(text || "0")).toFixed(2))
-                }
+                value={formToll}
+                onChangeText={setFormToll}
                 keyboardType="numeric"
-                style={[styles.webTextInput, { flex: 1, maxWidth: 400 }]}
-                placeholder="0.00"
+                style={styles.webTextInput}
               />
             </View>
+
             <View
               style={[
                 styles.inputRow,
@@ -681,69 +497,40 @@ export default function SubmitExpenseWebScreen() {
               <TextInput
                 value={formTripReport}
                 onChangeText={setFormTripReport}
-                maxLength={2000}
                 multiline
-                style={[
-                  styles.webTextInput,
-                  { flex: 1, maxWidth: 400, minHeight: 80 },
-                ]}
+                style={[styles.webTextInput, { minHeight: 80 }]}
                 placeholder="Trip Report"
               />
             </View>
-            <View
-              style={[styles.inputRow, { marginTop: 10, alignItems: "center" }]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Business Card:</Text>
-              <View style={{ flex: 1, maxWidth: 400 }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0])
-                      setBusinessCardFile(e.target.files[0]);
-                  }}
-                  style={htmlInputStyle}
-                />
-              </View>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  e.target.files && setBusinessCardFile(e.target.files[0])
+                }
+                style={htmlInputStyle}
+              />
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Mileage:</Text>
               <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
             </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Cost:</Text>
               <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
             </View>
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={
-                getDistance() === 0 ||
-                !formPurpose.trim() ||
-                isNaN(parseFloat(formParking)) ||
-                isNaN(parseFloat(formToll))
-              }
-              style={[
-                styles.button,
-                { marginTop: 10, alignSelf: "flex-start" },
-                (getDistance() === 0 ||
-                  !formPurpose.trim() ||
-                  isNaN(parseFloat(formParking)) ||
-                  isNaN(parseFloat(formToll))) && { opacity: 0.5 },
-              ]}
-            >
+
+            <TouchableOpacity onPress={handleSubmit} style={styles.button}>
               <Text style={styles.buttonText}>Submit Expense</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Mileage rate configuration form restored[cite: 1] */}
           <View style={styles.mileageUpdateContainer}>
             <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>
               Mileage Rate
@@ -761,7 +548,7 @@ export default function SubmitExpenseWebScreen() {
               onPress={updateMileageRate}
               style={[styles.button, { marginTop: 10 }]}
             >
-              <Text style={styles.buttonText}>Update Mileage</Text>
+              <Text style={styles.buttonText}>Update Rate</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -770,106 +557,135 @@ export default function SubmitExpenseWebScreen() {
   );
 }
 
-// Fallback styles for HTML elements that don't have direct RN equivalents (like date pickers)
 const htmlInputStyle = {
   padding: "8px 12px",
   border: "1px solid #ccc",
   width: "100%",
+  maxWidth: "400px",
   boxSizing: "border-box" as const,
-  fontSize: "14px",
 };
 
 const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, flexDirection: "row" },
-  mapWrapper: { width: "30%", height: "100%" },
-  scrollContent: { paddingBottom: 40, flexDirection: "row" },
-  webTextInput: {
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    fontSize: 14,
-    backgroundColor: "#fff",
+  boldLabel: {
+    fontWeight: "bold",
+    color: "#333",
   },
-  header: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    right: 10,
-    zIndex: 10,
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 8,
+  dropdownContainer: {
+    position: "relative",
+    marginVertical: 10,
+    width: "100%",
+    maxWidth: 400,
+    zIndex: 5000,
+    elevation: 5,
   },
-  formContainer: {
-    paddingLeft: 20,
-    paddingRight: 20,
-    paddingBottom: 20,
-    paddingTop: 5,
-    flex: 1,
-  },
-  mileageUpdateContainer: { padding: 20, width: 200, alignItems: "flex-start" },
-  formLabel: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  button: { backgroundColor: "#2196F3", padding: 10, borderRadius: 5 },
-  buttonText: { color: "white" },
-  searchSection: {
-    marginBottom: 10,
-    backgroundColor: "transparent",
-  },
-  infoSection: {
+  dropdownHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "transparent",
-    marginBottom: 10, // Added margin to separate from form
-  },
-  instructions: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  detailsContainer: {
-    flex: 1,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 0, // Removed border radius
     backgroundColor: "#fff",
-    padding: 0, // Adjusted to 0, children will manage their own padding
-    justifyContent: "flex-start",
   },
-  detailsText: {
-    color: "#999",
-    fontSize: 16,
+  dropdownListWrapper: {
+    position: "absolute",
+    top: 50, // Increased from 45 to add a gap (adjust as needed)
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 0, // Removed border radius
+    maxHeight: 300,
+    zIndex: 5001,
+    boxShadow: "0px 4px 10px rgba(0,0,0,0.1)",
   },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "transparent",
+  selectedText: {
+    fontSize: 14,
+    color: "#333",
   },
-  fieldLabel: {
+  arrow: {
+    fontSize: 12,
+    color: "#666",
+  },
+  tripList: {
+    maxHeight: 280,
+  },
+  tripItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  selectedTripItem: {
+    backgroundColor: "#f0f7ff",
+  },
+  listContainer: {
+    marginVertical: 10,
+    width: "100%",
+  },
+  label: {
     fontSize: 14,
     fontWeight: "600",
+    marginBottom: 8,
     color: "#333",
-    width: 90,
   },
-  fieldValue: {
-    fontSize: 14,
-    color: "#333",
-    flex: 1,
+  tripHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  toggleColumn: {
-    marginLeft: 10,
-    width: 10,
-    backgroundColor: "transparent",
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  arrowButton: {
-    paddingTop: 5,
-    paddingLeft: 20,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-  },
-  arrowText: {
-    fontSize: 15,
-    color: "#666", // Subtle gray
+  timeText: {
+    fontSize: 12,
     fontWeight: "bold",
+    color: "#2196F3",
+  },
+  remarkText: {
+    fontSize: 12,
+    fontStyle: "italic",
+    color: "#666",
+  },
+  addressText: {
+    fontSize: 13,
+    color: "#444",
+    lineHeight: 18,
+  },
+  emptyItem: {
+    padding: 20,
+    alignItems: "center",
+  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  detailsContainer: { flex: 1 },
+  scrollContent: { padding: 20 },
+  formContainer: { flex: 1 },
+  webTextInput: {
+    flex: 1,
+    maxWidth: 400,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    zIndex: 1,
+    position: "relative",
+  },
+  inputRow: { flexDirection: "row", alignItems: "center" },
+  fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
+  fieldValue: { fontSize: 14, flex: 1 },
+  button: {
+    backgroundColor: "#2196F3",
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 20,
+    alignItems: "center",
+    maxWidth: 200,
+  },
+  buttonText: { color: "white", fontWeight: "bold" },
+  formLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
+  mileageUpdateContainer: {
+    marginTop: 40,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    paddingTop: 20,
   },
 });

@@ -1,7 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { initializeApp } from "firebase/app";
+import {
+  browserLocalPersistence,
+  getReactNativePersistence,
+  initializeAuth,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { Platform } from "react-native";
 
 console.log("API KEY:", process.env.EXPO_PUBLIC_FIREBASE_API_KEY);
 console.log("EXTRA:", JSON.stringify(Constants.expoConfig?.extra));
@@ -30,6 +37,13 @@ if (missingKeys.length > 0) {
 }
 
 const app = initializeApp(firebaseConfig);
+
+export const auth = initializeAuth(app, {
+  persistence:
+    Platform.OS === "web"
+      ? browserLocalPersistence
+      : getReactNativePersistence(AsyncStorage),
+});
 
 // Log the storage bucket name to the console during development to verify it matches CLI configuration
 if (__DEV__) {

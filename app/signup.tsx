@@ -1,20 +1,23 @@
 import { Text, View } from "@/components/Themed";
 import { Link, useRouter } from "expo-router";
-import {
-  createUserWithEmailAndPassword,
-  getAuth,
-  updateProfile,
-} from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useState } from "react";
-import { Alert, StyleSheet, TextInput, TouchableOpacity } from "react-native";
-import { db } from "../firebaseConfig";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
+import { auth, db } from "../firebaseConfig";
 
 export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSignup = async () => {
@@ -33,29 +36,28 @@ export default function SignupPage() {
       return;
     }
 
+    setIsLoading(true);
     try {
-      const auth = getAuth();
+      // createUserWithEmailAndPassword automatically signs the user in
       const userCredential = await createUserWithEmailAndPassword(
-        auth,
+        auth, // ✅ use the persistent auth instance, not getAuth()
         email.trim(),
         password,
       );
 
-      // Set the display name in Firebase Auth
       await updateProfile(userCredential.user, {
         displayName: username.trim(),
       });
 
-      // Store additional user data in Firestore
       await setDoc(doc(db, "users", userCredential.user.uid), {
         uid: userCredential.user.uid,
         username: username.trim(),
         email: email.trim(),
         createdAt: serverTimestamp(),
-        role: 1, // Regular user
+        role: 1,
       });
 
-      Alert.alert("Signup Success", `Account created for ${username}!`);
+      // User is already signed in at this point — navigate directly
       router.replace("/submit");
     } catch (error) {
       const err = error as any;
@@ -65,13 +67,15 @@ export default function SignupPage() {
       if (err.code === "auth/email-already-in-use") {
         errorMessage = "This email is already registered.";
       } else if (err.code === "auth/weak-password") {
-        errorMessage = "The password is too weak.";
+        errorMessage = "Password must be at least 6 characters.";
       } else if (err.code === "auth/configuration-not-found") {
         errorMessage =
           "Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.";
       }
 
       Alert.alert("Signup Failed", errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -87,7 +91,6 @@ export default function SignupPage() {
         onChangeText={setUsername}
         autoCapitalize="none"
       />
-
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -97,7 +100,6 @@ export default function SignupPage() {
         keyboardType="email-address"
         autoCapitalize="none"
       />
-
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -106,7 +108,6 @@ export default function SignupPage() {
         onChangeText={setPassword}
         secureTextEntry
       />
-
       <TextInput
         style={styles.input}
         placeholder="Confirm Password"
@@ -116,8 +117,16 @@ export default function SignupPage() {
         secureTextEntry
       />
 
-      <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-        <Text style={styles.signupButtonText}>Create Account</Text>
+      <TouchableOpacity
+        style={[styles.signupButton, isLoading && { opacity: 0.7 }]}
+        onPress={handleSignup}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.signupButtonText}>Create Account</Text>
+        )}
       </TouchableOpacity>
 
       <Link href="/login" asChild>

@@ -49,7 +49,7 @@ interface Expense {
   business_card_url?: string;
   route_image_url?: string;
   approval_status: number;
-  createdAt: any;
+  created_at: any;
 }
 
 export default function ExpensesWebScreen() {
@@ -136,7 +136,7 @@ export default function ExpensesWebScreen() {
     const q = query(
       collection(db, "expenses"),
       where("user_id", "==", userId),
-      orderBy("createdAt", "desc"),
+      orderBy("created_at", "desc"),
     );
     return onSnapshot(q, (querySnapshot) => {
       const expensesData: Expense[] = [];

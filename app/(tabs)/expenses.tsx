@@ -51,7 +51,7 @@ interface Expense {
   business_card_url?: string;
   route_image_url?: string;
   approval_status: number;
-  createdAt: any;
+  created_att: any;
 }
 
 export default function ExpensesScreen() {
@@ -145,7 +145,7 @@ export default function ExpensesScreen() {
     const q = query(
       collection(db, "expenses"),
       where("user_id", "==", userId),
-      orderBy("createdAt", "desc"),
+      orderBy("created_at", "desc"),
     );
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const expensesData: Expense[] = [];
