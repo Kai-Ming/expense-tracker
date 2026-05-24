@@ -22,6 +22,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
@@ -55,8 +56,18 @@ export default function SubmitExpenseWebScreen() {
   const [showModal, setShowModal] = useState(false);
   const [fromAddress, setFromAddress] = useState<string>("");
   const [toAddress, setToAddress] = useState<string>("");
-  const [formGoingHome, setFormGoingHome] = useState<string>("");
+  const [formGoingHome, setFormGoingHome] = useState<boolean>(false);
+  const [formTripFromTime, setFormTripFromTime] = useState<string>("");
+  const [formTripToTime, setFormTripToTime] = useState<string>("");
   const [formRemark, setFormRemark] = useState<string>("");
+  const [originCoord, setOriginCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [destCoord, setDestCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -197,77 +208,179 @@ export default function SubmitExpenseWebScreen() {
     }
   };
 
-  const saveTripToFirestore = async () => {
-    console.log("Saving trip to Firestore...");
+  const getRouteImageUrl = async (origin, destination) => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&key=${apiKey}`;
+
+    const response = await fetch(directionsUrl);
+    const data = await response.json();
+
+    if (data.status !== "OK" || !data.routes[0]) {
+      throw new Error("Failed to fetch route data");
+    }
+
+    // Get the encoded polyline for the entire route
+    const routePolyline = data.routes[0].overview_polyline.points;
+
+    // Construct the static map URL with the encoded path
+    // The 'enc:' prefix tells the Static API to decode the polyline[reference:0]
+    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&maptype=roadmap&path=enc:${routePolyline}&markers=color:green|label:S|${origin.lat},${origin.lng}&markers=color:red|label:E|${destination.lat},${destination.lng}&key=${apiKey}`;
+
+    return staticMapUrl;
   };
 
-  /* const saveTripToFirestore = async (
-    finalToAddress: string,
-    finalDistance: number,
-    finalEndTime: Date,
-    finalImageUrl: string,
-  ) => {
-    const currentLoc = currentLocationRef.current;
+  const fetchTollCost = async (
+    origin: { lat: number; lng: number },
+    dest: { lat: number; lng: number },
+  ): Promise<number> => {
+    try {
+      const response = await fetch(
+        "https://routes.googleapis.com/directions/v2:computeRoutes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+            "X-Goog-FieldMask": "routes.travelAdvisory.tollInfo",
+          },
+          body: JSON.stringify({
+            origin: {
+              location: {
+                latLng: { latitude: origin.lat, longitude: origin.lng },
+              },
+            },
+            destination: {
+              location: { latLng: { latitude: dest.lat, longitude: dest.lng } },
+            },
+            travelMode: "DRIVE",
+            extraComputations: ["TOLLS"],
+            routeModifiers: { vehicleInfo: { emissionType: "GASOLINE" } },
+          }),
+        },
+      );
 
-    let subToAddress = finalToAddress;
-    let subDistance = finalDistance;
-    let finalToll = 0;
-
-    // Perform comparison if going home and we have a valid starting point
-    if (toHome && points && currentLocation) {
-      const distToCurrent = getHaversineDistance(points, currentLocation);
-      const distToOffice = getHaversineDistance(points, officeCoords);
-
-      if (distToOffice < distToCurrent) {
-        console.log(`Route Comparison: Using Current.`);
-      } else {
-        console.log(`Route Comparison: Using Office.`);
-        subDistance = parseFloat(distToOffice.toFixed(2));
-        if (officeCoords) {
-          subToAddress = await getAddressFromCoords(
-            officeCoords.lat,
-            officeCoords.lng,
-          );
-          if (currentLocation) {
-            finalToll = await fetchTollCost(currentLocation, officeCoords);
-          }
-        }
+      const data = await response.json();
+      const tollInfo = data.routes?.[0]?.travelAdvisory?.tollInfo;
+      if (tollInfo?.estimatedPrice?.length > 0) {
+        const price = tollInfo.estimatedPrice[0];
+        return (price.units ?? 0) + (price.nanos ?? 0) / 1e9;
       }
+      return 0;
+    } catch (error) {
+      console.error("Toll fetch error:", error);
+      return 0;
     }
-    if (finalToll === 0 && currentLocation && destination) {
-      finalToll = await fetchTollCost(currentLocation, destination);
+  };
+
+  const getDrivingDistance = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ): Promise<{ km: number; text: string; duration: string } | null> => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error("Missing Google Maps API key");
+      return null;
     }
 
-    let mileage = subDistance * mileageRate;
-    let total = mileage + finalToll;
-    // ────────────────────────────────────────────────────────────────────────
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destination.lat},${destination.lng}&key=${apiKey}`;
 
     try {
-      await addDoc(collection(db, "trips"), {
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log("Full API response:", data);
+
+      if (data.status === "OK") {
+        const element = data.rows[0].elements[0];
+        if (element.status === "OK") {
+          return {
+            km: element.distance.value / 1000, // meters → km
+            text: element.distance.text, // e.g. "12.3 km"
+            duration: element.duration.text, // e.g. "25 mins"
+          };
+        } else {
+          console.warn("No route:", element.status);
+          return null;
+        }
+      } else {
+        console.error("Distance API error:", data.status);
+        return null;
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+      return null;
+    }
+  };
+
+  const saveTripToFirestore = async () => {
+    // Validation
+    if (!fromAddress.trim() || !toAddress.trim()) {
+      alert("Please fill in both 'From' and 'To' addresses.");
+      return;
+    }
+    if (!originCoord || !destCoord) {
+      alert("Please select valid locations from the suggestions.");
+      return;
+    }
+    if (!userId) {
+      alert("You must be logged in.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const distanceData = await getDrivingDistance(originCoord, destCoord);
+      if (!distanceData) {
+        console.log("from", originCoord, "to", destCoord);
+        console.log("from", fromAddress, "to", toAddress);
+        alert("Could not calculate driving distance. Please try again.");
+        return;
+      }
+
+      let routeImageUrl = "";
+      try {
+        routeImageUrl = await getRouteImageUrl(originCoord, destCoord);
+      } catch (imageError) {
+        console.error("Error generating route image:", imageError);
+        // Continue saving even if image generation fails, but log the error.
+      }
+
+      let mileage = distanceData.km * mileageRate;
+      let toll = await fetchTollCost(originCoord, destCoord);
+
+      // Prepare trip document
+      const tripToSave = {
         user_id: userId,
         from_address: fromAddress,
-        to_address: subToAddress,
-        distance: subDistance,
-        toll: parseFloat(finalToll.toFixed(2)), // ← new field
-        mileage: parseFloat(mileage.toFixed(2)),
-        total: parseFloat(total.toFixed(2)),
-        remark:  formRemark,
-        from_time: fromTime,
-        to_time: finalEndTime,
-        to_home: toHome,
-        route_image_url: finalImageUrl,
+        to_address: toAddress,
+        distance: distanceData.km.toFixed(2),
+        mileage: mileage.toFixed(2),
+        toll: toll.toFixed(2),
+        total: (mileage + toll).toFixed(2),
+        remark: formRemark.trim() || "",
+        from_time: formTripFromTime,
+        to_time: formTripToTime,
+        to_home: formGoingHome,
+        route_image_url: routeImageUrl,
+        date: formDate,
         created_at: serverTimestamp(),
-      });
+      };
 
-      await sendTripSavedNotification(subDistance, total);
+      await addDoc(collection(db, "trips"), tripToSave);
 
-      Alert.alert("Success", "Your trip data has been saved.");
-      resetForm();
+      // Reset modal and form fields
+      setFormDate("");
+      setFormTripFromTime("");
+      setFormTripToTime("");
+      setFormGoingHome(false);
+      setShowModal(false);
     } catch (error) {
-      console.error("Error saving trip:", error);
-      Alert.alert("Error", "Failed to save trip to Firebase.");
+      console.error("Save error:", error);
+      alert("Failed to save trip.");
+    } finally {
+      setIsSaving(false);
     }
-  }; */
+  };
 
   const handleSubmit = async () => {
     const dist = getDistanceValue();
@@ -401,12 +514,12 @@ export default function SubmitExpenseWebScreen() {
               />
             </View>
 
-            <TouchableOpacity
+            {/* <TouchableOpacity
               onPress={() => setShowModal(true)}
               style={styles.button}
             >
               <Text style={styles.buttonText}>Add Trip</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
             <Modal
               animationType="fade"
               transparent={true}
@@ -430,13 +543,14 @@ export default function SubmitExpenseWebScreen() {
 
                       <View style={styles.formGroup}>
                         <Text style={styles.modalSubtitle}>
-                          From (Destination):
+                          From (Starting location):
                         </Text>
                         <PlacesInput
                           value={fromAddress}
-                          placeholder="Search destination…"
+                          placeholder="Search starting location"
                           onPlaceSelected={(address, location) => {
                             setFromAddress(address);
+                            setOriginCoord(location);
                           }}
                         />
                         <Text style={styles.modalSubtitle}>
@@ -447,7 +561,19 @@ export default function SubmitExpenseWebScreen() {
                           placeholder="Search destination…"
                           onPlaceSelected={(address, location) => {
                             setToAddress(address);
+                            setDestCoord(location);
                           }}
+                        />
+
+                        <Text style={styles.modalSubtitle}>Going Home:</Text>
+                        <Switch
+                          trackColor={{ false: "#767577", true: "#81b0ff" }}
+                          thumbColor="#2196F3"
+                          ios_backgroundColor="#3e3e3e"
+                          value={formGoingHome}
+                          onValueChange={(newValue) =>
+                            setFormGoingHome(newValue)
+                          }
                         />
                         <Text style={styles.modalSubtitle}>
                           Remark (Optional):
