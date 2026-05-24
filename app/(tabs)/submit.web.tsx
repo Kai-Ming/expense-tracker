@@ -1,3 +1,4 @@
+import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -13,8 +14,12 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -31,8 +36,6 @@ export default function SubmitExpenseWebScreen() {
   const [formCompany, setFormCompany] = useState<string>("");
   const [formName, setFormName] = useState<string>("");
   const [formContactNumber, setFormContactNumber] = useState<string>("");
-  const [fromAddress, setFromAddress] = useState<string>("");
-  const [toAddress, setToAddress] = useState<string>("");
   const [formFromTime, setFormFromTime] = useState<string>("");
   const [formToTime, setFormToTime] = useState<string>("");
   const [formParking, setFormParking] = useState<string>("0.00");
@@ -43,61 +46,71 @@ export default function SubmitExpenseWebScreen() {
   const [username, setUsername] = useState<string>("");
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
-  const [userTrips, setUserTrips] = useState<any[]>([]);
+  const [allUserTrips, setAllUserTrips] = useState<any[]>([]);
+  const [tripsForSelectedDate, setTripsForSelectedDate] = useState<any[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
+  const [addedTrips, setAddedTrips] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  const [showModal, setShowModal] = useState(false);
+  const [fromAddress, setFromAddress] = useState<string>("");
+  const [toAddress, setToAddress] = useState<string>("");
+  const [formGoingHome, setFormGoingHome] = useState<string>("");
+  const [formRemark, setFormRemark] = useState<string>("");
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch all user trips
   useEffect(() => {
-    if (!userId || !formDate) return;
-
-    // 1. Create JS Date objects for the start and end of the selected day
-    const startOfDay = new Date(formDate);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(formDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    console.log(
-      `🔍 Searching: user_id=${userId} between ${startOfDay} and ${endOfDay}`,
-    );
-
-    // 2. Query where created_at is within that 24-hour window
+    if (!userId) return;
     const q = query(
       collection(db, "trips"),
       where("user_id", "==", userId),
-      where("created_at", ">=", startOfDay),
-      where("created_at", "<=", endOfDay),
       orderBy("created_at", "desc"),
     );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        console.log("✅ Trips found for this date:", snapshot.docs.length);
-        const tripsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setUserTrips(tripsData);
-      },
-      (error) => {
-        console.error("❌ Firestore Error:", error);
-      },
-    );
-
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const trips = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAllUserTrips(trips);
+    });
     return () => unsubscribe();
-  }, [userId, formDate]);
+  }, [userId]);
+
+  // Filter trips by selected date
+  useEffect(() => {
+    const selectedDateStr = formDate;
+    const filtered = allUserTrips.filter((trip) => {
+      if (!trip.created_at) return false;
+      const tripDate = trip.created_at.toDate
+        ? trip.created_at.toDate()
+        : new Date(trip.created_at);
+      const tripDateStr = tripDate.toISOString().split("T")[0];
+      return tripDateStr === selectedDateStr;
+    });
+    setTripsForSelectedDate(filtered);
+    setSelectedTripId("");
+    setAddedTrips([]);
+    setDistance("0.00");
+  }, [allUserTrips, formDate]);
+
+  // Total distance from added trips
+  useEffect(() => {
+    const totalDist = addedTrips.reduce(
+      (sum, trip) => sum + (parseFloat(trip.distance) || 0),
+      0,
+    );
+    setDistance(totalDist.toFixed(2));
+  }, [addedTrips]);
 
   useEffect(() => {
-    if (mileageRate !== undefined) {
-      setFormMileageRate(mileageRate);
-    }
+    if (mileageRate !== undefined) setFormMileageRate(mileageRate);
   }, [mileageRate]);
 
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
     if (!configId) return;
-
     const unsubscribe = onSnapshot(
       doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
       (docSnap) => {
@@ -123,90 +136,142 @@ export default function SubmitExpenseWebScreen() {
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
+          } else {
+            setUsername(user.displayName || "User");
           }
         } catch (error) {
           console.error("Error fetching user doc:", error);
+          setUsername("");
         }
+      } else {
+        setUserId(null);
+        setUsername("");
       }
     });
     return () => unsubscribe();
   }, []);
 
-  const handleTripSelect = (tripId: string) => {
-    setSelectedTripId(tripId);
-    const selectedTrip = userTrips.find((t) => t.id === tripId);
-
-    if (selectedTrip) {
-      setFromAddress(selectedTrip.from_address || "");
-      setToAddress(selectedTrip.to_address || "");
-      setDistance(selectedTrip.distance?.toString() || "0.00");
-      setFormTripReport(selectedTrip.remark || "");
-
-      // Convert Firebase Timestamps to HH:mm for the HTML time inputs
-      if (selectedTrip.from_time) {
-        const start = selectedTrip.from_time.toDate
-          ? selectedTrip.from_time.toDate()
-          : new Date(selectedTrip.from_time);
-        setFormFromTime(start.toTimeString().slice(0, 5));
-      }
-      if (selectedTrip.to_time) {
-        const end = selectedTrip.to_time.toDate
-          ? selectedTrip.to_time.toDate()
-          : new Date(selectedTrip.to_time);
-        setFormToTime(end.toTimeString().slice(0, 5));
-      }
+  const handleAddTrip = (tripId?: string) => {
+    const idToAdd = tripId || selectedTripId;
+    if (!idToAdd) return;
+    const tripToAdd = tripsForSelectedDate.find((t) => t.id === idToAdd);
+    if (tripToAdd && !addedTrips.some((t) => t.id === tripToAdd.id)) {
+      setAddedTrips((prev) => [...prev, tripToAdd]);
+      setSelectedTripId(""); // clear selection after adding
+    } else if (tripToAdd) {
+      alert("This trip has already been added.");
     }
+  };
+
+  const handleRemoveTrip = (tripId: string) => {
+    setAddedTrips((prev) => prev.filter((t) => t.id !== tripId));
   };
 
   const getDistanceValue = () =>
     parseFloat(distance.replace(/[^0-9.]/g, "")) || 0;
-
-  const calculateMileage = useCallback(() => {
-    return (getDistanceValue() * mileageRate).toFixed(2);
-  }, [mileageRate, distance]);
-
+  const calculateMileage = () => (getDistanceValue() * mileageRate).toFixed(2);
   const calculateCost = () => {
     const travelCost = getDistanceValue() * mileageRate;
     const parking = parseFloat(formParking) || 0;
     const toll = parseFloat(formToll) || 0;
     return (travelCost + parking + toll).toFixed(2);
   };
-
   const calculateDuration = () => {
     if (!formFromTime || !formToTime) return "0h 0m";
     const [h1, m1] = formFromTime.split(":").map(Number);
     const [h2, m2] = formToTime.split(":").map(Number);
     let diff = h2 * 60 + m2 - (h1 * 60 + m1);
     if (diff < 0) diff += 1440;
-    const hours = Math.floor(diff / 60);
-    const mins = diff % 60;
-    return `${hours}h ${mins}m`;
+    return `${Math.floor(diff / 60)}h ${diff % 60}m`;
   };
 
   const updateMileageRate = async () => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
-    if (!configId) {
-      console.error("No Config ID found in environment variables");
-      return;
-    }
+    if (!configId) return;
     const docRef = doc(db, "config", configId);
     try {
       await updateDoc(docRef, { mileage_rate: formMileageRate });
       alert("Rate updated successfully!");
     } catch (error) {
-      console.error("Error updating document:", error);
+      console.error(error);
     }
   };
 
+  const saveTripToFirestore = async () => {
+    console.log("Saving trip to Firestore...");
+  };
+
+  /* const saveTripToFirestore = async (
+    finalToAddress: string,
+    finalDistance: number,
+    finalEndTime: Date,
+    finalImageUrl: string,
+  ) => {
+    const currentLoc = currentLocationRef.current;
+
+    let subToAddress = finalToAddress;
+    let subDistance = finalDistance;
+    let finalToll = 0;
+
+    // Perform comparison if going home and we have a valid starting point
+    if (toHome && points && currentLocation) {
+      const distToCurrent = getHaversineDistance(points, currentLocation);
+      const distToOffice = getHaversineDistance(points, officeCoords);
+
+      if (distToOffice < distToCurrent) {
+        console.log(`Route Comparison: Using Current.`);
+      } else {
+        console.log(`Route Comparison: Using Office.`);
+        subDistance = parseFloat(distToOffice.toFixed(2));
+        if (officeCoords) {
+          subToAddress = await getAddressFromCoords(
+            officeCoords.lat,
+            officeCoords.lng,
+          );
+          if (currentLocation) {
+            finalToll = await fetchTollCost(currentLocation, officeCoords);
+          }
+        }
+      }
+    }
+    if (finalToll === 0 && currentLocation && destination) {
+      finalToll = await fetchTollCost(currentLocation, destination);
+    }
+
+    let mileage = subDistance * mileageRate;
+    let total = mileage + finalToll;
+    // ────────────────────────────────────────────────────────────────────────
+
+    try {
+      await addDoc(collection(db, "trips"), {
+        user_id: userId,
+        from_address: fromAddress,
+        to_address: subToAddress,
+        distance: subDistance,
+        toll: parseFloat(finalToll.toFixed(2)), // ← new field
+        mileage: parseFloat(mileage.toFixed(2)),
+        total: parseFloat(total.toFixed(2)),
+        remark:  formRemark,
+        from_time: fromTime,
+        to_time: finalEndTime,
+        to_home: toHome,
+        route_image_url: finalImageUrl,
+        created_at: serverTimestamp(),
+      });
+
+      await sendTripSavedNotification(subDistance, total);
+
+      Alert.alert("Success", "Your trip data has been saved.");
+      resetForm();
+    } catch (error) {
+      console.error("Error saving trip:", error);
+      Alert.alert("Error", "Failed to save trip to Firebase.");
+    }
+  }; */
+
   const handleSubmit = async () => {
     const dist = getDistanceValue();
-    if (
-      dist === 0 ||
-      !formPurpose.trim() ||
-      !formDate ||
-      !fromAddress ||
-      !toAddress
-    ) {
+    if (dist === 0 || !formPurpose.trim() || !formDate) {
       alert("Please ensure all required fields are filled.");
       return;
     }
@@ -227,8 +292,6 @@ export default function SubmitExpenseWebScreen() {
         user_name: username,
         date: formDate,
         purpose: formPurpose,
-        from_address: fromAddress,
-        to_address: toAddress,
         company: formCompany,
         name: formName,
         contact_number: formContactNumber,
@@ -245,13 +308,81 @@ export default function SubmitExpenseWebScreen() {
         type: 1,
         approval_status: 0,
         created_at: serverTimestamp(),
+        // 🔹 NEW: store the list of trip IDs that were added
+        trip_ids: addedTrips.map((trip) => trip.id),
       });
       alert("Expense submitted successfully!");
+      // Optionally reset the form or clear addedTrips
+      // setAddedTrips([]);
+      // setSelectedTripId("");
     } catch (e) {
       console.error(e);
       alert("Failed to save expense.");
     }
   };
+
+  const renderTripModal = () => (
+    <Modal
+      visible={isDropdownOpen}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setIsDropdownOpen(false)}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setIsDropdownOpen(false)}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select a Trip</Text>
+            <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList}>
+            {tripsForSelectedDate.length === 0 && (
+              <Text style={styles.noTripsText}>
+                No trips found for {formDate.split("-").reverse().join("-")}
+              </Text>
+            )}
+            {tripsForSelectedDate.map((trip) => (
+              <TouchableOpacity
+                key={trip.id}
+                style={styles.modalTripItem}
+                onPress={() => {
+                  setSelectedTripId(trip.id);
+                  setIsDropdownOpen(false);
+                  handleAddTrip(trip.id);
+                }}
+              >
+                <View style={styles.modalTripHeader}>
+                  <Text style={styles.timeText}>
+                    {trip.created_at?.toDate().toLocaleTimeString()}
+                  </Text>
+                  <Text style={styles.distanceText}>
+                    {(parseFloat(trip.distance) || 0).toFixed(2)} km
+                  </Text>
+                </View>
+                <Text style={styles.addressText}>
+                  <Text style={styles.boldLabel}>Remark: </Text>
+                  {trip.remark || "No Remark"}
+                </Text>
+                <Text style={styles.addressText}>
+                  <Text style={styles.boldLabel}>From: </Text>
+                  {trip.from_address}
+                </Text>
+                <Text style={styles.addressText}>
+                  <Text style={styles.boldLabel}>To: </Text>
+                  {trip.to_address}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
 
   return (
     <View style={styles.container}>
@@ -270,80 +401,171 @@ export default function SubmitExpenseWebScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputRow,
-                {
-                  marginTop: 10,
-                  marginBottom: 20,
-                  borderBottomWidth: 1,
-                  borderColor: "#eee",
-                  paddingBottom: 15,
-                  zIndex: isDropdownOpen ? 1000 : 1,
-                  elevation: isDropdownOpen ? 1000 : 1,
-                },
-              ]}
+            <TouchableOpacity
+              onPress={() => setShowModal(true)}
+              style={styles.button}
             >
-              <Text style={styles.fieldLabel}>Import Trip:</Text>
+              <Text style={styles.buttonText}>Add Trip</Text>
+            </TouchableOpacity>
+            <Modal
+              animationType="fade"
+              transparent={true}
+              visible={showModal}
+              statusBarTranslucent={true}
+              onRequestClose={() => !isSaving && setShowModal(false)}
+            >
+              <View style={styles.screenOverlay}>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === "ios" ? "padding" : "height"}
+                  style={styles.keyboardContainer}
+                >
+                  <ScrollView
+                    style={styles.modalScrollWrapper}
+                    contentContainerStyle={styles.modalScrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <View style={styles.modalView}>
+                      <Text style={styles.modalTitle}>Add Trip</Text>
 
-              <View
-                style={[
-                  styles.dropdownContainer,
-                  { zIndex: isDropdownOpen ? 9999 : 1 },
-                ]}
-              >
+                      <View style={styles.formGroup}>
+                        <Text style={styles.modalSubtitle}>
+                          From (Destination):
+                        </Text>
+                        <PlacesInput
+                          value={fromAddress}
+                          placeholder="Search destination…"
+                          onPlaceSelected={(address, location) => {
+                            setFromAddress(address);
+                          }}
+                        />
+                        <Text style={styles.modalSubtitle}>
+                          To (Destination):
+                        </Text>
+                        <PlacesInput
+                          value={toAddress}
+                          placeholder="Search destination…"
+                          onPlaceSelected={(address, location) => {
+                            setToAddress(address);
+                          }}
+                        />
+                        <Text style={styles.modalSubtitle}>
+                          Remark (Optional):
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            { minHeight: 80, textAlignVertical: "top" },
+                          ]}
+                          placeholder="Trip Remark..."
+                          placeholderTextColor="#999999"
+                          value={formRemark}
+                          onChangeText={setFormRemark}
+                          editable={!isSaving}
+                          keyboardType="default"
+                          multiline
+                          numberOfLines={3}
+                        />
+                      </View>
+
+                      <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                          style={[styles.dialogButton, styles.cancelButton]}
+                          onPress={() => setShowModal(false)}
+                          disabled={isSaving}
+                        >
+                          <Text style={styles.textStyle}>Cancel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.dialogButton,
+                            styles.submitButton,
+                            isSaving && { opacity: 0.7 },
+                          ]}
+                          onPress={saveTripToFirestore}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.textStyle}>Submit</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </ScrollView>
+                </KeyboardAvoidingView>
+              </View>
+            </Modal>
+
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Select Trips:</Text>
+              <View style={styles.dropdownInput}>
                 <TouchableOpacity
-                  style={styles.dropdownHeader}
-                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+                  style={styles.dropdownButton}
+                  onPress={() => setIsDropdownOpen(true)}
                 >
                   <Text style={styles.selectedText}>
                     {selectedTripId
-                      ? "Trip Selected"
-                      : userTrips.length > 0
-                        ? `-- Select a Trip --`
-                        : "-- No Trips --"}
+                      ? (() => {
+                          const selected = tripsForSelectedDate.find(
+                            (t) => t.id === selectedTripId,
+                          );
+                          return selected
+                            ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
+                            : "Click to Select";
+                        })()
+                      : tripsForSelectedDate.length > 0
+                        ? "Click to Select"
+                        : "No Trips on this Day"}
                   </Text>
                 </TouchableOpacity>
-
-                {/* Use a clear ternary operator to avoid "0" or "false" being rendered as text */}
-                {isDropdownOpen === true ? (
-                  <View style={styles.dropdownListWrapper}>
-                    <ScrollView style={styles.tripList}>
-                      {userTrips.map((trip) => (
-                        <TouchableOpacity
-                          key={trip.id}
-                          onPress={() => {
-                            handleTripSelect(trip.id);
-                            setIsDropdownOpen(false);
-                          }}
-                          style={styles.tripItem}
-                        >
-                          <Text style={styles.timeText}>
-                            {trip.created_at?.toDate().toLocaleTimeString()}
-                          </Text>
-                          <Text style={styles.addressText}>
-                            <Text style={styles.boldLabel}>Remark: </Text>
-                            {trip.remark || "No Remark"}
-                          </Text>
-
-                          <Text style={styles.addressText}>
-                            <Text style={styles.boldLabel}>From: </Text>
-                            {trip.from_address}
-                          </Text>
-
-                          <Text style={styles.addressText}>
-                            <Text style={styles.boldLabel}>To: </Text>
-                            {trip.to_address}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null}
+                {/* <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={handleAddTrip}
+                >
+                  <Text style={styles.addButtonText}>Add Trip</Text>
+                </TouchableOpacity> */}
               </View>
-            </View>
 
-            <View style={styles.inputRow}>
+              {renderTripModal()}
+            </View>
+            {addedTrips.length > 0 && (
+              <View style={styles.addedTripsContainer}>
+                <Text style={styles.subsectionTitle}>Selected Trips:</Text>
+                {addedTrips.map((trip) => (
+                  <View key={trip.id} style={styles.addedTripItem}>
+                    <View style={styles.addedTripDetails}>
+                      <Text style={styles.tripRemark}>
+                        {trip.remark || "No Remark"} (
+                        {parseFloat(trip.distance || 0).toFixed(2)} km)
+                      </Text>
+                      <Text style={styles.tripAddress} numberOfLines={1}>
+                        {trip.from_address} → {trip.to_address}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveTrip(trip.id)}
+                      style={styles.removeButton}
+                    >
+                      <Text style={styles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <View style={styles.totalSummary}>
+                  <Text style={styles.summaryText}>
+                    Total Distance: {getDistanceValue().toFixed(2)} km
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    Total Mileage: RM {calculateMileage()}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Rest of the form fields (same as before) */}
+            {/*<View style={styles.inputRow}>
               <Text style={styles.fieldLabel}>From:</Text>
               <TextInput
                 placeholder="From..."
@@ -352,7 +574,6 @@ export default function SubmitExpenseWebScreen() {
                 style={styles.webTextInput}
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To:</Text>
               <TextInput
@@ -361,17 +582,19 @@ export default function SubmitExpenseWebScreen() {
                 onChangeText={setToAddress}
                 style={styles.webTextInput}
               />
-            </View>
-
+            </View>*/}
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Distance (km):</Text>
-              <TextInput
+              <Text style={styles.fieldLabel}>Distance:</Text>
+              {/* <TextInput
                 placeholder="0.00"
                 value={distance}
-                onChangeText={setDistance}
-                keyboardType="numeric"
-                style={styles.webTextInput}
-              />
+                editable={false}
+                style={[styles.webTextInput, styles.disabledInput]}
+              /> */}
+              <Text style={styles.fieldValue}>{distance} km</Text>
+              {/* <Text style={styles.autoNote}>
+                (Auto-sum from selected trips)
+              </Text> */}
             </View>
 
             <View
@@ -419,7 +642,6 @@ export default function SubmitExpenseWebScreen() {
                 placeholder="Company/Site"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Name:</Text>
               <TextInput
@@ -429,7 +651,6 @@ export default function SubmitExpenseWebScreen() {
                 placeholder="Name"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Contact:</Text>
               <TextInput
@@ -441,7 +662,6 @@ export default function SubmitExpenseWebScreen() {
                 placeholder="Contact Number"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>From Time:</Text>
               <input
@@ -451,7 +671,6 @@ export default function SubmitExpenseWebScreen() {
                 style={htmlInputStyle}
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>To Time:</Text>
               <input
@@ -461,12 +680,10 @@ export default function SubmitExpenseWebScreen() {
                 style={htmlInputStyle}
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Duration:</Text>
               <Text style={styles.fieldValue}>{calculateDuration()}</Text>
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Parking (RM):</Text>
               <TextInput
@@ -476,7 +693,6 @@ export default function SubmitExpenseWebScreen() {
                 style={styles.webTextInput}
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Toll (RM):</Text>
               <TextInput
@@ -486,7 +702,6 @@ export default function SubmitExpenseWebScreen() {
                 style={styles.webTextInput}
               />
             </View>
-
             <View
               style={[
                 styles.inputRow,
@@ -502,7 +717,6 @@ export default function SubmitExpenseWebScreen() {
                 placeholder="Trip Report"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Business Card:</Text>
               <input
@@ -514,12 +728,10 @@ export default function SubmitExpenseWebScreen() {
                 style={htmlInputStyle}
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Mileage:</Text>
               <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Cost:</Text>
               <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
@@ -530,8 +742,7 @@ export default function SubmitExpenseWebScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Mileage rate configuration form restored[cite: 1] */}
-          <View style={styles.mileageUpdateContainer}>
+          {/* <View style={styles.mileageUpdateContainer}>
             <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>
               Mileage Rate
             </Text>
@@ -550,7 +761,7 @@ export default function SubmitExpenseWebScreen() {
             >
               <Text style={styles.buttonText}>Update Rate</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </ScrollView>
       </View>
     </View>
@@ -562,104 +773,31 @@ const htmlInputStyle = {
   border: "1px solid #ccc",
   width: "100%",
   maxWidth: "400px",
+  minHeight: "36px",
   boxSizing: "border-box" as const,
+  backgroundColor: "#fff",
 };
-
 const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
 
 const styles = StyleSheet.create({
-  boldLabel: {
-    fontWeight: "bold",
-    color: "#333",
-  },
-  dropdownContainer: {
-    position: "relative",
-    marginVertical: 10,
-    width: "100%",
-    maxWidth: 400,
-    zIndex: 5000,
-    elevation: 5,
-  },
-  dropdownHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 0, // Removed border radius
-    backgroundColor: "#fff",
-  },
-  dropdownListWrapper: {
-    position: "absolute",
-    top: 50, // Increased from 45 to add a gap (adjust as needed)
-    left: 0,
-    right: 0,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 0, // Removed border radius
-    maxHeight: 300,
-    zIndex: 5001,
-    boxShadow: "0px 4px 10px rgba(0,0,0,0.1)",
-  },
-  selectedText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  arrow: {
-    fontSize: 12,
-    color: "#666",
-  },
-  tripList: {
-    maxHeight: 280,
-  },
-  tripItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  selectedTripItem: {
-    backgroundColor: "#f0f7ff",
-  },
-  listContainer: {
-    marginVertical: 10,
-    width: "100%",
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-    color: "#333",
-  },
-  tripHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  timeText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#2196F3",
-  },
-  remarkText: {
-    fontSize: 12,
-    fontStyle: "italic",
-    color: "#666",
-  },
-  addressText: {
-    fontSize: 13,
-    color: "#444",
-    lineHeight: 18,
-  },
-  emptyItem: {
-    padding: 20,
-    alignItems: "center",
-  },
+  boldLabel: { fontWeight: "bold", color: "#333" },
   container: { flex: 1, backgroundColor: "#fff" },
   detailsContainer: { flex: 1 },
   scrollContent: { padding: 20 },
   formContainer: { flex: 1 },
+  dropdownInput: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    // Ensure consistent height with native select
+    height: "auto",
+    minHeight: 36,
+    maxWidth: 400,
+  },
   webTextInput: {
     flex: 1,
     maxWidth: 400,
@@ -669,7 +807,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
     position: "relative",
   },
-  inputRow: { flexDirection: "row", alignItems: "center" },
+  disabledInput: { backgroundColor: "#f5f5f5", color: "#888" },
+  autoNote: { marginLeft: 8, fontSize: 12, color: "#666", fontStyle: "italic" },
+  inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
   fieldValue: { fontSize: 14, flex: 1 },
   button: {
@@ -687,5 +827,176 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#eee",
     paddingTop: 20,
+  },
+  tripSelectionSection: {
+    marginTop: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    padding: 12,
+    backgroundColor: "#fafafa",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#333",
+  },
+  dropdownAddRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dropdownButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#fff",
+    backgroundColor: "#fff",
+  },
+  selectedText: { fontSize: 14, color: "#333" },
+  addButton: {
+    backgroundColor: "#4caf50",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+  },
+  addButtonText: { color: "white", fontWeight: "bold" },
+  addedTripsContainer: { marginTop: 16 },
+  subsectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+    color: "#555",
+  },
+  addedTripItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  addedTripDetails: { flex: 1 },
+  tripRemark: { fontWeight: "bold", fontSize: 14 },
+  tripAddress: { fontSize: 12, color: "#666" },
+  removeButton: {
+    backgroundColor: "#f44336",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginLeft: 10,
+  },
+  removeButtonText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  totalSummary: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: "#e8f5e9",
+    borderLeftWidth: 4,
+    borderLeftColor: "#4caf50",
+    maxWidth: 400,
+  },
+  summaryText: { fontSize: 14, fontWeight: "500", color: "#2e7d32" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "white",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold" },
+  closeButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
+  modalList: { maxHeight: 400 },
+  modalTripItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
+  modalTripHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  timeText: { fontSize: 12, fontWeight: "bold", color: "#2196F3" },
+  distanceText: { fontSize: 12, fontWeight: "bold", color: "#4caf50" },
+  addressText: { fontSize: 13, color: "#444", marginTop: 2 },
+  noTripsText: { padding: 20, textAlign: "center", color: "#888" },
+  screenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  modalScrollWrapper: {
+    flex: 1,
+    width: "100%",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  modalView: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 25,
+    alignItems: "stretch",
+    shadowColor: "#000",
+    elevation: 5,
+  },
+  formGroup: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: "normal",
+    marginBottom: 8,
+    color: "#666",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  dialogButton: {
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+    flex: 1,
+    alignItems: "center",
+  },
+  submitButton: {
+    backgroundColor: "#2196F3",
+  },
+  cancelButton: {
+    backgroundColor: "#f44336",
+  },
+  textStyle: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  input: {
+    width: "100%",
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#eee",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#333",
   },
 });

@@ -37,12 +37,15 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.anonymous.expensecalculator",
+      useNextNotificationsApi: true,
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
       ],
       config: {
         googleMaps: {
@@ -58,6 +61,14 @@ export default {
     plugins: [
       "expo-router",
       "expo-task-manager",
+      "expo-background-fetch",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/icon.png",
+          color: "#2196F3",
+        },
+      ],
       [
         "expo-location",
         {

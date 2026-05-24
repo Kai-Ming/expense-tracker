@@ -30,8 +30,7 @@ interface Expense {
   id: string;
   distance: number;
   date?: string;
-  from_address: string;
-  to_address: string;
+  trip_ids: string[];
   purpose: string;
   from_time?: string;
   to_time?: string;
@@ -49,6 +48,23 @@ interface Expense {
   business_card_url?: string;
   route_image_url?: string;
   approval_status: number;
+  created_at: any;
+}
+
+interface Trip {
+  id: string;
+  user_id: string;
+  distance: number;
+  toll?: number;
+  mileage?: number;
+  date?: any;
+  from_address: string;
+  to_address: string;
+  from_time?: string;
+  to_time?: string;
+  remark: string;
+  route_image_url?: string;
+  to_home: boolean;
   created_at: any;
 }
 
@@ -74,6 +90,7 @@ export default function ExpensesWebScreen() {
   const editInputARef = useRef<any>(null);
   const editInputBRef = useRef<any>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
 
   const purposeList = [
     { label: "Application support", value: "Application support" },
@@ -117,34 +134,77 @@ export default function ExpensesWebScreen() {
 
   useEffect(() => {
     const auth = getAuth();
-    return onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          setRole(userDoc.data().role);
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log("User doc data:", userData);
+            console.log("Role value:", userData.role);
+            setRole(userData.role);
+          } else {
+            console.warn("User document does NOT exist for uid:", user.uid);
+            setRole(null);
+          }
+        } catch (error) {
+          console.error("Error fetching user doc:", error);
+          setRole(null);
         }
       } else {
         setUserId(null);
         setRole(null);
       }
     });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!userId) return;
-    const q = query(
-      collection(db, "expenses"),
-      where("user_id", "==", userId),
-      orderBy("created_at", "desc"),
-    );
-    return onSnapshot(q, (querySnapshot) => {
+    // Wait until role is determined (not null)
+    if (role === null) return;
+
+    let q;
+    if (role === 0) {
+      // Admin: fetch all expenses (no user_id filter)
+      q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
+    } else {
+      // Regular user: fetch only their own expenses
+      q = query(
+        collection(db, "expenses"),
+        where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const expensesData: Expense[] = [];
       querySnapshot.forEach((doc) =>
         expensesData.push({ id: doc.id, ...doc.data() } as Expense),
       );
       setExpenses(expensesData);
     });
+
+    return () => unsubscribe();
+  }, [userId, role]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const q = query(
+      collection(db, "trips"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tripsData: Trip[] = [];
+      snapshot.forEach((doc) => {
+        tripsData.push({ id: doc.id, ...doc.data() } as Trip);
+      });
+      setAllTrips(tripsData);
+    });
+    return () => unsubscribe();
   }, [userId]);
 
   useEffect(() => {
@@ -252,6 +312,10 @@ export default function ExpensesWebScreen() {
     return () => clearTimeout(timer);
   }, [editingId]);
 
+  const getTripById = (tripId: string): Trip | undefined => {
+    return allTrips.find((trip) => trip.id === tripId);
+  };
+
   const filteredExpenses = expenses.filter((e) => {
     if (!e.date || (!appliedStartDate && !appliedEndDate)) return true;
     return (
@@ -293,7 +357,7 @@ export default function ExpensesWebScreen() {
   const handleEdit = async (expense: Expense) => {
     setEditingId(expense.id);
     setEditFormData({ ...expense });
-    setTempPolyline(null);
+    /* setTempPolyline(null);
     if ((window as any).google) {
       const geocoder = new (window as any).google.maps.Geocoder();
       const geocode = (addr: string) =>
@@ -309,7 +373,7 @@ export default function ExpensesWebScreen() {
         geocode(expense.to_address),
       ]);
       setTempPoints([p0, p1]);
-    }
+    } */
   };
 
   const handleSaveEdit = async () => {
@@ -396,8 +460,6 @@ export default function ExpensesWebScreen() {
         (e) => `
       <tr>
         <td>${e.date}</td>
-        <td>${e.from_address}</td>
-        <td>${e.to_address}</td>
         <td>${e.user_name || ""}</td>
         <td>${e.purpose}</td>
         <td>${e.company || ""}</td>
@@ -447,8 +509,6 @@ export default function ExpensesWebScreen() {
         (e) => `
       <div class="expense-detail">
         <h3>${e.company}, ${e.name} - ${e.purpose} (${e.date || "N/A"} ${e.from_time}-${e.to_time})</h3>
-        <p><strong>From:</strong> ${e.from_address}</p>
-        <p><strong>To:</strong> ${e.to_address}</p>
         <p><strong>Purpose:</strong> ${e.purpose}</p>
         <p><strong>Company/Site:</strong> ${e.company}</p>
         <p><strong>Name:</strong> ${e.name}</p>
@@ -555,7 +615,10 @@ export default function ExpensesWebScreen() {
         <React.Fragment key={item.id}>
           <tr
             style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
-            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+            onClick={() => {
+              console.log(role);
+              setExpandedId(isExpanded ? null : item.id);
+            }}
           >
             <td style={webTableStyles.td}>{item.user_name || "N/A"}</td>
             <td style={webTableStyles.td}>{item.date || "N/A"}</td>
@@ -594,40 +657,6 @@ export default function ExpensesWebScreen() {
                   </View>
 
                   <View style={styles.section}>
-                    <Text style={styles.descriptionLabel}>Route:</Text>
-                    {isEditing ? (
-                      <View style={{ backgroundColor: "transparent" }}>
-                        <TextInput
-                          ref={editInputARef}
-                          style={styles.inlineInput}
-                          value={editFormData.from_address}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              from_address: text,
-                            })
-                          }
-                          placeholder="From Address"
-                        />
-                        <TextInput
-                          ref={editInputBRef}
-                          style={styles.inlineInput}
-                          value={editFormData.to_address}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              to_address: text,
-                            })
-                          }
-                          placeholder="To Address"
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {item.from_address} → {item.to_address}
-                      </Text>
-                    )}
-
                     <Text style={styles.descriptionLabel}>Date:</Text>
                     {isEditing ? (
                       <TextInput
@@ -835,22 +864,55 @@ export default function ExpensesWebScreen() {
                       </Text>
                     )}
 
-                    {item.route_image_url && !isEditing && (
-                      <>
-                        <Text style={styles.descriptionLabel}>Route Map:</Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setSelectedImage(item.route_image_url || null);
-                          }}
-                        >
-                          <Image
-                            source={{ uri: item.route_image_url }}
-                            style={styles.businessCardImage}
-                            resizeMode="contain"
-                          />
-                        </TouchableOpacity>
-                      </>
+                    {item.trip_ids && item.trip_ids.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.descriptionLabel}>Trips:</Text>
+                        {item.trip_ids.map((tripId) => {
+                          const trip = getTripById(tripId);
+                          return trip ? (
+                            <View key={tripId} style={styles.tripItem}>
+                              <Text style={styles.descriptionText}>
+                                {trip.from_address} → {trip.to_address} (
+                                {trip.distance?.toFixed(2)} km)
+                              </Text>
+                              <Text style={styles.tripRemark}>
+                                {trip.remark}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text key={tripId} style={styles.descriptionText}>
+                              Trip data not available
+                            </Text>
+                          );
+                        })}
+                      </View>
+                    )}
+
+                    {item.trip_ids && item.trip_ids.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.descriptionLabel}>
+                          Trip Route Maps:
+                        </Text>
+                        {item.trip_ids.map((tripId) => {
+                          const trip = getTripById(tripId);
+                          if (!trip || !trip.route_image_url) return null;
+                          return (
+                            <TouchableOpacity
+                              key={tripId}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setSelectedImage(trip.route_image_url || null);
+                              }}
+                            >
+                              <Image
+                                source={{ uri: trip.route_image_url }}
+                                style={styles.businessCardImage}
+                                resizeMode="contain"
+                              />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
                     )}
 
                     {item.business_card_url && (
@@ -873,39 +935,47 @@ export default function ExpensesWebScreen() {
                       </>
                     )}
                   </View>
-                  <View style={styles.actionButtonsContainer}>
-                    {isEditing ? (
-                      <>
+                  {item.user_id === userId && (
+                    <>
+                      <View style={styles.actionButtonsContainer}>
+                        {isEditing ? (
+                          <>
+                            <TouchableOpacity
+                              style={styles.approveButton}
+                              onPress={() => handleSaveEdit()}
+                            >
+                              <Text style={styles.approveButtonText}>Save</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.rejectButton}
+                              onPress={() => handleCancelEdit()}
+                            >
+                              <Text style={styles.rejectButtonText}>
+                                Cancel
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          item.approval_status === 0 && (
+                            <TouchableOpacity
+                              style={styles.editButton}
+                              onPress={() => handleEdit(item)}
+                            >
+                              <Text style={styles.editButtonText}>Edit</Text>
+                            </TouchableOpacity>
+                          )
+                        )}
                         <TouchableOpacity
-                          style={styles.approveButton}
-                          onPress={() => handleSaveEdit()}
+                          style={styles.deleteButton}
+                          onPress={() => handleDelete(item.id)}
                         >
-                          <Text style={styles.approveButtonText}>Save</Text>
+                          <Text style={styles.deleteButtonText}>Delete</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          onPress={() => handleCancelEdit()}
-                        >
-                          <Text style={styles.rejectButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      item.approval_status === 0 && (
-                        <TouchableOpacity
-                          style={styles.editButton}
-                          onPress={() => handleEdit(item)}
-                        >
-                          <Text style={styles.editButtonText}>Edit</Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(item.id)}
-                    >
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
 
+                  <View style={styles.actionButtonsContainer}>
                     {role === 0 && item.approval_status === 0 && (
                       <>
                         <TouchableOpacity
@@ -973,38 +1043,6 @@ export default function ExpensesWebScreen() {
             <View style={styles.separator} />
 
             <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Route:</Text>
-              {isEditing ? (
-                <View style={{ backgroundColor: "transparent" }}>
-                  <TextInput
-                    ref={editInputARef}
-                    style={styles.inlineInput}
-                    value={editFormData.from_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, from_address: text })
-                    }
-                    placeholder="From Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                  <TextInput
-                    ref={editInputBRef}
-                    style={styles.inlineInput}
-                    value={editFormData.to_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, to_address: text })
-                    }
-                    placeholder="To Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </View>
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.from_address || "N/A"} → {item.to_address || "N/A"}
-                </Text>
-              )}
-
               <Text style={styles.descriptionLabel}>Date:</Text>
               {isEditing ? (
                 <TextInput
@@ -1775,6 +1813,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 4,
     backgroundColor: "#f9f9f9",
+  },
+  tripItem: {
+    marginBottom: 8,
+    backgroundColor: "#f5f5f5",
+    padding: 8,
+    borderRadius: 4,
+  },
+  tripRemark: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
   },
 });
 

@@ -1,6 +1,7 @@
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -16,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   DeviceEventEmitter,
+  Platform,
   StyleSheet,
   Switch,
   TextInput,
@@ -23,7 +25,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import MapComponent from "../../components/MapComponent";
-import { db, storage } from "../../firebaseConfig";
+import { db } from "../../firebaseConfig";
 
 const LOCATION_TRACKING_TASK = "background-location-task";
 const BG_LOCATION_EVENT = "bg-location-update";
@@ -36,18 +38,24 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, ({ data, error }: any) => {
   if (data) {
     const { locations } = data;
     if (locations && locations.length > 0) {
-      const location = locations;
+      const location = locations[0]; // ← take the first location object
       const latLng = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       };
 
       console.log("Background location captured:", latLng);
-
-      // Emit the event to any active foreground listeners
       DeviceEventEmitter.emit(BG_LOCATION_EVENT, latLng);
     }
   }
+});
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
 });
 
 export default function SubmitExpenseScreen() {
@@ -59,6 +67,7 @@ export default function SubmitExpenseScreen() {
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(
     null,
   );
+  const currentLocationRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const [distance, setDistance] = useState<string | null>(null);
   const [routePolyline, setRoutePolyline] = useState<string | null>(null);
@@ -105,8 +114,52 @@ export default function SubmitExpenseScreen() {
   } | null>(null);
   const [arrivalDistance, setArrivalDistance] = useState<number>(0.1);
   const [toll, setToll] = useState<string>("");
+  const totalTraveledDistanceRef = useRef<number>(0);
+  const toAddressRef = useRef<string>("");
+  const routeCoordsRef = useRef<{ latitude: number; longitude: number }[]>([]);
+  const tripActiveRef = useRef(false);
+  const arrivalDistanceRef = useRef<number>(0.1);
+  const destinationRef = useRef<{ lat: number; lng: number } | null>(null);
+  const pointsRef = useRef<({ lat: number; lng: number } | null)[]>([
+    null,
+    null,
+  ]);
+  const lastCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const OFFICE_COORDINATES = { lat: 3.0277632, lng: 101.4693888 };
+  const MIN_TRAVEL_DISTANCE = 0.04;
+
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+
+  useEffect(() => {
+    lastCoordsRef.current = lastCoords;
+  }, [lastCoords]);
+
+  useEffect(() => {
+    arrivalDistanceRef.current = arrivalDistance;
+  }, [arrivalDistance]);
+
+  useEffect(() => {
+    destinationRef.current = destination;
+  }, [destination]);
+
+  useEffect(() => {
+    tripActiveRef.current = tripActive;
+  }, [tripActive]);
+
+  useEffect(() => {
+    totalTraveledDistanceRef.current = totalTraveledDistance;
+  }, [totalTraveledDistance]);
+
+  useEffect(() => {
+    toAddressRef.current = toAddress;
+  }, [toAddress]);
+
+  useEffect(() => {
+    routeCoordsRef.current = routeCoords;
+  }, [routeCoords]);
 
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
@@ -143,12 +196,51 @@ export default function SubmitExpenseScreen() {
     fromTimeRef.current = fromTime;
   }, [fromTime]);
 
+  useEffect(() => {
+    currentLocationRef.current = currentLocation;
+  }, [currentLocation]);
+
+  useEffect(() => {
+    // Request notification permission on mount
+    Notifications.requestPermissionsAsync();
+  }, []);
+
+  useEffect(() => {
+    async function setupNotifications() {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") return;
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: "default",
+        });
+      }
+    }
+    setupNotifications();
+  }, []);
+
+  const sendTripSavedNotification = async (distance: number, total: number) => {
+    await Notifications.requestPermissionsAsync();
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Trip Saved ✅",
+        body: `${distance.toFixed(2)} km • RM ${total.toFixed(2)} total`,
+        sound: true,
+      },
+      trigger: null, // null = fire immediately
+    });
+  };
+
   const updateDestination = (latLng: { lat: number; lng: number }) => {
     setDestination(latLng);
     setPoints((prev) => [prev[0], latLng]);
   };
 
-  const resetForm = () => {
+  const resetForm = async () => {
+    await stopTracking();
+
     setFromAddress("");
     setToAddress("");
     setDistance(null);
@@ -163,6 +255,8 @@ export default function SubmitExpenseScreen() {
     setPoints([null, null]);
     setDestination(null);
     setTripActive(false);
+    setCurrentLocation(null);
+    currentLocationRef.current = null;
 
     // Stop any active tracking
     locationSubscriptionRef.current?.remove();
@@ -243,12 +337,45 @@ export default function SubmitExpenseScreen() {
     }
   };
 
+  const checkAndAutoSubmit = async (
+    currentCoords: { lat: number; lng: number },
+    totalTraveled: number,
+  ) => {
+    const dest = destinationRef.current;
+    if (!dest) return false;
+    if (totalTraveled < MIN_TRAVEL_DISTANCE) return false;
+
+    const distToDest = getHaversineDistance(currentCoords, dest);
+    if (distToDest <= arrivalDistanceRef.current) {
+      console.log(
+        `Auto-submit: ${distToDest.toFixed(2)}km ≤ ${arrivalDistanceRef.current}km`,
+      );
+
+      // Stop tracking immediately
+      await stopTracking();
+
+      // Submit in background (no alerts, no UI reset)
+      await submitTripInBackground();
+
+      // Reset tracking refs for the next potential trip
+      totalTraveledDistanceRef.current = 0;
+      routeCoordsRef.current = [];
+      lastCoordsRef.current = null;
+      // Do NOT reset pointsRef or destinationRef – they keep the form data
+
+      return true;
+    }
+    return false;
+  };
+
   const saveTripToFirestore = async (
     finalToAddress: string,
     finalDistance: number,
     finalEndTime: Date,
     finalImageUrl: string,
   ) => {
+    const currentLoc = currentLocationRef.current;
+
     let subToAddress = finalToAddress;
     let subDistance = finalDistance;
     let finalToll = 0;
@@ -298,6 +425,8 @@ export default function SubmitExpenseScreen() {
         route_image_url: finalImageUrl,
         created_at: serverTimestamp(),
       });
+
+      await sendTripSavedNotification(subDistance, total);
 
       Alert.alert("Success", "Your trip data has been saved.");
       resetForm();
@@ -372,25 +501,47 @@ export default function SubmitExpenseScreen() {
   ) => {
     if (coords.length === 0) return null;
 
-    // 1. Create the base URL
-    const baseUrl = "https://maps.googleapis.com/maps/api/staticmap";
+    // ── 1. Sample points to stay under URL limit ──────────────────
+    const MAX_POINTS = 50;
+    const sampled =
+      coords.length <= MAX_POINTS
+        ? coords
+        : coords.filter(
+            (_, i) =>
+              i === 0 ||
+              i === coords.length - 1 ||
+              i % Math.floor(coords.length / MAX_POINTS) === 0,
+          );
 
-    // 2. Format the path (polyline) from your route coordinates
-    // Note: For very long routes, you might need to "sample" every 5th or 10th point
-    // to stay under URL character limits.
-    const pathString = coords
+    // ── 2. Build path string ───────────────────────────────────────
+    const pathString = sampled
       .map((c) => `${c.latitude},${c.longitude}`)
       .join("|");
+
+    // ── 3. Start and end markers ───────────────────────────────────
+    const start = coords[0];
+    const end = coords[coords.length - 1];
+    const markerA = `markers=color:green|label:A|${start.latitude},${start.longitude}`;
+    const markerB = `markers=color:red|label:B|${end.latitude},${end.longitude}`;
 
     const params = [
       `size=600x300`,
       `scale=2`,
       `maptype=roadmap`,
-      `path=color:0x2196F3|weight:5|${pathString}`,
-      `key=${apiKey}`, // Uses your existing apiKey variable
+      `path=color:0x2196F3ff|weight:5|${pathString}`,
+      markerA,
+      markerB,
+      `key=${apiKey}`,
     ];
 
-    return `${baseUrl}?${params.join("&")}`;
+    const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join("&")}`;
+
+    // ── 4. Safety check — log if still too long ───────────────────
+    if (url.length > 8192) {
+      console.warn("Static map URL too long:", url.length, "chars");
+    }
+
+    return url;
   };
 
   const uploadRouteImage = async (
@@ -429,37 +580,61 @@ export default function SubmitExpenseScreen() {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
-      console.error("API Key is missing from process.env");
-      // Fallback to native if no key is found
+      console.error("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is undefined");
       const geo = await Location.reverseGeocodeAsync({
         latitude: lat,
         longitude: lng,
       });
-      return geo.length > 0
-        ? [geo.name, geo.city].filter(Boolean).join(", ")
-        : "API Key Missing";
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+      return "Address not found";
     }
 
     try {
       const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
       const response = await fetch(url);
       const data = await response.json();
-
-      console.log("Google Geocode Status:", data.status);
 
       if (data.status === "OK" && data.results.length > 0) {
         return data.results[0].formatted_address
           .replace(/\b\d{5}\b,?\s*/g, "")
           .trim();
-      } else if (data.status === "REQUEST_DENIED") {
-        console.error("Google API Error:", data.error_message);
-        return "API Access Denied";
+      }
+
+      // ── Fallback to native if Google fails ────────────────────────
+      console.warn(
+        "Google geocoding failed, falling back to native:",
+        data.status,
+      );
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
       }
 
       return "Address not found";
     } catch (error) {
-      console.error("Fetch error:", error);
-      return "Network error";
+      console.error("Geocoding fetch error:", error);
+      // ── Fallback to native on network error ───────────────────────
+      try {
+        const geo = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        if (geo.length > 0) {
+          const g = geo[0];
+          return [g.name, g.street, g.city].filter(Boolean).join(", ");
+        }
+      } catch (nativeError) {
+        console.error("Native geocoding also failed:", nativeError);
+      }
+      return "Address not found";
     }
   };
 
@@ -499,7 +674,7 @@ export default function SubmitExpenseScreen() {
 
       const curr = { lat: loc.coords.latitude, lng: loc.coords.longitude };
       setCurrentLocation(curr);
-      setPoints((prev) => [curr, prev]);
+      setPoints((prev) => [curr, prev[1]]);
 
       const addressText = await getAddressFromCoords(
         loc.coords.latitude,
@@ -547,7 +722,6 @@ export default function SubmitExpenseScreen() {
 
     return () => {
       unsubscribe();
-      // Clean up any active tracking subscription on unmount
       locationSubscriptionRef.current?.remove();
     };
   }, []);
@@ -559,28 +733,25 @@ export default function SubmitExpenseScreen() {
     let isMounted = true;
 
     // Helper function to handle coordinate math and state updating
-    const handleNewCoordinate = (newLat: number, newLng: number) => {
-      if (!isMounted) return;
+    const handleNewCoordinate = (lat: number, lng: number) => {
+      if (!tripActiveRef.current) return;
 
-      const curr = { lat: newLat, lng: newLng };
-
-      // Update current position marker
+      const curr = { lat, lng };
       setCurrentLocation(curr);
-      setPoints((prev) => [curr, prev]);
+      setPoints((prev) => [curr, prev[1]]);
+      setRouteCoords((prev) => [...prev, { latitude: lat, longitude: lng }]);
 
-      // Append breadcrumb
-      setRouteCoords((prev) => [
-        ...prev,
-        { latitude: newLat, longitude: newLng },
-      ]);
-
-      // Accumulate distance
+      // Update lastCoords and calculate distance
       setLastCoords((prev) => {
         if (prev) {
           const delta = getHaversineDistance(prev, curr);
           setTotalTraveledDistance((total) => {
             const newTotal = total + delta;
             setDistance(`${newTotal.toFixed(2)} km`);
+
+            // ⭐ Auto-submit check (does not rely on nested setPoints)
+            checkAndAutoSubmit(curr, newTotal);
+
             return newTotal;
           });
         }
@@ -642,8 +813,111 @@ export default function SubmitExpenseScreen() {
     };
   }, [tripActive]);
 
+  const submitTrip = async () => {
+    const currentLoc = currentLocationRef.current; // ← ref, not state
+    if (!currentLoc) return;
+
+    try {
+      const finalDistance = totalTraveledDistanceRef.current;
+      const finalToAddress = toAddressRef.current;
+      const finalRouteCoords = routeCoordsRef.current;
+
+      const resolvedToAddress = finalToAddress || "Unknown Destination";
+      const endTime = new Date();
+      const tripId = `trip_${Date.now()}`;
+
+      const routeImageUrl =
+        finalRouteCoords.length > 0
+          ? await uploadRouteImage(finalRouteCoords, tripId)
+          : "";
+
+      await saveTripToFirestore(
+        resolvedToAddress,
+        parseFloat(finalDistance.toFixed(2)),
+        endTime,
+        routeImageUrl ?? "",
+      );
+    } catch (error) {
+      console.error("Submission error:", error);
+      Alert.alert("Error", "Failed to save the trip.");
+    }
+  };
+
+  const submitTripInBackground = async () => {
+    const startPoint = pointsRef.current?.[0]; // add a ref for points
+    const currentLoc = currentLocationRef.current;
+    const dest = destinationRef.current;
+
+    if (!currentLoc) return;
+
+    try {
+      let finalDistance = totalTraveledDistanceRef.current;
+      let finalToAddress = toAddressRef.current;
+      let finalToll = 0;
+      let finalRouteCoords = routeCoordsRef.current;
+
+      // toHome logic
+      if (toHome && startPoint && officeCoords) {
+        const distToCurrent = getHaversineDistance(startPoint, currentLoc);
+        const distToOffice = getHaversineDistance(startPoint, officeCoords);
+        if (distToOffice < distToCurrent) {
+          finalDistance = distToOffice;
+          finalToAddress = await getAddressFromCoords(
+            officeCoords.lat,
+            officeCoords.lng,
+          );
+          finalToll = await fetchTollCost(currentLoc, officeCoords);
+        }
+      } else if (dest) {
+        finalToll = await fetchTollCost(currentLoc, dest);
+      }
+
+      const mileage = finalDistance * mileageRate;
+      const total = mileage + finalToll;
+
+      await addDoc(collection(db, "trips"), {
+        user_id: userId,
+        from_address: fromAddress,
+        to_address: finalToAddress,
+        distance: parseFloat(finalDistance.toFixed(2)),
+        toll: parseFloat(finalToll.toFixed(2)),
+        mileage: parseFloat(mileage.toFixed(2)),
+        total: parseFloat(total.toFixed(2)),
+        remark: remarkRef.current || formRemark,
+        from_time: fromTimeRef.current || fromTime,
+        to_time: new Date(),
+        to_home: toHome,
+        route_image_url: await uploadRouteImage(
+          finalRouteCoords,
+          `trip_${Date.now()}`,
+        ),
+        created_at: serverTimestamp(),
+      });
+
+      // Silent notification (optional)
+      await sendTripSavedNotification(finalDistance, total);
+    } catch (error) {
+      console.error("Background submission failed:", error);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Trip Auto‑Submit Failed",
+          body: "Please check your connection and try again.",
+        },
+        trigger: null,
+      });
+    } finally {
+      await stopTracking();
+      // Reset only the tracking refs, not the UI fields
+      totalTraveledDistanceRef.current = 0;
+      routeCoordsRef.current = [];
+      toAddressRef.current = "";
+      // Do NOT reset fromAddress, destination, etc. – user might start another trip
+    }
+  };
+
   const submitTripEarly = async () => {
-    if (!currentLocation) {
+    const currentLoc = currentLocationRef.current; // ← ref, not state
+    if (!currentLoc) {
       Alert.alert(
         "Error",
         "Current location not available. Please wait a moment.",
@@ -652,41 +926,53 @@ export default function SubmitExpenseScreen() {
     }
 
     try {
+      const finalDistance = totalTraveledDistanceRef.current;
+      const finalRouteCoords = routeCoordsRef.current;
+
       const geo = await Location.reverseGeocodeAsync({
-        latitude: currentLocation.lat,
-        longitude: currentLocation.lng,
+        latitude: currentLoc.lat,
+        longitude: currentLoc.lng,
       });
 
       let currentSpotAddress = "Unknown Location";
       if (geo.length > 0) {
-        const g = geo;
+        const g = geo[0];
         currentSpotAddress = [g.name, g.street, g.city]
           .filter(Boolean)
           .join(", ");
       }
 
       const endTime = new Date();
+      const tripId = `trip_${Date.now()}`;
 
-      const routeImageUrl = await uploadRoutePreview(
-        points,
-        routePolyline,
-        apiKey,
-        storage,
-      );
+      const routeImageUrl =
+        finalRouteCoords.length > 0
+          ? await uploadRouteImage(finalRouteCoords, tripId)
+          : "";
 
-      // We use the current location as both the 'from' and 'to' point
-      // for a spot-submission entry.
-      console.log("Saving trip------------------");
       await saveTripToFirestore(
         currentSpotAddress,
-        parseFloat(totalTraveledDistance.toFixed(2)),
+        parseFloat(finalDistance.toFixed(2)),
         endTime,
-        routeImageUrl,
+        routeImageUrl ?? "",
       );
     } catch (error) {
       console.error("Submission error:", error);
       Alert.alert("Error", "Failed to save the trip.");
     }
+  };
+
+  const resetBackgroundState = () => {
+    // Reset refs (no state setters)
+    totalTraveledDistanceRef.current = 0;
+    toAddressRef.current = "";
+    routeCoordsRef.current = [];
+    //lastCoordsRef.current = null;
+    currentLocationRef.current = null;
+    remarkRef.current = "";
+    fromTimeRef.current = null;
+    // Optionally reset flags
+    setTripActive(false); // but you'll need to manage this carefully
   };
 
   const defaultRegion = {
@@ -785,20 +1071,27 @@ export default function SubmitExpenseScreen() {
                 styles.buttonDisabled,
               tripActive && { backgroundColor: "#f44336" },
             ]}
-            onPress={() => {
+            onPress={async () => {
               if (tripActive) {
                 Alert.alert(
                   "Reset Trip",
                   "Are you sure you want to cancel the current trip?",
                   [
                     { text: "No", style: "cancel" },
-                    { text: "Yes", onPress: () => resetForm() },
+                    {
+                      text: "Yes",
+                      onPress: async () => {
+                        await stopTracking();
+                        resetForm();
+                      },
+                    },
                   ],
                 );
               } else {
                 const startTime = new Date();
                 setFromTime(startTime);
                 setTripActive(true);
+                await startTracking();
                 Alert.alert(
                   "Trip Started",
                   `Start time: ${startTime.toLocaleTimeString()}`,
