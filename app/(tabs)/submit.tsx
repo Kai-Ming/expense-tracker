@@ -125,6 +125,7 @@ export default function SubmitExpenseScreen() {
     null,
   ]);
   const lastCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const isSubmittingRef = useRef(false);
 
   const OFFICE_COORDINATES = { lat: 3.0277632, lng: 101.4693888 };
   const MIN_TRAVEL_DISTANCE = 0.04;
@@ -344,25 +345,17 @@ export default function SubmitExpenseScreen() {
     const dest = destinationRef.current;
     if (!dest) return false;
     if (totalTraveled < MIN_TRAVEL_DISTANCE) return false;
+    if (isSubmittingRef.current) return false; // ← guard
 
     const distToDest = getHaversineDistance(currentCoords, dest);
     if (distToDest <= arrivalDistanceRef.current) {
-      console.log(
-        `Auto-submit: ${distToDest.toFixed(2)}km ≤ ${arrivalDistanceRef.current}km`,
-      );
-
-      // Stop tracking immediately
+      isSubmittingRef.current = true; // ← lock
       await stopTracking();
-
-      // Submit in background (no alerts, no UI reset)
       await submitTripInBackground();
-
-      // Reset tracking refs for the next potential trip
       totalTraveledDistanceRef.current = 0;
       routeCoordsRef.current = [];
       lastCoordsRef.current = null;
-      // Do NOT reset pointsRef or destinationRef – they keep the form data
-
+      isSubmittingRef.current = false;
       return true;
     }
     return false;
@@ -423,6 +416,7 @@ export default function SubmitExpenseScreen() {
         to_time: finalEndTime,
         to_home: toHome,
         route_image_url: finalImageUrl,
+        date: new Date().toISOString().split("T")[0],
         created_at: serverTimestamp(),
       });
 
@@ -737,26 +731,33 @@ export default function SubmitExpenseScreen() {
       if (!tripActiveRef.current) return;
 
       const curr = { lat, lng };
+
+      // Update all state for UI
       setCurrentLocation(curr);
+      currentLocationRef.current = curr;
       setPoints((prev) => [curr, prev[1]]);
-      setRouteCoords((prev) => [...prev, { latitude: lat, longitude: lng }]);
-
-      // Update lastCoords and calculate distance
-      setLastCoords((prev) => {
-        if (prev) {
-          const delta = getHaversineDistance(prev, curr);
-          setTotalTraveledDistance((total) => {
-            const newTotal = total + delta;
-            setDistance(`${newTotal.toFixed(2)} km`);
-
-            // ⭐ Auto-submit check (does not rely on nested setPoints)
-            checkAndAutoSubmit(curr, newTotal);
-
-            return newTotal;
-          });
-        }
-        return curr;
+      setRouteCoords((prev) => {
+        const updated = [...prev, { latitude: lat, longitude: lng }];
+        routeCoordsRef.current = updated;
+        return updated;
       });
+
+      // ── Distance calculation using ONLY refs (no nested setState) ──
+      const prev = lastCoordsRef.current;
+      if (prev) {
+        const delta = getHaversineDistance(prev, curr);
+        const newTotal = totalTraveledDistanceRef.current + delta;
+
+        totalTraveledDistanceRef.current = newTotal;
+        setTotalTraveledDistance(newTotal);
+        setDistance(`${newTotal.toFixed(2)} km`);
+
+        // ── Auto-submit check runs OUTSIDE any setState callback ──
+        checkAndAutoSubmit(curr, newTotal);
+      }
+
+      lastCoordsRef.current = curr;
+      setLastCoords(curr);
     };
 
     (async () => {
@@ -891,6 +892,7 @@ export default function SubmitExpenseScreen() {
           finalRouteCoords,
           `trip_${Date.now()}`,
         ),
+        date: new Date().toISOString().split("T")[0],
         created_at: serverTimestamp(),
       });
 

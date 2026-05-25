@@ -16,6 +16,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -47,6 +48,7 @@ interface Expense {
   user_name?: string;
   business_card_url?: string;
   route_image_url?: string;
+  receipt_urls?: string[];
   approval_status: number;
   created_at: any;
 }
@@ -311,6 +313,22 @@ export default function ExpensesWebScreen() {
     }, 500);
     return () => clearTimeout(timer);
   }, [editingId]);
+
+  const handleOpenLink = async (url) => {
+    try {
+      // Check if the device has an app that can handle the URL
+      const supported = await Linking.canOpenURL(url);
+
+      if (supported) {
+        // Open the link in the default browser
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(`Don't know how to open this URL: ${url}`);
+      }
+    } catch (error) {
+      Alert.alert(`An error occurred: ${error.message}`);
+    }
+  };
 
   const getTripById = (tripId: string): Trip | undefined => {
     return allTrips.find((trip) => trip.id === tripId);
@@ -629,6 +647,7 @@ export default function ExpensesWebScreen() {
             <td style={webTableStyles.td}>{item.purpose}</td>
             <td style={webTableStyles.td}>{item.company}</td>
             <td style={webTableStyles.td}>{item.name}</td>
+            {/* <td style={webTableStyles.td}>{item.id}</td> */}
             <td
               style={{
                 ...webTableStyles.td,
@@ -885,6 +904,31 @@ export default function ExpensesWebScreen() {
                             </Text>
                           );
                         })}
+                      </View>
+                    )}
+
+                    {item.receipt_urls && item.receipt_urls?.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.descriptionLabel}>Receipts:</Text>
+                        {item.receipt_urls.map((receiptUrl) => (
+                          <TouchableOpacity
+                            key={receiptUrl}
+                            style={[{ marginBottom: 10 }]}
+                            onPress={(e) => {
+                              console.log(receiptUrl);
+                              handleOpenLink(receiptUrl);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.descriptionText,
+                                { color: "#2196F3", fontWeight: "semibold" },
+                              ]}
+                            >
+                              {receiptUrl}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
                       </View>
                     )}
 

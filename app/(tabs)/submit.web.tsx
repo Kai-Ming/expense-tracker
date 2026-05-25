@@ -1,4 +1,3 @@
-import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -16,13 +15,9 @@ import {
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
@@ -43,6 +38,7 @@ export default function SubmitExpenseWebScreen() {
   const [formToll, setFormToll] = useState<string>("0.00");
   const [formTripReport, setFormTripReport] = useState<string>("");
   const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
   const [mileageRate, setMileageRate] = useState<number>(0.8);
@@ -162,13 +158,19 @@ export default function SubmitExpenseWebScreen() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const { fromTime, toTime } = getOverallTimes();
+    setFormFromTime(fromTime);
+    setFormToTime(toTime);
+  }, [addedTrips]);
+
   const handleAddTrip = (tripId?: string) => {
     const idToAdd = tripId || selectedTripId;
     if (!idToAdd) return;
     const tripToAdd = tripsForSelectedDate.find((t) => t.id === idToAdd);
     if (tripToAdd && !addedTrips.some((t) => t.id === tripToAdd.id)) {
       setAddedTrips((prev) => [...prev, tripToAdd]);
-      setSelectedTripId(""); // clear selection after adding
+      setSelectedTripId("");
     } else if (tripToAdd) {
       alert("This trip has already been added.");
     }
@@ -180,17 +182,98 @@ export default function SubmitExpenseWebScreen() {
 
   const getDistanceValue = () =>
     parseFloat(distance.replace(/[^0-9.]/g, "")) || 0;
-  const calculateMileage = () => (getDistanceValue() * mileageRate).toFixed(2);
+
+  const getTotalMileage = () => {
+    return addedTrips.reduce(
+      (sum, trip) => sum + (parseFloat(trip.mileage) || 0),
+      0,
+    );
+  };
+
+  const calculateMileage = () => getTotalMileage().toFixed(2);
+
+  const getTotalToll = () => {
+    return addedTrips.reduce(
+      (sum, trip) => sum + (parseFloat(trip.toll) || 0),
+      0,
+    );
+  };
+
+  const calculateToll = () => getTotalToll().toFixed(2);
+
   const calculateCost = () => {
-    const travelCost = getDistanceValue() * mileageRate;
+    const travelCost = getTotalMileage();
     const parking = parseFloat(formParking) || 0;
-    const toll = parseFloat(formToll) || 0;
+    const toll = getTotalToll();
     return (travelCost + parking + toll).toFixed(2);
   };
+
+  // Get overall start and end times from added trips
+  // Helper: Convert any value to HH:MM string, or return null if not possible
+  const toTimeString = (value: any): string | null => {
+    if (!value) return null;
+    // If it's a Firestore Timestamp (has toDate method)
+    if (typeof value.toDate === "function") {
+      const date = value.toDate();
+      const hours = date.getHours().toString().padStart(2, "0");
+      const minutes = date.getMinutes().toString().padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    // If it's a string in HH:MM format
+    if (typeof value === "string" && value.match(/^\d{2}:\d{2}$/)) {
+      return value;
+    }
+    // If it's a Date object
+    if (value instanceof Date) {
+      const hours = value.getHours().toString().padStart(2, "0");
+      const minutes = value.getMinutes().toString().padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    return null;
+  };
+
+  const to12HourTime = (time24: string): string => {
+    if (!time24) return "";
+    const [hours, minutes] = time24.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    let hour12 = hours % 12;
+    if (hour12 === 0) hour12 = 12;
+    return `${hour12}:${minutes.toString().padStart(2, "0")} ${period}`;
+  };
+
+  const getOverallTimes = () => {
+    if (addedTrips.length === 0) {
+      return { fromTime: "", toTime: "" };
+    }
+    let minFromTime = "23:59";
+    let maxToTime = "00:00";
+    let hasValidTimes = false;
+
+    for (const trip of addedTrips) {
+      const fromStr = toTimeString(trip.from_time);
+      const toStr = toTimeString(trip.to_time);
+
+      if (fromStr) {
+        if (fromStr < minFromTime) minFromTime = fromStr;
+        hasValidTimes = true;
+      }
+      if (toStr) {
+        if (toStr > maxToTime) maxToTime = toStr;
+        hasValidTimes = true;
+      }
+    }
+
+    if (!hasValidTimes) {
+      return { fromTime: "", toTime: "" };
+    }
+    return { fromTime: minFromTime, toTime: maxToTime };
+  };
+
   const calculateDuration = () => {
-    if (!formFromTime || !formToTime) return "0h 0m";
-    const [h1, m1] = formFromTime.split(":").map(Number);
-    const [h2, m2] = formToTime.split(":").map(Number);
+    const { fromTime, toTime } = getOverallTimes();
+    if (!fromTime || !toTime) return "0h 0m";
+    const [h1, m1] = fromTime.split(":").map(Number);
+    const [h2, m2] = toTime.split(":").map(Number);
     let diff = h2 * 60 + m2 - (h1 * 60 + m1);
     if (diff < 0) diff += 1440;
     return `${Math.floor(diff / 60)}h ${diff % 60}m`;
@@ -219,11 +302,7 @@ export default function SubmitExpenseWebScreen() {
       throw new Error("Failed to fetch route data");
     }
 
-    // Get the encoded polyline for the entire route
     const routePolyline = data.routes[0].overview_polyline.points;
-
-    // Construct the static map URL with the encoded path
-    // The 'enc:' prefix tells the Static API to decode the polyline[reference:0]
     const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&maptype=roadmap&path=enc:${routePolyline}&markers=color:green|label:S|${origin.lat},${origin.lng}&markers=color:red|label:E|${destination.lat},${destination.lng}&key=${apiKey}`;
 
     return staticMapUrl;
@@ -293,9 +372,9 @@ export default function SubmitExpenseWebScreen() {
         const element = data.rows[0].elements[0];
         if (element.status === "OK") {
           return {
-            km: element.distance.value / 1000, // meters → km
-            text: element.distance.text, // e.g. "12.3 km"
-            duration: element.duration.text, // e.g. "25 mins"
+            km: element.distance.value / 1000,
+            text: element.distance.text,
+            duration: element.duration.text,
           };
         } else {
           console.warn("No route:", element.status);
@@ -312,7 +391,6 @@ export default function SubmitExpenseWebScreen() {
   };
 
   const saveTripToFirestore = async () => {
-    // Validation
     if (!fromAddress.trim() || !toAddress.trim()) {
       alert("Please fill in both 'From' and 'To' addresses.");
       return;
@@ -342,13 +420,11 @@ export default function SubmitExpenseWebScreen() {
         routeImageUrl = await getRouteImageUrl(originCoord, destCoord);
       } catch (imageError) {
         console.error("Error generating route image:", imageError);
-        // Continue saving even if image generation fails, but log the error.
       }
 
       let mileage = distanceData.km * mileageRate;
       let toll = await fetchTollCost(originCoord, destCoord);
 
-      // Prepare trip document
       const tripToSave = {
         user_id: userId,
         from_address: fromAddress,
@@ -368,7 +444,6 @@ export default function SubmitExpenseWebScreen() {
 
       await addDoc(collection(db, "trips"), tripToSave);
 
-      // Reset modal and form fields
       setFormDate("");
       setFormTripFromTime("");
       setFormTripToTime("");
@@ -400,6 +475,19 @@ export default function SubmitExpenseWebScreen() {
         businessCardUrl = await getDownloadURL(uploadResult.ref);
       }
 
+      const receiptUrls: string[] = [];
+      for (const file of receiptFiles) {
+        const storageRef = ref(
+          storage,
+          `receipts/${userId}/${Date.now()}_${file.name}`,
+        );
+        const uploadResult = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(uploadResult.ref);
+        receiptUrls.push(url);
+      }
+
+      const { fromTime, toTime } = getOverallTimes();
+
       await addDoc(collection(db, "expenses"), {
         user_id: userId,
         user_name: username,
@@ -408,12 +496,13 @@ export default function SubmitExpenseWebScreen() {
         company: formCompany,
         name: formName,
         contact_number: formContactNumber,
-        from_time: formFromTime,
-        to_time: formToTime,
+        from_time: fromTime,
+        to_time: toTime,
         duration: calculateDuration(),
         distance: dist,
         trip_report: formTripReport,
         business_card_url: businessCardUrl,
+        receipt_urls: receiptUrls,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
         mileage: parseFloat(calculateMileage()),
@@ -421,13 +510,9 @@ export default function SubmitExpenseWebScreen() {
         type: 1,
         approval_status: 0,
         created_at: serverTimestamp(),
-        // 🔹 NEW: store the list of trip IDs that were added
         trip_ids: addedTrips.map((trip) => trip.id),
       });
       alert("Expense submitted successfully!");
-      // Optionally reset the form or clear addedTrips
-      // setAddedTrips([]);
-      // setSelectedTripId("");
     } catch (e) {
       console.error(e);
       alert("Failed to save expense.");
@@ -512,127 +597,13 @@ export default function SubmitExpenseWebScreen() {
                 onChange={(e) => setFormDate(e.target.value)}
                 style={htmlInputStyle}
               />
-            </View>
-
-            {/* <TouchableOpacity
-              onPress={() => setShowModal(true)}
-              style={styles.button}
-            >
-              <Text style={styles.buttonText}>Add Trip</Text>
-            </TouchableOpacity> */}
-            <Modal
-              animationType="fade"
-              transparent={true}
-              visible={showModal}
-              statusBarTranslucent={true}
-              onRequestClose={() => !isSaving && setShowModal(false)}
-            >
-              <View style={styles.screenOverlay}>
-                <KeyboardAvoidingView
-                  behavior={Platform.OS === "ios" ? "padding" : "height"}
-                  style={styles.keyboardContainer}
-                >
-                  <ScrollView
-                    style={styles.modalScrollWrapper}
-                    contentContainerStyle={styles.modalScrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <View style={styles.modalView}>
-                      <Text style={styles.modalTitle}>Add Trip</Text>
-
-                      <View style={styles.formGroup}>
-                        <Text style={styles.modalSubtitle}>
-                          From (Starting location):
-                        </Text>
-                        <PlacesInput
-                          value={fromAddress}
-                          placeholder="Search starting location"
-                          onPlaceSelected={(address, location) => {
-                            setFromAddress(address);
-                            setOriginCoord(location);
-                          }}
-                        />
-                        <Text style={styles.modalSubtitle}>
-                          To (Destination):
-                        </Text>
-                        <PlacesInput
-                          value={toAddress}
-                          placeholder="Search destination…"
-                          onPlaceSelected={(address, location) => {
-                            setToAddress(address);
-                            setDestCoord(location);
-                          }}
-                        />
-
-                        <Text style={styles.modalSubtitle}>Going Home:</Text>
-                        <Switch
-                          trackColor={{ false: "#767577", true: "#81b0ff" }}
-                          thumbColor="#2196F3"
-                          ios_backgroundColor="#3e3e3e"
-                          value={formGoingHome}
-                          onValueChange={(newValue) =>
-                            setFormGoingHome(newValue)
-                          }
-                        />
-                        <Text style={styles.modalSubtitle}>
-                          Remark (Optional):
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            { minHeight: 80, textAlignVertical: "top" },
-                          ]}
-                          placeholder="Trip Remark..."
-                          placeholderTextColor="#999999"
-                          value={formRemark}
-                          onChangeText={setFormRemark}
-                          editable={!isSaving}
-                          keyboardType="default"
-                          multiline
-                          numberOfLines={3}
-                        />
-                      </View>
-
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={[styles.dialogButton, styles.cancelButton]}
-                          onPress={() => setShowModal(false)}
-                          disabled={isSaving}
-                        >
-                          <Text style={styles.textStyle}>Cancel</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.dialogButton,
-                            styles.submitButton,
-                            isSaving && { opacity: 0.7 },
-                          ]}
-                          onPress={saveTripToFirestore}
-                          disabled={isSaving}
-                        >
-                          {isSaving ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                          ) : (
-                            <Text style={styles.textStyle}>Submit</Text>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </ScrollView>
-                </KeyboardAvoidingView>
-              </View>
-            </Modal>
-
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Select Trips:</Text>
+              {/* <Text style={styles.fieldLabel}>Select Trips:</Text> */}
               <View style={styles.dropdownInput}>
                 <TouchableOpacity
                   style={styles.dropdownButton}
                   onPress={() => setIsDropdownOpen(true)}
                 >
-                  <Text style={styles.selectedText}>
+                  <Text style={styles.buttonText}>
                     {selectedTripId
                       ? (() => {
                           const selected = tripsForSelectedDate.find(
@@ -640,23 +611,17 @@ export default function SubmitExpenseWebScreen() {
                           );
                           return selected
                             ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
-                            : "Click to Select";
+                            : "Select Trips";
                         })()
                       : tripsForSelectedDate.length > 0
-                        ? "Click to Select"
-                        : "No Trips on this Day"}
+                        ? "Select Trips"
+                        : "No Trips"}
                   </Text>
                 </TouchableOpacity>
-                {/* <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={handleAddTrip}
-                >
-                  <Text style={styles.addButtonText}>Add Trip</Text>
-                </TouchableOpacity> */}
               </View>
-
               {renderTripModal()}
             </View>
+
             {addedTrips.length > 0 && (
               <View style={styles.addedTripsContainer}>
                 <Text style={styles.subsectionTitle}>Selected Trips:</Text>
@@ -690,37 +655,9 @@ export default function SubmitExpenseWebScreen() {
               </View>
             )}
 
-            {/* Rest of the form fields (same as before) */}
-            {/*<View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>From:</Text>
-              <TextInput
-                placeholder="From..."
-                value={fromAddress}
-                onChangeText={setFromAddress}
-                style={styles.webTextInput}
-              />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>To:</Text>
-              <TextInput
-                placeholder="To..."
-                value={toAddress}
-                onChangeText={setToAddress}
-                style={styles.webTextInput}
-              />
-            </View>*/}
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Distance:</Text>
-              {/* <TextInput
-                placeholder="0.00"
-                value={distance}
-                editable={false}
-                style={[styles.webTextInput, styles.disabledInput]}
-              /> */}
               <Text style={styles.fieldValue}>{distance} km</Text>
-              {/* <Text style={styles.autoNote}>
-                (Auto-sum from selected trips)
-              </Text> */}
             </View>
 
             <View
@@ -767,8 +704,6 @@ export default function SubmitExpenseWebScreen() {
                 style={styles.webTextInput}
                 placeholder="Company/Site"
               />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Name:</Text>
               <TextInput
                 value={formName}
@@ -776,8 +711,6 @@ export default function SubmitExpenseWebScreen() {
                 style={styles.webTextInput}
                 placeholder="Name"
               />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Contact:</Text>
               <TextInput
                 value={formContactNumber}
@@ -788,29 +721,25 @@ export default function SubmitExpenseWebScreen() {
                 placeholder="Contact Number"
               />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>From Time:</Text>
-              <input
-                type="time"
-                value={formFromTime}
-                onChange={(e) => setFormFromTime(e.target.value)}
-                style={htmlInputStyle}
-              />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldValue}>
+                {to12HourTime(formFromTime) || "N/A"}
+              </Text>
               <Text style={styles.fieldLabel}>To Time:</Text>
-              <input
-                type="time"
-                value={formToTime}
-                onChange={(e) => setFormToTime(e.target.value)}
-                style={htmlInputStyle}
-              />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldValue}>
+                {to12HourTime(formToTime) || "N/A"}
+              </Text>
               <Text style={styles.fieldLabel}>Duration:</Text>
               <Text style={styles.fieldValue}>{calculateDuration()}</Text>
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
+              <Text style={styles.fieldLabel}>Mileage (RM):</Text>
+              <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
+              <Text style={styles.fieldLabel}>Toll (RM):</Text>
+              <Text style={styles.fieldValue}>RM {calculateToll()}</Text>
               <Text style={styles.fieldLabel}>Parking (RM):</Text>
               <TextInput
                 value={formParking}
@@ -818,16 +747,10 @@ export default function SubmitExpenseWebScreen() {
                 keyboardType="numeric"
                 style={styles.webTextInput}
               />
+              <Text style={styles.fieldLabel}>Cost:</Text>
+              <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
             </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Toll (RM):</Text>
-              <TextInput
-                value={formToll}
-                onChangeText={setFormToll}
-                keyboardType="numeric"
-                style={styles.webTextInput}
-              />
-            </View>
+
             <View
               style={[
                 styles.inputRow,
@@ -839,10 +762,14 @@ export default function SubmitExpenseWebScreen() {
                 value={formTripReport}
                 onChangeText={setFormTripReport}
                 multiline
-                style={[styles.webTextInput, { minHeight: 80 }]}
+                style={[
+                  styles.webTextInput,
+                  { minHeight: 200, width: "100%", maxWidth: "100%" },
+                ]}
                 placeholder="Trip Report"
               />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Business Card:</Text>
               <input
@@ -854,40 +781,35 @@ export default function SubmitExpenseWebScreen() {
                 style={htmlInputStyle}
               />
             </View>
+
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Mileage:</Text>
-              <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
+              <Text style={styles.fieldLabel}>Receipts:</Text>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setReceiptFiles(Array.from(e.target.files));
+                  }
+                }}
+                style={htmlInputStyle}
+              />
             </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Cost:</Text>
-              <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
-            </View>
+            {receiptFiles.length > 0 && (
+              <View style={styles.receiptList}>
+                <Text style={styles.receiptLabel}>Selected files:</Text>
+                {receiptFiles.map((file, idx) => (
+                  <Text key={idx} style={styles.receiptFileName}>
+                    {file.name}
+                  </Text>
+                ))}
+              </View>
+            )}
 
             <TouchableOpacity onPress={handleSubmit} style={styles.button}>
               <Text style={styles.buttonText}>Submit Expense</Text>
             </TouchableOpacity>
           </View>
-
-          {/* <View style={styles.mileageUpdateContainer}>
-            <Text style={[styles.fieldLabel, { marginBottom: 10 }]}>
-              Mileage Rate
-            </Text>
-            <select
-              value={formMileageRate}
-              onChange={(e) => setFormMileageRate(parseFloat(e.target.value))}
-              style={htmlSelectStyle}
-            >
-              <option value={0.6}>0.6</option>
-              <option value={0.8}>0.8</option>
-              <option value={1.0}>1.0</option>
-            </select>
-            <TouchableOpacity
-              onPress={updateMileageRate}
-              style={[styles.button, { marginTop: 10 }]}
-            >
-              <Text style={styles.buttonText}>Update Rate</Text>
-            </TouchableOpacity>
-          </View> */}
         </ScrollView>
       </View>
     </View>
@@ -898,10 +820,11 @@ const htmlInputStyle = {
   padding: "8px 12px",
   border: "1px solid #ccc",
   width: "100%",
-  maxWidth: "400px",
+  maxWidth: "200px",
   minHeight: "36px",
   boxSizing: "border-box" as const,
   backgroundColor: "#fff",
+  marginRight: "10px",
 };
 const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
 
@@ -912,17 +835,17 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   formContainer: { flex: 1 },
   dropdownInput: {
+    backgroundColor: "#2196F3",
+    borderRadius: 5,
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "#ccc",
-    backgroundColor: "#fff",
     justifyContent: "center",
-    // Ensure consistent height with native select
-    height: "auto",
     minHeight: 36,
-    maxWidth: 400,
+    maxWidth: 200,
+    alignItems: "center",
   },
   webTextInput: {
     flex: 1,
@@ -932,9 +855,8 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     zIndex: 1,
     position: "relative",
+    marginRight: 10,
   },
-  disabledInput: { backgroundColor: "#f5f5f5", color: "#888" },
-  autoNote: { marginLeft: 8, fontSize: 12, color: "#666", fontStyle: "italic" },
   inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
   fieldValue: { fontSize: 14, flex: 1 },
@@ -942,47 +864,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#2196F3",
     padding: 12,
     borderRadius: 5,
-    marginTop: 20,
     alignItems: "center",
     maxWidth: 200,
+    marginRight: 10,
+    marginLeft: 10,
   },
   buttonText: { color: "white", fontWeight: "bold" },
   formLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
-  mileageUpdateContainer: {
-    marginTop: 40,
-    borderTopWidth: 1,
-    borderColor: "#eee",
-    paddingTop: 20,
-  },
-  tripSelectionSection: {
-    marginTop: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    padding: 12,
-    backgroundColor: "#fafafa",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: "#333",
-  },
-  dropdownAddRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dropdownButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#fff",
-    backgroundColor: "#fff",
-  },
-  selectedText: { fontSize: 14, color: "#333" },
-  addButton: {
-    backgroundColor: "#4caf50",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-  },
-  addButtonText: { color: "white", fontWeight: "bold" },
   addedTripsContainer: { marginTop: 16 },
   subsectionTitle: {
     fontSize: 14,
@@ -1055,74 +943,7 @@ const styles = StyleSheet.create({
   distanceText: { fontSize: 12, fontWeight: "bold", color: "#4caf50" },
   addressText: { fontSize: 13, color: "#444", marginTop: 2 },
   noTripsText: { padding: 20, textAlign: "center", color: "#888" },
-  screenOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    ...StyleSheet.absoluteFillObject,
-  },
-  keyboardContainer: {
-    flex: 1,
-    width: "100%",
-  },
-  modalScrollWrapper: {
-    flex: 1,
-    width: "100%",
-  },
-  modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  modalView: {
-    width: "80%",
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 25,
-    alignItems: "stretch",
-    shadowColor: "#000",
-    elevation: 5,
-  },
-  formGroup: {
-    width: "100%",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    fontWeight: "normal",
-    marginBottom: 8,
-    color: "#666",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  dialogButton: {
-    borderRadius: 8,
-    padding: 12,
-    elevation: 2,
-    flex: 1,
-    alignItems: "center",
-  },
-  submitButton: {
-    backgroundColor: "#2196F3",
-  },
-  cancelButton: {
-    backgroundColor: "#f44336",
-  },
-  textStyle: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    backgroundColor: "#f9f9f9",
-    borderWidth: 1,
-    borderColor: "#eee",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#333",
-  },
+  receiptList: { marginLeft: 120, marginTop: 5, marginBottom: 10 },
+  receiptLabel: { fontSize: 12, fontWeight: "500", color: "#555" },
+  receiptFileName: { fontSize: 11, color: "#666", marginLeft: 10 },
 });

@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  Timestamp,
   where,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -33,8 +34,8 @@ interface Trip {
   date?: any;
   from_address: string;
   to_address: string;
-  from_time?: string;
-  to_time?: string;
+  from_time?: Timestamp;
+  to_time?: Timestamp;
   remark: string;
   route_image_url?: string;
   to_home: boolean;
@@ -198,6 +199,34 @@ export default function TripScreen() {
               <Text style={styles.descriptionLabel}>To:</Text>
               <Text style={styles.descriptionText}>
                 {item.to_address || "N/A"}
+              </Text>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>From Time:</Text>
+              <Text style={styles.descriptionText}>
+                {item.from_time && typeof item.from_time.toDate === "function"
+                  ? item.from_time.toDate().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                    })
+                  : "N/A"}
+              </Text>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.descriptionLabel}>To Time:</Text>
+              <Text style={styles.descriptionText}>
+                {item.to_time && typeof item.to_time.toDate === "function"
+                  ? item.to_time.toDate().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                    })
+                  : "N/A"}
               </Text>
             </View>
 

@@ -53,7 +53,7 @@ export default function SignupPage() {
         uid: userCredential.user.uid,
         username: username.trim(),
         email: email.trim(),
-        createdAt: serverTimestamp(),
+        created_at: serverTimestamp(),
         role: 1,
       });
 
