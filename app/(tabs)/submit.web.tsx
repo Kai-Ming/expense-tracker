@@ -520,7 +520,7 @@ export default function SubmitExpenseWebScreen() {
         to_home: formGoingHome,
         route_image_url: routeImageUrl,
         date: formDate,
-        type: 2,
+        platform: 2,
         created_at: serverTimestamp(),
       };
 
@@ -666,7 +666,7 @@ export default function SubmitExpenseWebScreen() {
                 </View>
                 <Text style={styles.addressText}>
                   <Text style={styles.boldLabel}>Platform: </Text>
-                  {trip?.type === 2 ? "Web" : "Mobile"}
+                  {trip?.platform === 2 ? "Web" : "Mobile"}
                 </Text>
                 <Text style={styles.addressText}>
                   <Text style={styles.boldLabel}>Remark: </Text>

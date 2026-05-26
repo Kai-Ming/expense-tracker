@@ -417,7 +417,7 @@ export default function SubmitExpenseScreen() {
         to_home: toHome,
         route_image_url: finalImageUrl,
         date: new Date().toISOString().split("T")[0],
-        type: 1,
+        platform: 1,
         created_at: serverTimestamp(),
       });
 

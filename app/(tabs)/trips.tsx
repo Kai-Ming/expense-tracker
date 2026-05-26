@@ -39,7 +39,7 @@ interface Trip {
   remark: string;
   route_image_url?: string;
   to_home: boolean;
-  type: number; // 1 - Mobile, 2 - Web
+  platform: number; // 1 - Mobile, 2 - Web
   created_at: any;
 }
 
@@ -146,7 +146,7 @@ export default function TripScreen() {
         <View style={styles.cardHeader}>
           <View style={styles.cardLocation}>
             <Text style={styles.addressText}>
-              {item.type === 2 ? "Web" : "Mobile"}
+              {item.platform === 2 ? "Web" : "Mobile"}
             </Text>
             <Text style={styles.addressText} numberOfLines={1}>
               📍 {item.from_address}
