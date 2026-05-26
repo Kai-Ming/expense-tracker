@@ -39,6 +39,7 @@ interface Trip {
   remark: string;
   route_image_url?: string;
   to_home: boolean;
+  type: number; // 1 - Mobile, 2 - Web
   created_at: any;
 }
 
@@ -144,6 +145,9 @@ export default function TripScreen() {
         {/* Card Main View */}
         <View style={styles.cardHeader}>
           <View style={styles.cardLocation}>
+            <Text style={styles.addressText}>
+              {item.type === 2 ? "Web" : "Mobile"}
+            </Text>
             <Text style={styles.addressText} numberOfLines={1}>
               📍 {item.from_address}
             </Text>
@@ -170,7 +174,7 @@ export default function TripScreen() {
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Toll:</Text>
               <Text style={styles.detailValue}>
-                RM {item.toll !== undefined ? item.toll.toFixed(2) : "0.00"}
+                RM {item.toll ? Number(item.toll).toFixed(2) : "0.00"}
               </Text>
             </View>
 
@@ -178,7 +182,7 @@ export default function TripScreen() {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Mileage:</Text>
                 <Text style={styles.detailValue}>
-                  RM {item.mileage.toFixed(2)}
+                  RM {item.mileage ? Number(item.mileage).toFixed(2) : "0.00"}
                 </Text>
               </View>
             )}

@@ -10,6 +10,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -279,6 +280,23 @@ export default function SubmitExpenseWebScreen() {
     return to12HourTime(time24);
   };
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "";
+    return dateString.split("-").reverse().join("-");
+  };
+
+  const formatTripTime = (timestamp: Timestamp | undefined | null): string => {
+    if (!timestamp || typeof timestamp.toDate !== "function") {
+      return "--:--";
+    }
+
+    return timestamp.toDate().toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   const getOverallTimes = () => {
     if (addedTrips.length === 0) {
       return { fromTime: "", toTime: "" };
@@ -454,6 +472,14 @@ export default function SubmitExpenseWebScreen() {
       alert("Please select valid locations from the suggestions.");
       return;
     }
+    if (!formRemark.trim()) {
+      alert("Please fill in a remark.");
+      return;
+    }
+    if (!formTripFromTime || !formTripToTime) {
+      alert("Please fill in both 'From' and 'To' times.");
+      return;
+    }
     if (!userId) {
       alert("You must be logged in.");
       return;
@@ -606,7 +632,9 @@ export default function SubmitExpenseWebScreen() {
       >
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select a Trip</Text>
+            <Text style={styles.modalTitle}>
+              Select a Trip from {formatDate(formDate)}
+            </Text>
             <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
@@ -628,13 +656,18 @@ export default function SubmitExpenseWebScreen() {
                 }}
               >
                 <View style={styles.modalTripHeader}>
-                  <Text style={styles.timeText}>
+                  {/* <Text style={styles.timeText}>
                     {trip.created_at?.toDate().toLocaleTimeString()}
-                  </Text>
-                  <Text style={styles.distanceText}>
-                    {(parseFloat(trip.distance) || 0).toFixed(2)} km
+                  </Text> */}
+                  <Text style={styles.timeText}>
+                    {formatTripTime(trip.from_time)} -{" "}
+                    {formatTripTime(trip.to_time)}
                   </Text>
                 </View>
+                <Text style={styles.addressText}>
+                  <Text style={styles.boldLabel}>Platform: </Text>
+                  {trip?.type === 2 ? "Web" : "Mobile"}
+                </Text>
                 <Text style={styles.addressText}>
                   <Text style={styles.boldLabel}>Remark: </Text>
                   {trip.remark || "No Remark"}
@@ -786,9 +819,7 @@ export default function SubmitExpenseWebScreen() {
                               setFormGoingHome(newValue)
                             }
                           />
-                          <Text style={styles.modalSubtitle}>
-                            Remark (Optional):
-                          </Text>
+                          <Text style={styles.modalSubtitle}>Remark:</Text>
                           <TextInput
                             style={[
                               styles.input,
@@ -846,6 +877,10 @@ export default function SubmitExpenseWebScreen() {
                 {addedTrips.map((trip) => (
                   <View key={trip.id} style={styles.addedTripItem}>
                     <View style={styles.addedTripDetails}>
+                      <Text style={styles.timeText}>
+                        {formatTripTime(trip.from_time)} -{" "}
+                        {formatTripTime(trip.to_time)}
+                      </Text>
                       <Text style={styles.tripRemark}>
                         {trip.remark || "No Remark"} (
                         {parseFloat(trip.distance || 0).toFixed(2)} km)
@@ -1038,7 +1073,7 @@ const htmlInputStyle = {
   padding: "8px 12px",
   border: "1px solid #ccc",
   width: "100%",
-  maxWidth: "200px",
+  maxWidth: "220px",
   minHeight: "36px",
   boxSizing: "border-box" as const,
   backgroundColor: "#fff",

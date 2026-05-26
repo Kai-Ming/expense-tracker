@@ -1101,7 +1101,9 @@ export default function SubmitExpenseScreen() {
                 );
               }
             }}
-            disabled={!currentLocation || !destination || locationLoading}
+            disabled={
+              !currentLocation || !destination || locationLoading || !formRemark
+            }
           >
             <Text style={styles.buttonText}>
               {tripActive ? "Cancel Trip" : "Confirm Location"}
