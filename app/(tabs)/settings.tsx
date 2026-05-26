@@ -360,7 +360,7 @@ export default function settings() {
         onPress={() => setUsernameModalVisible(true)}
         style={styles.button}
       >
-        <Text style={styles.buttonText}>Change Username</Text>
+        <Text style={styles.buttonText}>Update Username</Text>
       </TouchableOpacity>
       <Modal
         animationType="fade"
@@ -381,7 +381,7 @@ export default function settings() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.modalView}>
-                <Text style={styles.modalTitle}>Change Username</Text>
+                <Text style={styles.modalTitle}>Update Username</Text>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>New username:</Text>
@@ -619,7 +619,7 @@ export default function settings() {
             onPress={() => setMileageModalVisible(true)}
             style={styles.button}
           >
-            <Text style={styles.buttonText}>Change Mileage</Text>
+            <Text style={styles.buttonText}>Set Mileage</Text>
           </TouchableOpacity>
 
           <Modal
@@ -641,7 +641,7 @@ export default function settings() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.modalView}>
-                    <Text style={styles.modalTitle}>Change Mileage</Text>
+                    <Text style={styles.modalTitle}>Set Mileage</Text>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.modalSubtitle}>Web Mileage:</Text>
@@ -727,7 +727,7 @@ export default function settings() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.modalView}>
-                    <Text style={styles.modalTitle}>Change Office Address</Text>
+                    <Text style={styles.modalTitle}>Set Office Address</Text>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.modalSubtitle}>Office Address:</Text>
@@ -780,7 +780,7 @@ export default function settings() {
             onPress={() => setDistanceModalVisible(true)}
             style={styles.button}
           >
-            <Text style={styles.buttonText}>Change Arrival Distance</Text>
+            <Text style={styles.buttonText}>Set Arrival Distance</Text>
           </TouchableOpacity>
           <Modal
             animationType="fade"
@@ -804,9 +804,7 @@ export default function settings() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.modalView}>
-                    <Text style={styles.modalTitle}>
-                      Change Arrival Distance
-                    </Text>
+                    <Text style={styles.modalTitle}>Set Arrival Distance</Text>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.modalSubtitle}>

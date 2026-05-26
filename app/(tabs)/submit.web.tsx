@@ -1,3 +1,4 @@
+import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -15,9 +16,13 @@ import {
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
@@ -53,8 +58,8 @@ export default function SubmitExpenseWebScreen() {
   const [fromAddress, setFromAddress] = useState<string>("");
   const [toAddress, setToAddress] = useState<string>("");
   const [formGoingHome, setFormGoingHome] = useState<boolean>(false);
-  const [formTripFromTime, setFormTripFromTime] = useState<string>("");
-  const [formTripToTime, setFormTripToTime] = useState<string>("");
+  const [formTripFromTime, setFormTripFromTime] = useState<Date | null>(null);
+  const [formTripToTime, setFormTripToTime] = useState<Date | null>(null);
   const [formRemark, setFormRemark] = useState<string>("");
   const [originCoord, setOriginCoord] = useState<{
     lat: number;
@@ -85,7 +90,7 @@ export default function SubmitExpenseWebScreen() {
     return () => unsubscribe();
   }, [userId]);
 
-  // Filter trips by selected date
+  // Effect 1: Filter trips when allUserTrips or formDate changes (without resetting addedTrips)
   useEffect(() => {
     const selectedDateStr = formDate;
     const filtered = allUserTrips.filter((trip) => {
@@ -98,9 +103,14 @@ export default function SubmitExpenseWebScreen() {
     });
     setTripsForSelectedDate(filtered);
     setSelectedTripId("");
+    // Do NOT reset addedTrips here
+  }, [allUserTrips, formDate]);
+
+  // Effect 2: When date changes, clear the added trips list (since they belong to a different day)
+  useEffect(() => {
     setAddedTrips([]);
     setDistance("0.00");
-  }, [allUserTrips, formDate]);
+  }, [formDate]);
 
   // Total distance from added trips
   useEffect(() => {
@@ -165,10 +175,19 @@ export default function SubmitExpenseWebScreen() {
   }, [addedTrips]);
 
   const handleAddTrip = (tripId?: string) => {
+    console.log("Handle add trip");
+    console.log(tripId);
     const idToAdd = tripId || selectedTripId;
-    if (!idToAdd) return;
+    if (!idToAdd) {
+      console.log(idToAdd);
+      console.log("No Trip");
+      return;
+    }
     const tripToAdd = tripsForSelectedDate.find((t) => t.id === idToAdd);
+    console.log(tripToAdd);
     if (tripToAdd && !addedTrips.some((t) => t.id === tripToAdd.id)) {
+      console.log(tripToAdd);
+      console.log("Adding trip");
       setAddedTrips((prev) => [...prev, tripToAdd]);
       setSelectedTripId("");
     } else if (tripToAdd) {
@@ -208,8 +227,6 @@ export default function SubmitExpenseWebScreen() {
     return (travelCost + parking + toll).toFixed(2);
   };
 
-  // Get overall start and end times from added trips
-  // Helper: Convert any value to HH:MM string, or return null if not possible
   const toTimeString = (value: any): string | null => {
     if (!value) return null;
     // If it's a Firestore Timestamp (has toDate method)
@@ -239,6 +256,27 @@ export default function SubmitExpenseWebScreen() {
     let hour12 = hours % 12;
     if (hour12 === 0) hour12 = 12;
     return `${hour12}:${minutes.toString().padStart(2, "0")} ${period}`;
+  };
+
+  const timeStringToDate = (timeString: string): Date | null => {
+    if (!formDate || !timeString) return null;
+    const [year, month, day] = formDate.split("-").map(Number);
+    const [hours, minutes] = timeString.split(":").map(Number);
+    return new Date(year, month - 1, day, hours, minutes, 0);
+  };
+
+  // Convert Date object to time string "HH:MM" for the input value
+  const dateToTimeString = (date: Date | null): string => {
+    if (!date) return "";
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  const formatDisplayTime = (date: Date | null) => {
+    if (!date) return "Select time";
+    const time24 = toTimeString(date) ?? ""; // assuming toTimeString works with Date
+    return to12HourTime(time24);
   };
 
   const getOverallTimes = () => {
@@ -351,6 +389,23 @@ export default function SubmitExpenseWebScreen() {
     }
   };
 
+  function getHaversineDistance(
+    p1: { lat: number; lng: number },
+    p2: { lat: number; lng: number },
+  ) {
+    const R = 6371;
+    const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+    const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((p1.lat * Math.PI) / 180) *
+        Math.cos((p2.lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
   const getDrivingDistance = async (
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
@@ -407,7 +462,7 @@ export default function SubmitExpenseWebScreen() {
     setIsSaving(true);
 
     try {
-      const distanceData = await getDrivingDistance(originCoord, destCoord);
+      const distanceData = getHaversineDistance(originCoord, destCoord);
       if (!distanceData) {
         console.log("from", originCoord, "to", destCoord);
         console.log("from", fromAddress, "to", toAddress);
@@ -422,14 +477,14 @@ export default function SubmitExpenseWebScreen() {
         console.error("Error generating route image:", imageError);
       }
 
-      let mileage = distanceData.km * mileageRate;
+      let mileage = distanceData * mileageRate;
       let toll = await fetchTollCost(originCoord, destCoord);
 
       const tripToSave = {
         user_id: userId,
         from_address: fromAddress,
         to_address: toAddress,
-        distance: distanceData.km.toFixed(2),
+        distance: distanceData.toFixed(2),
         mileage: mileage.toFixed(2),
         toll: toll.toFixed(2),
         total: (mileage + toll).toFixed(2),
@@ -439,15 +494,25 @@ export default function SubmitExpenseWebScreen() {
         to_home: formGoingHome,
         route_image_url: routeImageUrl,
         date: formDate,
+        type: 2,
         created_at: serverTimestamp(),
       };
 
-      await addDoc(collection(db, "trips"), tripToSave);
+      const docRef = await addDoc(collection(db, "trips"), tripToSave);
+      console.log("Trip saved with ID:", docRef.id);
 
-      setFormDate("");
-      setFormTripFromTime("");
-      setFormTripToTime("");
-      setFormGoingHome(false);
+      // --- Create a local trip object for immediate addition ---
+      const newTrip = {
+        id: docRef.id,
+        ...tripToSave,
+        created_at: new Date(), // local timestamp for display; Firestore will have serverTimestamp
+      };
+
+      // Add to addedTrips directly
+      setAddedTrips((prev) => [...prev, newTrip]);
+
+      // Reset the trip form and close modal
+      resetTripForm();
       setShowModal(false);
     } catch (error) {
       console.error("Save error:", error);
@@ -455,6 +520,14 @@ export default function SubmitExpenseWebScreen() {
     } finally {
       setIsSaving(false);
     }
+  };
+  const resetTripForm = () => {
+    setFromAddress("");
+    setToAddress("");
+    setFormRemark("");
+    setFormTripFromTime(null);
+    setFormTripToTime(null);
+    setFormGoingHome(false);
   };
 
   const handleSubmit = async () => {
@@ -620,6 +693,151 @@ export default function SubmitExpenseWebScreen() {
                 </TouchableOpacity>
               </View>
               {renderTripModal()}
+
+              <TouchableOpacity
+                onPress={() => setShowModal(true)}
+                style={[styles.dropdownInput, { marginLeft: 10 }]}
+              >
+                <Text style={styles.buttonText}>Add Trip</Text>
+              </TouchableOpacity>
+              <Modal
+                animationType="fade"
+                transparent={true}
+                visible={showModal}
+                statusBarTranslucent={true}
+                onRequestClose={() => !isSaving && setShowModal(false)}
+              >
+                <View style={styles.screenOverlay}>
+                  <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    style={styles.keyboardContainer}
+                  >
+                    <ScrollView
+                      style={styles.modalScrollWrapper}
+                      contentContainerStyle={styles.modalScrollContent}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <View style={styles.modalView}>
+                        <Text style={styles.modalTitle}>Add Trip</Text>
+
+                        <View style={styles.formGroup}>
+                          <Text style={styles.modalSubtitle}>
+                            From (Starting location):
+                          </Text>
+                          <PlacesInput
+                            value={fromAddress}
+                            placeholder="Search starting location"
+                            onPlaceSelected={(address, location) => {
+                              setFromAddress(address);
+                              setOriginCoord(location);
+                            }}
+                          />
+                          <Text
+                            style={[styles.modalSubtitle, { marginTop: 10 }]}
+                          >
+                            To (Destination):
+                          </Text>
+                          <PlacesInput
+                            value={toAddress}
+                            placeholder="Search destination…"
+                            onPlaceSelected={(address, location) => {
+                              setToAddress(address);
+                              setDestCoord(location);
+                            }}
+                          />
+                          <Text
+                            style={[styles.modalSubtitle, { marginTop: 10 }]}
+                          >
+                            From Time:
+                          </Text>
+                          <input
+                            type="time"
+                            value={dateToTimeString(formTripFromTime)}
+                            onChange={(e) =>
+                              setFormTripFromTime(
+                                timeStringToDate(e.target.value),
+                              )
+                            }
+                            style={styles.timeInput}
+                            disabled={isSaving}
+                          />
+
+                          <Text style={styles.modalSubtitle}>To Time:</Text>
+                          <input
+                            type="time"
+                            value={dateToTimeString(formTripToTime)}
+                            onChange={(e) =>
+                              setFormTripToTime(
+                                timeStringToDate(e.target.value),
+                              )
+                            }
+                            style={styles.timeInput}
+                            disabled={isSaving}
+                          />
+
+                          <Text style={styles.modalSubtitle}>Going Home:</Text>
+                          <Switch
+                            trackColor={{ false: "#767577", true: "#81b0ff" }}
+                            thumbColor="#2196F3"
+                            ios_backgroundColor="#3e3e3e"
+                            value={formGoingHome}
+                            onValueChange={(newValue) =>
+                              setFormGoingHome(newValue)
+                            }
+                          />
+                          <Text style={styles.modalSubtitle}>
+                            Remark (Optional):
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.input,
+                              { minHeight: 80, textAlignVertical: "top" },
+                            ]}
+                            placeholder="Trip Remark..."
+                            placeholderTextColor="#999999"
+                            value={formRemark}
+                            onChangeText={setFormRemark}
+                            editable={!isSaving}
+                            keyboardType="default"
+                            multiline
+                            numberOfLines={3}
+                          />
+                        </View>
+
+                        <View style={styles.buttonRow}>
+                          <TouchableOpacity
+                            style={[styles.dialogButton, styles.cancelButton]}
+                            onPress={() => {
+                              setShowModal(false);
+                              resetTripForm();
+                            }}
+                            disabled={isSaving}
+                          >
+                            <Text style={styles.textStyle}>Cancel</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.dialogButton,
+                              styles.submitButton,
+                              isSaving && { opacity: 0.7 },
+                            ]}
+                            onPress={saveTripToFirestore}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? (
+                              <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                              <Text style={styles.textStyle}>Submit</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </ScrollView>
+                  </KeyboardAvoidingView>
+                </View>
+              </Modal>
             </View>
 
             {addedTrips.length > 0 && (
@@ -946,4 +1164,98 @@ const styles = StyleSheet.create({
   receiptList: { marginLeft: 120, marginTop: 5, marginBottom: 10 },
   receiptLabel: { fontSize: 12, fontWeight: "500", color: "#555" },
   receiptFileName: { fontSize: 11, color: "#666", marginLeft: 10 },
+  screenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  modalScrollWrapper: {
+    flex: 1,
+    width: "100%",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  modalView: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 25,
+    alignItems: "stretch",
+    shadowColor: "#000",
+    elevation: 5,
+  },
+  formGroup: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: "normal",
+    marginBottom: 8,
+    color: "#666",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  dialogButton: {
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+    flex: 1,
+    alignItems: "center",
+  },
+  submitButton: {
+    backgroundColor: "#2196F3",
+  },
+  cancelButton: {
+    backgroundColor: "#f44336",
+  },
+  textStyle: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  input: {
+    width: "100%",
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#eee",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#333",
+  },
+  timePickerButton: {
+    backgroundColor: "#f0f0f0",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  timePickerText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  timeInput: {
+    maxWidth: 300,
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#eee",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#333",
+    boxSizing: "border-box",
+    marginBottom: 16,
+  },
 });

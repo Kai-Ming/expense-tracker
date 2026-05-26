@@ -24,6 +24,7 @@ function PlacesInput({
 }) {
   const [query, setQuery] = useState("");
   const [predictions, setPredictions] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const timer = useRef(null);
 
   useEffect(() => {
@@ -92,19 +93,37 @@ function PlacesInput({
   };
 
   return (
-    <View style={{ zIndex: 999 }}>
+    <View
+      style={[{ position: "relative", zIndex: isDropdownOpen ? 10000 : 1 }]}
+    >
       <TextInput
         placeholder={placeholder}
         value={query}
         onChangeText={handleChange}
         placeholderTextColor="#999"
         style={styles.input}
+        onFocus={() => setIsDropdownOpen(true)}
+        onBlur={() => {
+          // Delay to allow selection
+          setTimeout(() => setIsDropdownOpen(false), 200);
+        }}
       />
       {predictions.length > 0 && (
         <FlatList
           data={predictions}
           keyExtractor={(item: any) => item.placePrediction.placeId}
-          style={styles.list}
+          style={[
+            styles.list,
+            {
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              maxHeight: 200,
+              zIndex: 1000,
+              elevation: 1000,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }: any) => (
             <TouchableOpacity

@@ -10,7 +10,6 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
-console.log("API KEY:", process.env.EXPO_PUBLIC_FIREBASE_API_KEY);
 console.log("EXTRA:", JSON.stringify(Constants.expoConfig?.extra));
 
 const extra = Constants.expoConfig?.extra ?? {};
