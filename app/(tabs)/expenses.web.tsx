@@ -194,11 +194,7 @@ export default function ExpensesWebScreen() {
 
   useEffect(() => {
     if (!userId) return;
-    const q = query(
-      collection(db, "trips"),
-      where("user_id", "==", userId),
-      orderBy("created_at", "desc"),
-    );
+    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tripsData: Trip[] = [];
       snapshot.forEach((doc) => {

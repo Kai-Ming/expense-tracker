@@ -32,6 +32,7 @@ interface Expense {
   id: string;
   distance: number;
   date?: string;
+  trip_ids: string[];
   from_address: string;
   to_address: string;
   purpose: string;
@@ -54,6 +55,23 @@ interface Expense {
   created_att: any;
 }
 
+interface Trip {
+  id: string;
+  user_id: string;
+  distance: number;
+  toll?: number;
+  mileage?: number;
+  date?: any;
+  from_address: string;
+  to_address: string;
+  from_time?: string;
+  to_time?: string;
+  remark: string;
+  route_image_url?: string;
+  to_home: boolean;
+  created_at: any;
+}
+
 export default function ExpensesScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -69,6 +87,7 @@ export default function ExpensesScreen() {
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [tempPoints, setTempPoints] = useState<(any | null)[]>([null, null]);
   const [tempPolyline, setTempPolyline] = useState<string | null>(null);
 
@@ -158,6 +177,23 @@ export default function ExpensesScreen() {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    const q = query(
+      collection(db, "trips"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tripsData: Trip[] = [];
+      snapshot.forEach((doc) => {
+        tripsData.push({ id: doc.id, ...doc.data() } as Trip);
+      });
+      setAllTrips(tripsData);
+    });
+    return () => unsubscribe();
+  }, [userId]);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "config", "settings"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -168,6 +204,10 @@ export default function ExpensesScreen() {
     });
     return () => unsubscribe();
   }, []);
+
+  const getTripById = (tripId: string): Trip | undefined => {
+    return allTrips.find((trip) => trip.id === tripId);
+  };
 
   const handleApplyFilter = () => {
     setAppliedStartDate(startDate);
@@ -497,36 +537,26 @@ export default function ExpensesScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Route:</Text>
-              {isEditing ? (
-                <View style={{ backgroundColor: "transparent" }}>
-                  <TextInput
-                    ref={editInputARef}
-                    style={styles.inlineInput}
-                    value={editFormData.from_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, from_address: text })
-                    }
-                    placeholder="From Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                  <TextInput
-                    ref={editInputBRef}
-                    style={styles.inlineInput}
-                    value={editFormData.to_address}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, to_address: text })
-                    }
-                    placeholder="To Address"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
+              {item.trip_ids && item.trip_ids.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.descriptionLabel}>Trips:</Text>
+                  {item.trip_ids.map((tripId) => {
+                    const trip = getTripById(tripId);
+                    return trip ? (
+                      <View key={tripId} style={styles.tripItem}>
+                        <Text style={styles.descriptionText}>
+                          {trip.from_address} → {trip.to_address} (
+                          {trip.distance?.toFixed(2)} km)
+                        </Text>
+                        <Text style={styles.tripRemark}>{trip.remark}</Text>
+                      </View>
+                    ) : (
+                      <Text key={tripId} style={styles.descriptionText}>
+                        Trip data not available
+                      </Text>
+                    );
+                  })}
                 </View>
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.from_address || "N/A"} → {item.to_address || "N/A"}
-                </Text>
               )}
 
               <Text style={styles.descriptionLabel}>Date:</Text>
@@ -781,22 +811,29 @@ export default function ExpensesScreen() {
               </View>
             </View>
 
-            {item.route_image_url && !isEditing && (
-              <>
-                <Text style={styles.sectionHeader}>Route Map</Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedImage(item.route_image_url || null);
-                  }}
-                >
-                  <Image
-                    source={{ uri: item.route_image_url }}
-                    style={styles.businessCardImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              </>
+            {item.trip_ids && item.trip_ids.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionHeader}>Trip Route Maps:</Text>
+                {item.trip_ids.map((tripId) => {
+                  const trip = getTripById(tripId);
+                  if (!trip || !trip.route_image_url) return null;
+                  return (
+                    <TouchableOpacity
+                      key={tripId}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setSelectedImage(trip.route_image_url || null);
+                      }}
+                    >
+                      <Image
+                        source={{ uri: trip.route_image_url }}
+                        style={styles.businessCardImage}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             )}
 
             {item.business_card_url && (
@@ -817,7 +854,7 @@ export default function ExpensesScreen() {
               </>
             )}
 
-            {item.approval_status === 0 && (
+            {/* {item.approval_status === 0 && (
               <View style={styles.actionButtonsContainer}>
                 {isEditing ? (
                   <>
@@ -861,7 +898,7 @@ export default function ExpensesScreen() {
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            )} */}
 
             {role === 0 && item.approval_status === 0 && (
               <View style={styles.buttonContainer}>
@@ -1211,7 +1248,6 @@ const styles = StyleSheet.create({
     borderTopColor: "#eee",
     paddingTop: 12,
     backgroundColor: "transparent",
-    maxWidth: 250,
   },
   actionButtonsContainer: {
     flexDirection: "row",

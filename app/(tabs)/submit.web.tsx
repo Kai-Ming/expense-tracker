@@ -510,9 +510,9 @@ export default function SubmitExpenseWebScreen() {
         user_id: userId,
         from_address: fromAddress,
         to_address: toAddress,
-        distance: distanceData.toFixed(2),
-        mileage: mileage.toFixed(2),
-        toll: toll.toFixed(2),
+        distance: parseFloat(distanceData.toFixed(2)),
+        mileage: parseFloat(mileage.toFixed(2)),
+        toll: parseFloat(toll.toFixed(2)),
         total: (mileage + toll).toFixed(2),
         remark: formRemark.trim() || "",
         from_time: formTripFromTime,
@@ -526,6 +526,7 @@ export default function SubmitExpenseWebScreen() {
 
       const docRef = await addDoc(collection(db, "trips"), tripToSave);
       console.log("Trip saved with ID:", docRef.id);
+      console.log(tripToSave);
 
       // --- Create a local trip object for immediate addition ---
       const newTrip = {
@@ -558,7 +559,12 @@ export default function SubmitExpenseWebScreen() {
 
   const handleSubmit = async () => {
     const dist = getDistanceValue();
-    if (dist === 0 || !formPurpose.trim() || !formDate) {
+    if (
+      dist === 0 ||
+      !formPurpose.trim() ||
+      !formDate ||
+      addedTrips.length === 0
+    ) {
       alert("Please ensure all required fields are filled.");
       return;
     }
@@ -611,11 +617,22 @@ export default function SubmitExpenseWebScreen() {
         created_at: serverTimestamp(),
         trip_ids: addedTrips.map((trip) => trip.id),
       });
+      resetForm();
       alert("Expense submitted successfully!");
     } catch (e) {
       console.error(e);
       alert("Failed to save expense.");
     }
+  };
+
+  const resetForm = () => {
+    setFormPurpose("");
+    setFormCompany("");
+    setFormName("");
+    setFormContactNumber("");
+    setFormTripReport("");
+    setBusinessCardFile(null);
+    setReceiptFiles([]);
   };
 
   const renderTripModal = () => (

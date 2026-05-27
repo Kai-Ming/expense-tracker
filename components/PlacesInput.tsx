@@ -80,7 +80,6 @@ function PlacesInput({
         },
       );
       const data = await res.json();
-      console.log("PLACE DETAILS:", JSON.stringify(data));
       if (data.location) {
         onPlaceSelected(description, {
           lat: data.location.latitude,
@@ -104,11 +103,10 @@ function PlacesInput({
         style={styles.input}
         onFocus={() => setIsDropdownOpen(true)}
         onBlur={() => {
-          // Delay to allow selection
           setTimeout(() => setIsDropdownOpen(false), 200);
         }}
       />
-      {predictions.length > 0 && (
+      {isDropdownOpen && predictions.length > 0 && (
         <FlatList
           data={predictions}
           keyExtractor={(item: any) => item.placePrediction.placeId}

@@ -360,7 +360,7 @@ export default function settings() {
         onPress={() => setUsernameModalVisible(true)}
         style={styles.button}
       >
-        <Text style={styles.buttonText}>Update Username</Text>
+        <Text style={styles.buttonText}>Change Username</Text>
       </TouchableOpacity>
       <Modal
         animationType="fade"
@@ -381,7 +381,7 @@ export default function settings() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.modalView}>
-                <Text style={styles.modalTitle}>Update Username</Text>
+                <Text style={styles.modalTitle}>Change Username</Text>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>New username:</Text>
@@ -417,7 +417,7 @@ export default function settings() {
                     {isSaving ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.textStyle}>Submit</Text>
+                      <Text style={styles.textStyle}>Confirm</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -686,7 +686,7 @@ export default function settings() {
                         {isSaving ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
-                          <Text style={styles.textStyle}>Submit</Text>
+                          <Text style={styles.textStyle}>Set</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -703,7 +703,7 @@ export default function settings() {
             onPress={() => setAddressModalVisible(true)}
             style={styles.button}
           >
-            <Text style={styles.buttonText}>Change Office Address</Text>
+            <Text style={styles.buttonText}>Set Office Address</Text>
           </TouchableOpacity>
           <Modal
             animationType="fade"
@@ -763,7 +763,7 @@ export default function settings() {
                         {isSaving ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
-                          <Text style={styles.textStyle}>Submit</Text>
+                          <Text style={styles.textStyle}>Set</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -841,7 +841,7 @@ export default function settings() {
                         {isSaving ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
-                          <Text style={styles.textStyle}>Submit</Text>
+                          <Text style={styles.textStyle}>Set</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -937,6 +937,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     gap: 10,
+    elevation: 0,
   },
   dialogButton: {
     borderRadius: 8,
