@@ -67,6 +67,7 @@ interface Trip {
   remark: string;
   route_image_url?: string;
   to_home: boolean;
+  platform: number;
   created_at: any;
 }
 
@@ -892,6 +893,12 @@ export default function ExpensesWebScreen() {
                               </Text>
                               <Text style={styles.tripRemark}>
                                 {trip.remark}
+                              </Text>
+                              <Text style={styles.tripRemark}>
+                                {trip.platform === 1 ? "Web" : "Mobile"}
+                              </Text>
+                              <Text style={styles.tripRemark}>
+                                {trip.to_home === true ? "Going Home" : ""}
                               </Text>
                             </View>
                           ) : (

@@ -631,6 +631,10 @@ export default function SubmitExpenseWebScreen() {
     setFormName("");
     setFormContactNumber("");
     setFormTripReport("");
+    setFormParking("0.00");
+    setAddedTrips([]);
+    setFormParking("0.00");
+    setFormToll("0.00");
     setBusinessCardFile(null);
     setReceiptFiles([]);
   };
@@ -662,43 +666,56 @@ export default function SubmitExpenseWebScreen() {
                 No trips found for {formDate.split("-").reverse().join("-")}
               </Text>
             )}
-            {tripsForSelectedDate.map((trip) => (
-              <TouchableOpacity
-                key={trip.id}
-                style={styles.modalTripItem}
-                onPress={() => {
-                  setSelectedTripId(trip.id);
-                  setIsDropdownOpen(false);
-                  handleAddTrip(trip.id);
-                }}
-              >
-                <View style={styles.modalTripHeader}>
-                  {/* <Text style={styles.timeText}>
-                    {trip.created_at?.toDate().toLocaleTimeString()}
-                  </Text> */}
-                  <Text style={styles.timeText}>
+            {tripsForSelectedDate.map((trip) => {
+              const isAdded = addedTrips.some((added) => added.id === trip.id);
+
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[
+                    styles.modalTripItem,
+                    isAdded && styles.disabledTripItem,
+                  ]}
+                  onPress={() => {
+                    if (isAdded) return;
+                    setSelectedTripId(trip.id);
+                    setIsDropdownOpen(false);
+                    handleAddTrip(trip.id);
+                  }}
+                >
+                  <Text
+                    style={[styles.timeText, isAdded && styles.disabledText]}
+                  >
                     {formatTripTime(trip.from_time)} -{" "}
                     {formatTripTime(trip.to_time)}
                   </Text>
-                </View>
-                <Text style={styles.addressText}>
-                  <Text style={styles.boldLabel}>Platform: </Text>
-                  {trip?.platform === 2 ? "Web" : "Mobile"}
-                </Text>
-                <Text style={styles.addressText}>
-                  <Text style={styles.boldLabel}>Remark: </Text>
-                  {trip.remark || "No Remark"}
-                </Text>
-                <Text style={styles.addressText}>
-                  <Text style={styles.boldLabel}>From: </Text>
-                  {trip.from_address}
-                </Text>
-                <Text style={styles.addressText}>
-                  <Text style={styles.boldLabel}>To: </Text>
-                  {trip.to_address}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Platform: </Text>
+                    {trip?.platform === 2 ? "Web" : "Mobile"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Remark: </Text>
+                    {trip.remark || "No Remark"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>From: </Text>
+                    {trip.from_address}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>To: </Text>
+                    {trip.to_address}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </TouchableOpacity>
@@ -799,7 +816,7 @@ export default function SubmitExpenseWebScreen() {
                           <Text
                             style={[styles.modalSubtitle, { marginTop: 10 }]}
                           >
-                            From Time:
+                            Departure Time:
                           </Text>
                           <input
                             type="time"
@@ -813,7 +830,9 @@ export default function SubmitExpenseWebScreen() {
                             disabled={isSaving}
                           />
 
-                          <Text style={styles.modalSubtitle}>To Time:</Text>
+                          <Text style={styles.modalSubtitle}>
+                            Arrival Time:
+                          </Text>
                           <input
                             type="time"
                             value={dateToTimeString(formTripToTime)}
@@ -993,11 +1012,11 @@ export default function SubmitExpenseWebScreen() {
             </View>
 
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>From Time:</Text>
+              <Text style={styles.fieldLabel}>Start Trip Time:</Text>
               <Text style={styles.fieldValue}>
                 {to12HourTime(formFromTime) || "N/A"}
               </Text>
-              <Text style={styles.fieldLabel}>To Time:</Text>
+              <Text style={styles.fieldLabel}>End Trip Time:</Text>
               <Text style={styles.fieldValue}>
                 {to12HourTime(formToTime) || "N/A"}
               </Text>
@@ -1009,7 +1028,13 @@ export default function SubmitExpenseWebScreen() {
               <Text style={styles.fieldLabel}>Mileage (RM):</Text>
               <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
               <Text style={styles.fieldLabel}>Toll (RM):</Text>
-              <Text style={styles.fieldValue}>RM {calculateToll()}</Text>
+              {/* <Text style={styles.fieldValue}>RM {calculateToll()}</Text> */}
+              <TextInput
+                value={formToll}
+                onChangeText={setFormToll}
+                keyboardType="numeric"
+                style={styles.webTextInput}
+              />
               <Text style={styles.fieldLabel}>Parking (RM):</Text>
               <TextInput
                 value={formParking}
@@ -1309,5 +1334,12 @@ const styles = StyleSheet.create({
     color: "#333",
     boxSizing: "border-box",
     marginBottom: 16,
+  },
+  disabledTripItem: {
+    backgroundColor: "#e0e0e0", // light grey background
+    opacity: 0.6, // optional: reduces overall opacity
+  },
+  disabledText: {
+    color: "#9e9e9e", // grey text
   },
 });
