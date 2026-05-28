@@ -174,10 +174,10 @@ export default function SubmitExpenseScreen() {
           if (data.mileage_rate_mobile)
             setMileageRate(data.mileage_rate_mobile);
 
-          if (data.office_location) {
+          if (data.office_coordinates) {
             setOfficeCoords({
-              lat: data.office_location.latitude,
-              lng: data.office_location.longitude,
+              lat: data.office_coordinates.latitude,
+              lng: data.office_coordinates.longitude,
             });
           }
           if (data.arrival_distance) {

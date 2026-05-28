@@ -54,6 +54,9 @@ export default function settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
+  const [homeModalVisible, setHomeModalVisible] = useState(false);
+  const [homeAddress, setHomeAddress] = useState<string>("");
+
   const [mileageModalVisible, setMileageModalVisible] = useState(false);
   const [mileageRate, setMileageRate] = useState<string>("0.0");
   const [mobileMileageRate, setMobileMileageRate] = useState<string>("0.0");
@@ -135,7 +138,6 @@ export default function settings() {
     setIsSaving(true);
 
     try {
-      // FIX 4: Target the explicit firestore string document name, NOT the auth UID string
       const userDocRef = doc(db, "users", firestoreDocId);
 
       await updateDoc(userDocRef, {
@@ -230,6 +232,55 @@ export default function settings() {
     } catch (error: any) {
       console.error(error);
       Alert.alert("Error", error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateHomeAddress = async () => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error("Google Maps API Key is missing");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // 1. Encode the address string to make it URL-safe
+      const encodedAddress = encodeURIComponent(homeAddress);
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+
+      // 2. Call the Google Geocoding API
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+
+      // 3. Check if Google successfully found the address
+      if (data.status !== "OK" || !data.results.length) {
+        Alert.alert("Error", `Geocoding failed: ${data.status}`);
+        return;
+      }
+
+      // 4. Extract latitude and longitude
+      const { lat, lng } = data.results[0].geometry.location;
+
+      console.log("Coordinates found:", lat, lng);
+
+      const userDocRef = doc(db, "users", firestoreDocId);
+
+      await updateDoc(userDocRef, {
+        home_coordinates: new GeoPoint(lat, lng),
+      });
+
+      Alert.alert(
+        "Success",
+        "Home address and coordinates updated successfully!",
+      );
+      setHomeModalVisible(false);
+    } catch (error) {
+      console.error("Error updating document or fetching coordinates:", error);
+      alert("An error occurred while updating the address.");
     } finally {
       setIsSaving(false);
     }
@@ -613,6 +664,84 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      <TouchableOpacity
+        onPress={() => setHomeModalVisible(true)}
+        style={styles.button}
+      >
+        <Text style={styles.buttonText}>Set Home Address</Text>
+      </TouchableOpacity>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={homeModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isSaving && setHomeModalVisible(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={[styles.modalScrollWrapper, { overflow: "visible" }]}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                { overflow: "visible" },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Set Home Address</Text>
+
+                <View
+                  style={[
+                    styles.formGroup,
+                    { position: "relative", zIndex: 10, elevation: 10 },
+                  ]}
+                >
+                  <Text style={styles.modalSubtitle}>Home Address:</Text>
+                  <View style={{ width: "100%" }}>
+                    <PlacesInput
+                      value={officeAddress}
+                      placeholder="Search home..."
+                      onPlaceSelected={(address, location) => {
+                        setHomeAddress(address);
+                      }}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => setHomeModalVisible(false)}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
+                    onPress={updateHomeAddress}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Set</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
       {role === 0 && (
         <>
           <TouchableOpacity
@@ -729,7 +858,12 @@ export default function settings() {
                   <View style={styles.modalView}>
                     <Text style={styles.modalTitle}>Set Office Address</Text>
 
-                    <View style={styles.formGroup}>
+                    <View
+                      style={[
+                        styles.formGroup,
+                        { position: "relative", zIndex: 10, elevation: 10 },
+                      ]}
+                    >
                       <Text style={styles.modalSubtitle}>Office Address:</Text>
                       <View style={{ width: "100%" }}>
                         <PlacesInput

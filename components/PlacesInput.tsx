@@ -14,6 +14,7 @@ function PlacesInput({
   placeholder,
   onPlaceSelected,
   value,
+  disabled = false, // new optional prop
 }: {
   placeholder: string;
   onPlaceSelected: (
@@ -21,6 +22,7 @@ function PlacesInput({
     location: { lat: number; lng: number },
   ) => void;
   value: string;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [predictions, setPredictions] = useState([]);
@@ -30,6 +32,21 @@ function PlacesInput({
   useEffect(() => {
     setQuery(value);
   }, [value]);
+
+  // Close dropdown when disabled becomes true
+  useEffect(() => {
+    if (disabled) {
+      setIsDropdownOpen(false);
+      setPredictions([]);
+    }
+  }, [disabled]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
 
   const fetchPredictions = async (text: string) => {
     if (text.length < 2) return setPredictions([]);
@@ -49,7 +66,6 @@ function PlacesInput({
         },
       );
       const data = await res.json();
-      console.log("RESPONSE:", JSON.stringify(data));
       setPredictions(data.suggestions || []);
     } catch (e) {
       console.log("ERROR:", e);
@@ -57,18 +73,19 @@ function PlacesInput({
   };
 
   const handleChange = (text: string) => {
+    if (disabled) return; // ignore changes when disabled
     setQuery(text);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => fetchPredictions(text), 350);
   };
 
   const handleSelect = async (item: any) => {
+    if (disabled) return;
     const placeId = item.placePrediction.placeId;
     const description = item.placePrediction.text.text;
     setQuery(description);
     setPredictions([]);
 
-    // Fetch coordinates
     try {
       const res = await fetch(
         `https://places.googleapis.com/v1/places/${placeId}`,
@@ -100,13 +117,17 @@ function PlacesInput({
         value={query}
         onChangeText={handleChange}
         placeholderTextColor="#999"
-        style={styles.input}
-        onFocus={() => setIsDropdownOpen(true)}
+        style={[styles.input, disabled && styles.disabledInput]}
+        onFocus={() => {
+          if (!disabled) setIsDropdownOpen(true);
+        }}
         onBlur={() => {
           setTimeout(() => setIsDropdownOpen(false), 200);
         }}
+        editable={!disabled}
+        pointerEvents={disabled ? "none" : "auto"} // optional: prevents any tap interaction
       />
-      {isDropdownOpen && predictions.length > 0 && (
+      {!disabled && isDropdownOpen && predictions.length > 0 && (
         <FlatList
           data={predictions}
           keyExtractor={(item: any) => item.placePrediction.placeId}
@@ -151,6 +172,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: "#333",
+  },
+  disabledInput: {
+    backgroundColor: "#f0f0f0",
+    color: "#999",
+    borderColor: "#ddd",
   },
   list: {
     backgroundColor: "#fff",

@@ -1,5 +1,6 @@
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
+import * as Location from "expo-location";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   addDoc,
@@ -30,6 +31,10 @@ import {
 import { db, storage } from "../../firebaseConfig";
 
 export default function SubmitExpenseWebScreen() {
+  const [homeCoords, setHomeCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [distance, setDistance] = useState<string>("0.00");
   const [formPurpose, setFormPurpose] = useState<string>("");
   const [formDate, setFormDate] = useState<string>(
@@ -48,6 +53,10 @@ export default function SubmitExpenseWebScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
   const [mileageRate, setMileageRate] = useState<number>(0.8);
+  const [officeCoords, setOfficeCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
   const [allUserTrips, setAllUserTrips] = useState<any[]>([]);
   const [tripsForSelectedDate, setTripsForSelectedDate] = useState<any[]>([]);
@@ -135,6 +144,12 @@ export default function SubmitExpenseWebScreen() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.mileage_rate) setMileageRate(data.mileage_rate);
+          if (data.office_coordinates) {
+            setOfficeCoords({
+              lat: data.office_coordinates.latitude,
+              lng: data.office_coordinates.longitude,
+            });
+          }
         }
       },
     );
@@ -154,6 +169,14 @@ export default function SubmitExpenseWebScreen() {
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
+            const homeCoord = userData.home_coordinates; // This is a Firebase GeoPoint
+
+            if (homeCoord) {
+              setHomeCoords({
+                lat: homeCoord.latitude,
+                lng: homeCoord.longitude,
+              });
+            }
           } else {
             setUsername(user.displayName || "User");
           }
@@ -258,7 +281,6 @@ export default function SubmitExpenseWebScreen() {
     if (hour12 === 0) hour12 = 12;
     return `${hour12}:${minutes.toString().padStart(2, "0")} ${period}`;
   };
-
   const timeStringToDate = (timeString: string): Date | null => {
     if (!formDate || !timeString) return null;
     const [year, month, day] = formDate.split("-").map(Number);
@@ -424,6 +446,71 @@ export default function SubmitExpenseWebScreen() {
     return R * c;
   }
 
+  const getAddressFromCoords = async (
+    lat: number,
+    lng: number,
+  ): Promise<string> => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is undefined");
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+      return "Address not found";
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === "OK" && data.results.length > 0) {
+        return data.results[0].formatted_address
+          .replace(/\b\d{5}\b,?\s*/g, "")
+          .trim();
+      }
+
+      // ── Fallback to native if Google fails ────────────────────────
+      console.warn(
+        "Google geocoding failed, falling back to native:",
+        data.status,
+      );
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+
+      return "Address not found";
+    } catch (error) {
+      console.error("Geocoding fetch error:", error);
+      // ── Fallback to native on network error ───────────────────────
+      try {
+        const geo = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        if (geo.length > 0) {
+          const g = geo[0];
+          return [g.name, g.street, g.city].filter(Boolean).join(", ");
+        }
+      } catch (nativeError) {
+        console.error("Native geocoding also failed:", nativeError);
+      }
+      return "Address not found";
+    }
+  };
+
   const getDrivingDistance = async (
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
@@ -463,6 +550,30 @@ export default function SubmitExpenseWebScreen() {
     }
   };
 
+  const handleUpdateHome = async (home: boolean) => {
+    console.log(home);
+    setFormGoingHome(home);
+    if (home) {
+      if (homeCoords) {
+        console.log("home coords");
+        console.log(homeCoords);
+        console.log(homeCoords.lat);
+        console.log(homeCoords.lng);
+        let homeAddress = await getAddressFromCoords(
+          homeCoords.lat,
+          homeCoords.lng,
+        );
+        console.log(homeAddress);
+        setToAddress(homeAddress);
+        setDestCoord(homeCoords);
+        console.log(homeAddress);
+        console.log(destCoord);
+      }
+    } else {
+      setToAddress("");
+    }
+  };
+
   const saveTripToFirestore = async () => {
     if (!fromAddress.trim() || !toAddress.trim()) {
       alert("Please fill in both 'From' and 'To' addresses.");
@@ -488,8 +599,32 @@ export default function SubmitExpenseWebScreen() {
     setIsSaving(true);
 
     try {
-      const distanceData = getHaversineDistance(originCoord, destCoord);
-      if (!distanceData) {
+      let subToAddress = toAddress;
+      let subDistance = getHaversineDistance(originCoord, destCoord);
+      let subToll = await fetchTollCost(originCoord, destCoord);
+      if (formGoingHome) {
+        const distToCurrent = getHaversineDistance(originCoord, destCoord);
+        const distToOffice = getHaversineDistance(originCoord, officeCoords);
+
+        if (distToOffice < distToCurrent) {
+          console.log(`Route Comparison: Using Current.`);
+        } else {
+          console.log(`Route Comparison: Using Office.`);
+          subDistance = parseFloat(distToOffice.toFixed(2));
+          subToll = await fetchTollCost(originCoord, officeCoords);
+          if (officeCoords) {
+            subToAddress = await getAddressFromCoords(
+              officeCoords.lat,
+              officeCoords.lng,
+            );
+            /* if (currentLocation) {
+              finalToll = await fetchTollCost(currentLocation, officeCoords);
+            } */
+          }
+        }
+      }
+      //const distanceData = getHaversineDistance(originCoord, destCoord);
+      if (!subDistance) {
         console.log("from", originCoord, "to", destCoord);
         console.log("from", fromAddress, "to", toAddress);
         alert("Could not calculate driving distance. Please try again.");
@@ -503,17 +638,16 @@ export default function SubmitExpenseWebScreen() {
         console.error("Error generating route image:", imageError);
       }
 
-      let mileage = distanceData * mileageRate;
-      let toll = await fetchTollCost(originCoord, destCoord);
+      let mileage = subDistance * mileageRate;
 
       const tripToSave = {
         user_id: userId,
         from_address: fromAddress,
         to_address: toAddress,
-        distance: parseFloat(distanceData.toFixed(2)),
+        distance: parseFloat(subDistance.toFixed(2)),
         mileage: parseFloat(mileage.toFixed(2)),
-        toll: parseFloat(toll.toFixed(2)),
-        total: (mileage + toll).toFixed(2),
+        toll: parseFloat(subToll.toFixed(2)),
+        total: (mileage + subToll).toFixed(2),
         remark: formRemark.trim() || "",
         from_time: formTripFromTime,
         to_time: formTripToTime,
@@ -812,6 +946,7 @@ export default function SubmitExpenseWebScreen() {
                               setToAddress(address);
                               setDestCoord(location);
                             }}
+                            disabled={formGoingHome}
                           />
                           <Text
                             style={[styles.modalSubtitle, { marginTop: 10 }]}
@@ -852,7 +987,7 @@ export default function SubmitExpenseWebScreen() {
                             ios_backgroundColor="#3e3e3e"
                             value={formGoingHome}
                             onValueChange={(newValue) =>
-                              setFormGoingHome(newValue)
+                              handleUpdateHome(newValue)
                             }
                           />
                           <Text style={styles.modalSubtitle}>Remark:</Text>
