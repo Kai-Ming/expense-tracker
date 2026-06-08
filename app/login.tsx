@@ -1,5 +1,5 @@
 import { Text, View } from "@/components/Themed"; // Assuming Themed components are available and desired
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -122,11 +122,11 @@ export default function LoginPage() {
       </TouchableOpacity>
 
       <View style={styles.footerRow}>
-        <Link href="/signup" asChild>
+        {/* <Link href="/signup" asChild>
           <TouchableOpacity style={styles.link}>
             <Text style={styles.linkText}>Sign up</Text>
           </TouchableOpacity>
-        </Link>
+        </Link> */}
 
         <TouchableOpacity
           onPress={() => setModalVisible(true)}

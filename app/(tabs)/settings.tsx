@@ -1,11 +1,14 @@
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
+import { useRouter } from "expo-router";
 import {
+  createUserWithEmailAndPassword,
   EmailAuthProvider,
   getAuth,
   onAuthStateChanged,
   reauthenticateWithCredential,
   updatePassword,
+  updateProfile,
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
@@ -15,6 +18,8 @@ import {
   getDocs,
   onSnapshot,
   query,
+  serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -30,7 +35,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 
 export default function settings() {
   const [username, setUsername] = useState<string>("");
@@ -57,9 +62,17 @@ export default function settings() {
   const [homeModalVisible, setHomeModalVisible] = useState(false);
   const [homeAddress, setHomeAddress] = useState<string>("");
 
+  const [documentModalVisible, setDocumentModalVisible] = useState(false);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+
   const [mileageModalVisible, setMileageModalVisible] = useState(false);
   const [mileageRate, setMileageRate] = useState<string>("0.0");
   const [mobileMileageRate, setMobileMileageRate] = useState<string>("0.0");
+  const [mileageRateOutstation, setMileageRateOutstation] =
+    useState<string>("0.0");
+  const [mobileMileageRateOutstation, setMobileMileageRateOutstation] =
+    useState<string>("0.0");
+  const [oustationDistance, setOutstationDistance] = useState<string>("0.0");
 
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [officeAddress, setOfficeAddress] = useState<string>("");
@@ -71,7 +84,19 @@ export default function settings() {
   const [distanceModalVisible, setDistanceModalVisible] = useState(false);
   const [distance, setDistance] = useState<string>("0.00");
 
+  const [userModalVisible, setUserModalVisible] = useState(false);
+  const [formUsername, setFormUsername] = useState<string>("");
+  const [formEmail, setFormEmail] = useState<string>("");
+  const [formPassword, setFormPassword] = useState<string>("");
+  const [formConfirmPassword, setFormConfirmPassword] = useState<string>("");
+  const [formEssNo, setFormEssNo] = useState<string>("");
+  const [formDepartment, setFormDepartment] = useState<string>("");
+  const [formGrade, setFormGrade] = useState<string>("");
+  const [formCostCenter, setFormCostCenter] = useState<string>("");
+
   const [isSaving, setIsSaving] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     const auth = getAuth();
@@ -112,6 +137,14 @@ export default function settings() {
           if (data.mileage_rate) setMileageRate(data.mileage_rate.toString());
           if (data.mileage_rate_mobile)
             setMobileMileageRate(data.mileage_rate_mobile.toString());
+          if (data.mileage_rate_outstation)
+            setMileageRateOutstation(data.mileage_rate_outstation.toString());
+          if (data.mileage_rate_outstation_mobile)
+            setMobileMileageRateOutstation(
+              data.mileage_rate_outstation_mobile.toString(),
+            );
+          if (data.outstation_distance)
+            setOutstationDistance(data.outstation_distance.toString());
           if (data.arrival_distance)
             setDistance((data.arrival_distance * 1000).toString());
         }
@@ -300,6 +333,9 @@ export default function settings() {
       await updateDoc(docRef, {
         mileage_rate: parseFloat(mileageRate),
         mileage_rate_mobile: parseFloat(mobileMileageRate),
+        mileage_rate_oustation: parseFloat(mileageRateOutstation),
+        mileage_rate_outstation_mobile: parseFloat(mobileMileageRateOutstation),
+        outstation_disance: parseFloat(oustationDistance),
       });
       Alert.alert("Success", "Mileage rate updated successfully!");
       setMileageModalVisible(false);
@@ -394,6 +430,73 @@ export default function settings() {
       console.error("Error updating document:", error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSignup = async () => {
+    if (
+      formUsername.trim() === "" ||
+      formEmail.trim() === "" ||
+      formPassword.trim() === "" ||
+      formConfirmPassword.trim() === "" ||
+      formEssNo.trim() === "" ||
+      formDepartment.trim() === "" ||
+      formGrade.trim() === "" ||
+      formCostCenter.trim() === " "
+    ) {
+      Alert.alert("Signup Error", "Please fill in all fields.");
+      return;
+    }
+
+    if (formPassword !== formConfirmPassword) {
+      Alert.alert("Signup Error", "Passwords do not match.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // createUserWithEmailAndPassword automatically signs the user in
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
+      await updateProfile(userCredential.user, {
+        displayName: username.trim(),
+      });
+
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        username: formUsername.trim(),
+        email: formEmail.trim(),
+        created_at: serverTimestamp(),
+        role: 1,
+        ess_no: formEssNo.trim(),
+        department: formDepartment.trim(),
+        grade: formGrade.trim(),
+        cost_center: formCostCenter.trim(),
+      });
+
+      // User is already signed in at this point — navigate directly
+      router.replace("/submit");
+    } catch (error) {
+      const err = error as any;
+      console.error("Signup error:", err.code, err.message);
+      let errorMessage = "An error occurred during signup.";
+
+      if (err.code === "auth/email-already-in-use") {
+        errorMessage = "This email is already registered.";
+      } else if (err.code === "auth/weak-password") {
+        errorMessage = "Password must be at least 6 characters.";
+      } else if (err.code === "auth/configuration-not-found") {
+        errorMessage =
+          "Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.";
+      }
+
+      Alert.alert("Signup Failed", errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -742,6 +845,77 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      {/* <TouchableOpacity
+        onPress={() => setDocumentModalVisible(true)}
+        style={styles.button}
+      >
+        <Text style={styles.buttonText}>Add Documents</Text>
+      </TouchableOpacity> */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={documentModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isSaving && setDocumentModalVisible(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Set Document</Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.modalSubtitle}>Current Password:</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Current Password"
+                    placeholderTextColor="#999999"
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    secureTextEntry
+                    editable={!isSaving}
+                  />
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => {
+                      setDocumentModalVisible(false);
+                    }}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
+                    onPress={changePassword}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Confirm</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
       {role === 0 && (
         <>
           <TouchableOpacity
@@ -773,7 +947,9 @@ export default function settings() {
                     <Text style={styles.modalTitle}>Set Mileage</Text>
 
                     <View style={styles.formGroup}>
-                      <Text style={styles.modalSubtitle}>Web Mileage:</Text>
+                      <Text style={styles.modalSubtitle}>
+                        Web Mileage (Local):
+                      </Text>
                       <TextInput
                         style={styles.input}
                         placeholderTextColor="#999999"
@@ -783,12 +959,50 @@ export default function settings() {
                         keyboardType="decimal-pad"
                       />
 
-                      <Text style={styles.modalSubtitle}>Mobile Mileage:</Text>
+                      <Text style={styles.modalSubtitle}>
+                        Mobile Mileage (Local):
+                      </Text>
                       <TextInput
                         style={styles.input}
                         placeholderTextColor="#999999"
                         value={mobileMileageRate}
                         onChangeText={setMobileMileageRate}
+                        editable={!isSaving}
+                        keyboardType="decimal-pad"
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Web Mileage (Outstation):
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholderTextColor="#999999"
+                        value={mileageRateOutstation}
+                        onChangeText={setMileageRateOutstation}
+                        editable={!isSaving}
+                        keyboardType="decimal-pad"
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Mobile Mileage (Outstation):
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholderTextColor="#999999"
+                        value={mobileMileageRateOutstation}
+                        onChangeText={setMobileMileageRateOutstation}
+                        editable={!isSaving}
+                        keyboardType="decimal-pad"
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Outstation Distance:
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholderTextColor="#999999"
+                        value={oustationDistance}
+                        onChangeText={setOutstationDistance}
                         editable={!isSaving}
                         keyboardType="decimal-pad"
                       />
@@ -976,6 +1190,164 @@ export default function settings() {
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
                           <Text style={styles.textStyle}>Set</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
+            </View>
+          </Modal>
+        </>
+      )}
+      {role === 0 && (
+        <>
+          <TouchableOpacity
+            onPress={() => setUserModalVisible(true)}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Create User</Text>
+          </TouchableOpacity>
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={userModalVisible}
+            statusBarTranslucent={true}
+            onRequestClose={() => !isSaving && setUserModalVisible(false)}
+          >
+            <View style={styles.screenOverlay}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.keyboardContainer}
+              >
+                <ScrollView
+                  style={[styles.modalScrollWrapper, { overflow: "visible" }]}
+                  contentContainerStyle={[
+                    styles.modalScrollContent,
+                    { overflow: "visible" },
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.modalView}>
+                    <Text style={styles.modalTitle}>Set Arrival Distance</Text>
+
+                    <View style={styles.formGroup}>
+                      <Text style={styles.modalSubtitle}>Username:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Username"
+                        placeholderTextColor="#999999"
+                        value={formUsername}
+                        onChangeText={setFormUsername}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Email:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Email"
+                        placeholderTextColor="#999999"
+                        value={formUsername}
+                        onChangeText={setFormUsername}
+                        editable={!isSaving}
+                        keyboardType="email-address"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Password:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Password"
+                        placeholderTextColor="#999999"
+                        value={formPassword}
+                        onChangeText={setFormPassword}
+                        editable={!isSaving}
+                        keyboardType="default"
+                        secureTextEntry
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Confirm Password:
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Password"
+                        placeholderTextColor="#999999"
+                        value={formPassword}
+                        onChangeText={setFormPassword}
+                        editable={!isSaving}
+                        keyboardType="default"
+                        secureTextEntry
+                      />
+
+                      <Text style={styles.modalSubtitle}>ESS No.:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter ESS No."
+                        placeholderTextColor="#999999"
+                        value={formEssNo}
+                        onChangeText={setFormEssNo}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Department:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Department"
+                        placeholderTextColor="#999999"
+                        value={formDepartment}
+                        onChangeText={setFormDepartment}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Grade:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Grade"
+                        placeholderTextColor="#999999"
+                        value={formGrade}
+                        onChangeText={setFormGrade}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Cost Center:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Cost Center"
+                        placeholderTextColor="#999999"
+                        value={formCostCenter}
+                        onChangeText={setFormCostCenter}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+                    </View>
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.dialogButton, styles.cancelButton]}
+                        onPress={() => setUserModalVisible(false)}
+                        disabled={isSaving}
+                      >
+                        <Text style={styles.textStyle}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.dialogButton,
+                          styles.submitButton,
+                          isSaving && { opacity: 0.7 },
+                        ]}
+                        onPress={handleSignup}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.textStyle}>Create User</Text>
                         )}
                       </TouchableOpacity>
                     </View>

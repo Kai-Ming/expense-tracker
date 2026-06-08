@@ -85,6 +85,8 @@ export default function ExpensesScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
   const [mileageRate, setMileageRate] = useState<number>(0.8);
+  const [mileageRateOutstation, setMileageRateOutstation] =
+    useState<number>(0.7);
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const [showPurposeDropDown, setShowPurposeDropDown] = useState(false);
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
@@ -199,6 +201,9 @@ export default function ExpensesScreen() {
         const data = docSnap.data();
         if (data.mileage_rate) {
           setMileageRate(data.mileage_rate);
+        }
+        if (data.mileage_rate_outstation) {
+          setMileageRateOutstation(data.mileage_rate_outstation);
         }
       }
     });
