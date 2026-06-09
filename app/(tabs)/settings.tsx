@@ -2,13 +2,11 @@ import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import {
-  createUserWithEmailAndPassword,
   EmailAuthProvider,
   getAuth,
   onAuthStateChanged,
   reauthenticateWithCredential,
   updatePassword,
-  updateProfile,
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
@@ -18,8 +16,6 @@ import {
   getDocs,
   onSnapshot,
   query,
-  serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -35,7 +31,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { auth, db } from "../../firebaseConfig";
+import { db } from "../../firebaseConfig";
 
 export default function settings() {
   const [username, setUsername] = useState<string>("");
@@ -496,8 +492,15 @@ export default function settings() {
 
       Alert.alert("Signup Failed", errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
+  };
+
+  const test = () => {
+    console.log(formEssNo);
+    console.log(formDepartment);
+    console.log(formGrade);
+    console.log(formCostCenter);
   };
 
   return (
@@ -1293,7 +1296,7 @@ export default function settings() {
                       />
 
                       <Text style={styles.modalSubtitle}>Department:</Text>
-                      <TextInput
+                      {/* <TextInput
                         style={styles.input}
                         placeholder="Enter Department"
                         placeholderTextColor="#999999"
@@ -1301,10 +1304,34 @@ export default function settings() {
                         onChangeText={setFormDepartment}
                         editable={!isSaving}
                         keyboardType="default"
-                      />
+                      /> */}
+
+                      <select
+                        value={formDepartment}
+                        onChange={(e) => setFormDepartment(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a department...
+                        </option>
+                        <option value="csd"> </option>
+                        <option value="CSD">CSD</option>
+                        <option value="FINANCE">FINANCE</option>
+                        <option value="MARKETING">MARKETING</option>
+                        <option value="MD OFFICE">MD OFFICE</option>
+                        <option value="OPERATIONS">OPERATIONS</option>
+                        <option value="PROJECT">PROJECT</option>
+                        <option value="SALES PL1">SALES PL1</option>
+                        <option value="SALES PL2 HQ">SALES PL2 HQ</option>
+                        <option value="SALES PL2 PNG">SALES PL2 PNG</option>
+                        <option value="SALES PL3">SALES PL3</option>
+                        <option value="SC">SC</option>
+                        <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                        <option value="OPERATIONS PNG">OPERATIONS PNG</option>
+                      </select>
 
                       <Text style={styles.modalSubtitle}>Grade:</Text>
-                      <TextInput
+                      {/* <TextInput
                         style={styles.input}
                         placeholder="Enter Grade"
                         placeholderTextColor="#999999"
@@ -1312,10 +1339,34 @@ export default function settings() {
                         onChangeText={setFormGrade}
                         editable={!isSaving}
                         keyboardType="default"
-                      />
+                      /> */}
+                      <select
+                        value={formGrade}
+                        onChange={(e) => setFormGrade(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a grade...
+                        </option>
+                        <option value="S4">S4</option>
+                        <option value="S3">S3</option>
+                        <option value="S2">S2</option>
+                        <option value="S1">S1</option>
+                        <option value="B4">B4</option>
+                        <option value="B3">B3</option>
+                        <option value="B2">B2</option>
+                        <option value="B1">B1</option>
+                        <option value="A4">A4</option>
+                        <option value="A3">A3</option>
+                        <option value="A2">A2</option>
+                        <option value="A1">A1</option>
+                        <option value="M4">M4</option>
+                        <option value="M3">M3</option>
+                        <option value="M2">M2</option>
+                      </select>
 
                       <Text style={styles.modalSubtitle}>Cost Center:</Text>
-                      <TextInput
+                      {/* <TextInput
                         style={styles.input}
                         placeholder="Enter Cost Center"
                         placeholderTextColor="#999999"
@@ -1323,7 +1374,23 @@ export default function settings() {
                         onChangeText={setFormCostCenter}
                         editable={!isSaving}
                         keyboardType="default"
-                      />
+                      /> */}
+                      <select
+                        value={formCostCenter}
+                        onChange={(e) => setFormCostCenter(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a cost center...
+                        </option>
+                        <option value="CSD">CSD</option>
+                        <option value="HQ">HQ</option>
+                        <option value="PROJECT">PROJECT</option>
+                        <option value="P_LINE1">P_LINE1</option>
+                        <option value="P_LINE2">P_LINE2</option>
+                        <option value="P_LINE2_PG">P_LINE2_PG</option>
+                        <option value="P_LINE3">P_LINE3</option>
+                      </select>
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -1361,6 +1428,17 @@ export default function settings() {
     </View>
   );
 }
+
+const dropdownInput = {
+  width: "100%",
+  backgroundColor: "#f9f9f9",
+  borderWidth: 0,
+  borderColor: "#eee",
+  borderRadius: 8,
+  padding: 12,
+  fontSize: 16,
+  color: "#333",
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5", padding: 16 },
