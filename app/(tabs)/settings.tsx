@@ -2,11 +2,13 @@ import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import {
+  createUserWithEmailAndPassword,
   EmailAuthProvider,
   getAuth,
   onAuthStateChanged,
   reauthenticateWithCredential,
   updatePassword,
+  updateProfile,
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
@@ -16,6 +18,8 @@ import {
   getDocs,
   onSnapshot,
   query,
+  serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -28,10 +32,23 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  ess_no: string;
+  department: string;
+  grade: string;
+  cost_center: string;
+  role: number;
+  active: boolean;
+}
 
 export default function settings() {
   const [username, setUsername] = useState<string>("");
@@ -89,6 +106,14 @@ export default function settings() {
   const [formDepartment, setFormDepartment] = useState<string>("");
   const [formGrade, setFormGrade] = useState<string>("");
   const [formCostCenter, setFormCostCenter] = useState<string>("");
+  const [formRole, setFormRole] = useState<string>("");
+  const [formActive, setFormActive] = useState(true);
+
+  const [editUserModalVisible, setEditUserModalVisible] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectUserModalVisible, setSelectUserModalVisible] = useState(false);
+  const [addedUsers, setAddedUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -148,6 +173,23 @@ export default function settings() {
     );
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (role !== 0) return;
+    const q = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userData: User[] = [];
+      snapshot.forEach((doc) => {
+        userData.push({ id: doc.id, ...doc.data() } as User);
+      });
+      setAllUsers(userData);
+    });
+    return () => unsubscribe();
+  }, [role]);
+
+  const getUserById = (userId: string): User | undefined => {
+    return allUsers.find((user) => user.id === userId);
+  };
 
   const changeUsername = async () => {
     if (!newUsername.trim()) {
@@ -390,7 +432,7 @@ export default function settings() {
 
       const docRef = doc(db, "config", configId);
       await updateDoc(docRef, {
-        office_coordinates: new GeoPoint(lat, lng), // <--- Creates native Firestore GeoPoint
+        office_coordinates: new GeoPoint(lat, lng),
       });
 
       Alert.alert(
@@ -462,20 +504,20 @@ export default function settings() {
         displayName: username.trim(),
       });
 
+      const role = parseInt(formRole);
+
       await setDoc(doc(db, "users", userCredential.user.uid), {
         uid: userCredential.user.uid,
         username: formUsername.trim(),
         email: formEmail.trim(),
         created_at: serverTimestamp(),
-        role: 1,
+        role: role,
         ess_no: formEssNo.trim(),
         department: formDepartment.trim(),
         grade: formGrade.trim(),
         cost_center: formCostCenter.trim(),
+        active: true,
       });
-
-      // User is already signed in at this point — navigate directly
-      router.replace("/submit");
     } catch (error) {
       const err = error as any;
       console.error("Signup error:", err.code, err.message);
@@ -492,15 +534,154 @@ export default function settings() {
 
       Alert.alert("Signup Failed", errorMessage);
     } finally {
+      clearUserForm();
       setIsSaving(false);
     }
   };
 
-  const test = () => {
-    console.log(formEssNo);
-    console.log(formDepartment);
-    console.log(formGrade);
-    console.log(formCostCenter);
+  const clearUserForm = () => {
+    setFormUsername("");
+    setFormEmail("");
+    setFormPassword("");
+    setFormConfirmPassword("");
+    setFormEssNo("");
+    setFormGrade("");
+    setFormDepartment("");
+    setFormCostCenter("");
+    setFormRole("");
+    setFormActive(true);
+  };
+
+  const handleSelectUser = (userId: string) => {
+    console.log(userId);
+    const idToAdd = userId || selectedUserId;
+    if (!idToAdd) {
+      return;
+    }
+
+    const userToAdd = allUsers.find((u) => u.id === idToAdd);
+    if (userToAdd && !addedUsers.some((u) => u.id === userToAdd.id)) {
+      setFormUsername(userToAdd.username || "");
+      setFormEmail(userToAdd.email || "");
+      setFormCostCenter(userToAdd.cost_center || "");
+      setFormEssNo(userToAdd.ess_no || "");
+      setFormGrade(userToAdd.grade || "");
+      setFormActive(userToAdd.active || true);
+      setFormRole(userToAdd.role.toString() || "");
+    }
+  };
+
+  const editUser = async () => {
+    if (!formUsername.trim() || !formEmail.trim() || !formEssNo.trim()) {
+      Alert.alert("Error", "Field cannot be empty");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const userDocRef = doc(db, "users", selectedUserId);
+
+      await updateDoc(userDocRef, {
+        username: formUsername.trim(),
+        email: formEmail.trim(),
+        ess_no: formEssNo.trim(),
+        department: formDepartment.trim(),
+        grade: formGrade.trim(),
+        cost_center: formCostCenter.trim(),
+        role: parseInt(formRole.trim()),
+        active: formActive,
+      });
+
+      Alert.alert("Success", "User updated successfully!");
+      setEditUserModalVisible(false);
+      clearUserForm();
+      setSelectedUserId("");
+    } catch (error) {
+      console.error("Error updating user: ", error);
+      Alert.alert("Error", "Failed to update user. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderSelectUserModal = () => {
+    return (
+      <Modal
+        visible={selectUserModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectUserModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectUserModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a User</Text>
+              <TouchableOpacity
+                onPress={() => setSelectUserModalVisible(false)}
+              >
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {allUsers.map((user) => {
+                const isAdded = addedUsers.some(
+                  (added) => added.id === user.id,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={[
+                      styles.modalUserItem,
+                      isAdded && styles.disabledUserItem,
+                    ]}
+                    onPress={() => {
+                      if (isAdded) return;
+                      setSelectedUserId(user.id);
+                      setSelectUserModalVisible(false);
+                      handleSelectUser(user.id);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.userInfoText,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      <Text style={styles.boldLabel}>Username: </Text>
+                      {user.username}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.userInfoText,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      <Text style={styles.boldLabel}>Email: </Text>
+                      {user.email}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.userInfoText,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      <Text style={styles.boldLabel}>Department: </Text>
+                      {user.department}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   return (
@@ -1233,7 +1414,7 @@ export default function settings() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.modalView}>
-                    <Text style={styles.modalTitle}>Set Arrival Distance</Text>
+                    <Text style={styles.modalTitle}>Create User</Text>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.modalSubtitle}>Username:</Text>
@@ -1252,8 +1433,8 @@ export default function settings() {
                         style={styles.input}
                         placeholder="Enter Email"
                         placeholderTextColor="#999999"
-                        value={formUsername}
-                        onChangeText={setFormUsername}
+                        value={formEmail}
+                        onChangeText={setFormEmail}
                         editable={!isSaving}
                         keyboardType="email-address"
                       />
@@ -1314,7 +1495,6 @@ export default function settings() {
                         <option value="" disabled>
                           Select a department...
                         </option>
-                        <option value="csd"> </option>
                         <option value="CSD">CSD</option>
                         <option value="FINANCE">FINANCE</option>
                         <option value="MARKETING">MARKETING</option>
@@ -1322,9 +1502,9 @@ export default function settings() {
                         <option value="OPERATIONS">OPERATIONS</option>
                         <option value="PROJECT">PROJECT</option>
                         <option value="SALES PL1">SALES PL1</option>
-                        <option value="SALES PL2 HQ">SALES PL2 HQ</option>
-                        <option value="SALES PL2 PNG">SALES PL2 PNG</option>
+                        <option value="SALES PL2">SALES PL2</option>
                         <option value="SALES PL3">SALES PL3</option>
+                        <option value="SALES PL4 PNG">SALES PL4</option>
                         <option value="SC">SC</option>
                         <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
                         <option value="OPERATIONS PNG">OPERATIONS PNG</option>
@@ -1388,8 +1568,24 @@ export default function settings() {
                         <option value="PROJECT">PROJECT</option>
                         <option value="P_LINE1">P_LINE1</option>
                         <option value="P_LINE2">P_LINE2</option>
-                        <option value="P_LINE2_PG">P_LINE2_PG</option>
                         <option value="P_LINE3">P_LINE3</option>
+                        <option value="P_LINE4">P_LINE4</option>
+                      </select>
+
+                      <Text style={styles.modalSubtitle}>Role:</Text>
+
+                      <select
+                        value={formRole}
+                        onChange={(e) => setFormRole(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a Role...
+                        </option>
+                        <option value="0">Admin</option>
+                        <option value="1">User</option>
+                        <option value="2">Manager</option>
+                        <option value="3">Supervisor</option>
                       </select>
                     </View>
 
@@ -1423,6 +1619,214 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
+        </>
+      )}
+
+      {role === 0 && (
+        <>
+          <TouchableOpacity
+            onPress={() => {
+              setEditUserModalVisible(true);
+            }}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Edit User</Text>
+          </TouchableOpacity>
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={editUserModalVisible}
+            statusBarTranslucent={true}
+            onRequestClose={() => !isSaving && setEditUserModalVisible(false)}
+          >
+            <View style={styles.screenOverlay}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.keyboardContainer}
+              >
+                <ScrollView
+                  style={[styles.modalScrollWrapper, { overflow: "visible" }]}
+                  contentContainerStyle={[
+                    styles.modalScrollContent,
+                    { overflow: "visible" },
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.modalView}>
+                    <Text style={styles.modalTitle}>Edit User</Text>
+                    <TouchableOpacity
+                      style={styles.selectUserButton}
+                      onPress={() => {
+                        setSelectUserModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.buttonText}>Select User</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.formGroup}>
+                      <Text style={styles.modalSubtitle}>Username:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Username"
+                        placeholderTextColor="#999999"
+                        value={formUsername}
+                        onChangeText={setFormUsername}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Email:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Email"
+                        placeholderTextColor="#999999"
+                        value={formEmail}
+                        onChangeText={setFormEmail}
+                        editable={!isSaving}
+                        keyboardType="email-address"
+                      />
+
+                      <Text style={styles.modalSubtitle}>ESS No.:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter ESS No."
+                        placeholderTextColor="#999999"
+                        value={formEssNo}
+                        onChangeText={setFormEssNo}
+                        editable={!isSaving}
+                        keyboardType="default"
+                      />
+
+                      <Text style={styles.modalSubtitle}>Department:</Text>
+                      <select
+                        value={formDepartment}
+                        onChange={(e) => setFormDepartment(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a department...
+                        </option>
+                        <option value="CSD">CSD</option>
+                        <option value="FINANCE">FINANCE</option>
+                        <option value="MARKETING">MARKETING</option>
+                        <option value="MD OFFICE">MD OFFICE</option>
+                        <option value="OPERATIONS">OPERATIONS</option>
+                        <option value="PROJECT">PROJECT</option>
+                        <option value="SALES PL1">SALES PL1</option>
+                        <option value="SALES PL2">SALES PL2</option>
+                        <option value="SALES PL3">SALES PL3</option>
+                        <option value="SALES PL4 PNG">SALES PL4</option>
+                        <option value="SC">SC</option>
+                        <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                        <option value="OPERATIONS PNG">OPERATIONS PNG</option>
+                      </select>
+
+                      <Text style={styles.modalSubtitle}>Grade:</Text>
+                      <select
+                        value={formGrade}
+                        onChange={(e) => setFormGrade(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a grade...
+                        </option>
+                        <option value="S4">S4</option>
+                        <option value="S3">S3</option>
+                        <option value="S2">S2</option>
+                        <option value="S1">S1</option>
+                        <option value="B4">B4</option>
+                        <option value="B3">B3</option>
+                        <option value="B2">B2</option>
+                        <option value="B1">B1</option>
+                        <option value="A4">A4</option>
+                        <option value="A3">A3</option>
+                        <option value="A2">A2</option>
+                        <option value="A1">A1</option>
+                        <option value="M4">M4</option>
+                        <option value="M3">M3</option>
+                        <option value="M2">M2</option>
+                      </select>
+
+                      <Text style={styles.modalSubtitle}>Cost Center:</Text>
+                      <select
+                        value={formCostCenter}
+                        onChange={(e) => setFormCostCenter(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a cost center...
+                        </option>
+                        <option value="CSD">CSD</option>
+                        <option value="HQ">HQ</option>
+                        <option value="PROJECT">PROJECT</option>
+                        <option value="P_LINE1">P_LINE1</option>
+                        <option value="P_LINE2">P_LINE2</option>
+                        <option value="P_LINE3">P_LINE3</option>
+                        <option value="P_LINE4">P_LINE4</option>
+                      </select>
+
+                      <Text style={styles.modalSubtitle}>Role:</Text>
+                      <select
+                        value={formRole}
+                        onChange={(e) => setFormRole(e.target.value)}
+                        style={dropdownInput}
+                      >
+                        <option value="" disabled>
+                          Select a Role...
+                        </option>
+                        <option value="0">Admin</option>
+                        <option value="1">User</option>
+                        <option value="2">Manager</option>
+                        <option value="3">Supervisor</option>
+                      </select>
+
+                      <Text style={styles.modalSubtitle}>Active:</Text>
+                      <Switch
+                        trackColor={{ false: "#767577", true: "#81b0ff" }}
+                        thumbColor="#2196F3"
+                        ios_backgroundColor="#3e3e3e"
+                        value={formActive}
+                        onValueChange={(newValue) => setFormActive(newValue)}
+                      />
+                    </View>
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.dialogButton, styles.cancelButton]}
+                        onPress={() => {
+                          setEditUserModalVisible(false);
+                          clearUserForm();
+                          setSelectedUserId("");
+                        }}
+                        disabled={isSaving}
+                      >
+                        <Text style={styles.textStyle}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.dialogButton,
+                          styles.submitButton,
+                          isSaving && { opacity: 0.7 },
+                        ]}
+                        onPress={editUser}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.textStyle}>Confirm</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
+            </View>
+          </Modal>
+
+          {renderSelectUserModal()}
         </>
       )}
     </View>
@@ -1472,6 +1876,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginTop: 12,
+  },
+  selectUserButton: {
+    backgroundColor: "#2196F3",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 8,
+    minWidth: 150,
   },
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   screenOverlay: {
@@ -1539,5 +1951,38 @@ const styles = StyleSheet.create({
   textStyle: {
     color: "white",
     fontWeight: "bold",
+  },
+  boldLabel: { fontWeight: "bold", color: "#333" },
+  userInfoText: { fontSize: 13, color: "#444", marginTop: 2 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "white",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  closeButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
+  disabledText: {
+    color: "#9e9e9e", // grey text
+  },
+  modalList: { maxHeight: 400 },
+  modalUserItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
+  disabledUserItem: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
   },
 });

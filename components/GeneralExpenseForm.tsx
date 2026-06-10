@@ -104,6 +104,7 @@ export default function GeneralExpenseForm() {
     setFormName("");
     setFormContactNumber("");
     setFormEmail("");
+    setFormExpenseReport("");
   };
 
   return (

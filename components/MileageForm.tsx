@@ -701,6 +701,7 @@ export default function MileageForm() {
       setIsSaving(false);
     }
   };
+
   const resetTripForm = () => {
     setFromAddress("");
     setToAddress("");
@@ -1112,7 +1113,7 @@ export default function MileageForm() {
               </View>
             )}
 
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
+            {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <TouchableOpacity
                 onPress={() => setShowTravelModal(true)}
                 style={[styles.dropdownInput, { marginLeft: 10 }]}
@@ -1215,9 +1216,6 @@ export default function MileageForm() {
                             keyboardType="numeric"
                             style={styles.webTextInput}
                           />
-                          {/* 
-                          Accommodation Allowance 
-                          */}
                           <Text style={styles.modalSubtitle}>
                             Meal Allowance (RM):
                           </Text>
@@ -1287,7 +1285,7 @@ export default function MileageForm() {
                   </KeyboardAvoidingView>
                 </View>
               </Modal>
-            </View>
+            </View> */}
 
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Distance:</Text>
@@ -1720,10 +1718,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   disabledTripItem: {
-    backgroundColor: "#e0e0e0", // light grey background
-    opacity: 0.6, // optional: reduces overall opacity
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
   },
   disabledText: {
-    color: "#9e9e9e", // grey text
+    color: "#9e9e9e",
   },
 });
