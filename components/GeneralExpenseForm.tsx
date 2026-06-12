@@ -78,7 +78,7 @@ export default function GeneralExpenseForm() {
         user_name: username,
         date: formDate,
         expense_type: expenseType[formExpenseType as keyof typeof expenseType],
-        amount: parseFloat(formAmount).toFixed(2),
+        amount: parseFloat(formAmount),
         company: formCompany,
         name: formName,
         contact_number: formContactNumber,

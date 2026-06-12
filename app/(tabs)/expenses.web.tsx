@@ -15,7 +15,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -107,6 +107,7 @@ export default function ExpensesWebScreen() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [generalExpense, setGeneralExpense] = useState<GeneralExpense[]>([]);
+  const [allTripIds, setAllTripIds] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [role, setRole] = useState<number | null>(null);
@@ -138,6 +139,7 @@ export default function ExpensesWebScreen() {
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null,
   );
+  const [selectedExpenseType, setSelectedExpenseType] = useState<number>(1);
 
   const purposeList = [
     { label: "Application support", value: "Application support" },
@@ -188,13 +190,23 @@ export default function ExpensesWebScreen() {
   ];
 
   const generalExpensePurpose = [
-    { label: "Meal with customer", value: "Meal with customer" },
-    { label: "Meal with supplier", value: "Meal with supplier" },
-    { label: "Medical", value: "Medical" },
-    { label: "Purchase of goods", value: "Purchase of goods" },
-    { label: "Staff benefits", value: "Staff benefits" },
-    { label: "Others", value: "Others" },
+    { label: "Meal with customer", value: "Meal with customer", id: "1" },
+    { label: "Meal with supplier", value: "Meal with supplier", id: "2" },
+    { label: "Medical", value: "Medical", id: "3" },
+    { label: "Purchase of goods", value: "Purchase of goods", id: "4" },
+    { label: "Staff benefits", value: "Staff benefits", id: "5" },
+    { label: "Others", value: "Others", id: "6" },
   ];
+
+  const expenseTypeMap = {
+    "1": "Mileage",
+    "2": "General",
+    "3": "Outstation",
+  };
+
+  const generalExpensePurposeMap = Object.fromEntries(
+    generalExpensePurpose.map((p) => [p.id, p.value]),
+  );
 
   useEffect(() => {
     const auth = getAuth();
@@ -263,24 +275,52 @@ export default function ExpensesWebScreen() {
         }
       });
       setExpenses(expensesData);
+      const allTripIds = expensesData.flatMap((item) => item.trip_ids);
+      setAllTripIds([...new Set(allTripIds)]);
+
       setGeneralExpense(generalExpenseData);
     });
 
     return () => unsubscribe();
   }, [userId, role]);
 
+  // Fetch all trips once, filter client-side
+  /* useEffect(() => {
+    if (!userId) return;
+    if (role === null) return;
+    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      const trips = snapshot.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() }) as Trip,
+      );
+      setAllTrips(trips);
+    });
+  }, [userId, role]) */
+
   useEffect(() => {
     if (!userId) return;
+    // Wait until role is determined (not null)
+    if (role === null) return;
+
     const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tripsData: Trip[] = [];
-      snapshot.forEach((doc) => {
-        tripsData.push({ id: doc.id, ...doc.data() } as Trip);
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const tripData: Trip[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tripData.push({ id: doc.id, ...data } as Trip);
       });
-      setAllTrips(tripsData);
+      setAllTrips(tripData);
     });
+
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, role]);
+
+  const filteredTrips = useMemo(() => {
+    if (!allTripIds?.length) return [];
+    const idSet = new Set(allTripIds);
+    return allTrips.filter((trip) => idSet.has(trip.id));
+  }, [allTrips, allTripIds]);
 
   useEffect(() => {
     return onSnapshot(doc(db, "config", "settings"), (docSnap) => {
@@ -300,6 +340,18 @@ export default function ExpensesWebScreen() {
       ).google.maps.DirectionsService());
     document.head.appendChild(script);
   }, []);
+
+  const test = () => {
+    console.log(allTrips.map((trip) => trip.user_id));
+    console.log(allTrips.map((trips) => trips.id === "Td8rQR2LTFOWFzUgYHqI"));
+    console.log(expenses.length);
+    console.log("all trip ids");
+    console.log(allTripIds);
+    console.log(allTripIds.includes("opRvURa2sOLbLVRqDDib"));
+    console.log(filteredTrips.map((trip) => trip.user_id));
+    console.log(allTrips);
+    console.log(selectedExpenseType);
+  };
 
   const calculateRoute = (
     p1: google.maps.LatLngLiteral,
@@ -408,6 +460,7 @@ export default function ExpensesWebScreen() {
   };
 
   const filteredExpenses = expenses.filter((e) => {
+    if (appliedExpenseType == "General") return false;
     if (
       !e.date ||
       (!appliedStartDate &&
@@ -425,6 +478,7 @@ export default function ExpensesWebScreen() {
   });
 
   const filteredGeneralExpense = generalExpense.filter((e) => {
+    if (appliedExpenseType == "Mileage") return false;
     if (
       !e.date ||
       (!appliedStartDate &&
@@ -735,7 +789,7 @@ export default function ExpensesWebScreen() {
           }),
       );
 
-  const generatePDF = () => {
+  const exportToPdf = () => {
     // Normalize a mileage expense
     const normalizeMileage = (item) => ({
       date: item.date || "",
@@ -1066,15 +1120,6 @@ export default function ExpensesWebScreen() {
       iframe.contentWindow.print();
       document.body.removeChild(iframe);
     }, 500);
-  };
-
-  const exportToPdf = () => {
-    /* const config = {
-      html: createHTML,
-      fileName: `Report`,
-      directory: "Downloads",
-    }; */
-    generatePDF();
   };
 
   const columns = [
@@ -1421,7 +1466,7 @@ export default function ExpensesWebScreen() {
                             </View>
                           ) : (
                             <Text key={tripId} style={styles.descriptionText}>
-                              Trip data not available {tripId}
+                              Trip data not available
                             </Text>
                           );
                         })}
@@ -1500,7 +1545,7 @@ export default function ExpensesWebScreen() {
                       </>
                     )}
                   </View>
-                  {item.user_id === userId && (
+                  {/*{item.user_id === userId && (
                     <>
                       <View style={styles.actionButtonsContainer}>
                         {isEditing ? (
@@ -1538,7 +1583,7 @@ export default function ExpensesWebScreen() {
                         </TouchableOpacity>
                       </View>
                     </>
-                  )}
+                  )}*/}
 
                   {/* <View style={styles.actionButtonsContainer}>
                     {role === 0 && item.approval_status === 0 && (
@@ -2348,7 +2393,38 @@ export default function ExpensesWebScreen() {
     );
   };
 
-  const renderDetailView = (expense: Expense) => {
+  const renderExpenseDetail = () => {
+    if (selectedExpense && selectedExpenseType === 1) {
+      return (
+        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 8 }}>
+          {renderMileageDetailView(selectedExpense)}
+        </View>
+      );
+    }
+
+    if (selectedGeneralExpense && selectedExpenseType === 2) {
+      return (
+        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 8 }}>
+          {renderGeneralDetailView(selectedGeneralExpense)}
+        </View>
+      );
+    }
+
+    return (
+      <Text
+        style={{
+          textAlign: "center",
+          marginTop: 50,
+          color: "#999",
+          fontSize: 16,
+        }}
+      >
+        Select an expense from the left to view details
+      </Text>
+    );
+  };
+
+  const renderMileageDetailView = (expense: Expense) => {
     const isEditing = editingId === expense.id;
 
     return (
@@ -2366,7 +2442,7 @@ export default function ExpensesWebScreen() {
           <Text style={{ fontSize: 20, fontWeight: "600" }}>
             Expense Details
           </Text>
-          {!isEditing &&
+          {/* {!isEditing &&
             expense.approval_status === 0 &&
             expense.user_id === userId && (
               <TouchableOpacity
@@ -2379,7 +2455,7 @@ export default function ExpensesWebScreen() {
               >
                 <Text style={{ color: "#fff", fontWeight: "bold" }}>Edit</Text>
               </TouchableOpacity>
-            )}
+            )} */}
           {!isEditing && (
             <TouchableOpacity
               style={{
@@ -2395,10 +2471,8 @@ export default function ExpensesWebScreen() {
           )}
         </View>
 
-        {/* All fields – reuse your existing expanded content JSX, just remove the outer TouchableOpacity wrapper */}
-        {/* Example field */}
         <View style={{ marginBottom: 16 }}>
-          <Text
+          {/* <Text
             style={{
               fontSize: 12,
               color: "#999",
@@ -2421,7 +2495,182 @@ export default function ExpensesWebScreen() {
             <Text style={{ fontSize: 14, color: "#444" }}>
               {expense.date || "N/A"}
             </Text>
-          )}
+          )} */}
+
+          <View style={{ flexDirection: "row", marginBottom: 10 }}>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Customer Name:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.name || "N/A"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Company:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.company || "N/A"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Contact Number:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.contact_number || "N/A"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Email:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.email || "N/A"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}></View>
+          </View>
+
+          <View style={{ marginBottom: 10 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Distance:
+            </Text>
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.distance} km
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", marginBottom: 10 }}>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Parking:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.parking.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Toll:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.toll.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Mileage:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.mileage.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Expense:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM{" "}
+                {typeof expense.expense === "number"
+                  ? expense.expense.toFixed(2)
+                  : "0.00"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 50 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Expense Purpose:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.expense_purpose || "N/A"}
+              </Text>
+            </View>
+          </View>
+
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#999",
+              fontWeight: "bold",
+              marginBottom: 4,
+            }}
+          >
+            Trip Report:
+          </Text>
+          <Text style={{ fontSize: 14, color: "#444" }}>
+            {expense.trip_report || "N/A"}
+          </Text>
 
           {expense.trip_ids && expense.trip_ids.length > 0 && (
             <View style={styles.section}>
@@ -2444,7 +2693,7 @@ export default function ExpensesWebScreen() {
                   </View>
                 ) : (
                   <Text key={tripId} style={styles.descriptionText}>
-                    Trip data not available
+                    Trip data not available {tripId}
                   </Text>
                 );
               })}
@@ -2517,160 +2766,492 @@ export default function ExpensesWebScreen() {
     );
   };
 
-  if (Platform.OS === "web") {
-    // Clear selection if selected expense not in filtered list
-    useEffect(() => {
-      if (
-        selectedExpenseId &&
-        !filteredExpenses.some((e) => e.id === selectedExpenseId)
-      ) {
-        setSelectedExpenseId(null);
-      }
-    }, [filteredExpenses, selectedExpenseId]);
-
-    const selectedExpense = filteredExpenses.find(
-      (e) => e.id === selectedExpenseId,
-    );
+  const renderGeneralDetailView = (expense: GeneralExpense) => {
+    const isEditing = editingId === expense.id;
 
     return (
-      <View
-        style={{
-          height: "100vh",
-          flexDirection: "column",
-          margin: "10px",
-          color: "#fff",
-        }}
-      >
-        {/* Filter header – fixed at top */}
-        <View style={{ flexShrink: 0 }}>{renderHeader()}</View>
+      <View>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: "#eee",
+            paddingBottom: 12,
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: "600" }}>
+            Expense Details
+          </Text>
+          {/* {!isEditing &&
+            expense.approval_status === 0 &&
+            expense.user_id === userId && (
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "#FF9800",
+                  padding: 8,
+                  borderRadius: 6,
+                }}
+                onPress={() => handleEdit(expense)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Edit</Text>
+              </TouchableOpacity>
+            )} */}
+          {!isEditing && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#F44336",
+                padding: 8,
+                borderRadius: 6,
+                marginLeft: 8,
+              }}
+              onPress={() => handleDelete(expense.id)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Delete</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Two-pane area */}
-        <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
-          {/* LEFT PANEL: 30% width, scrollable list */}
-          <ScrollView
+        <View style={{ marginBottom: 16 }}>
+          {/* <Text
             style={{
-              width: "30%",
-              borderRightWidth: 1,
-              borderRightColor: "#e0e0e0",
-              backgroundColor: "#fafafa",
+              fontSize: 12,
+              color: "#999",
+              fontWeight: "bold",
+              marginBottom: 4,
             }}
           >
-            <View style={{ padding: 16 }}>
-              {filteredExpenses.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
+            Date:
+          </Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.inlineInput}
+              value={editFormData.date}
+              onChangeText={(text) =>
+                setEditFormData({ ...editFormData, date: text })
+              }
+              placeholder="YYYY-MM-DD"
+            />
+          ) : (
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.date || "N/A"}
+            </Text>
+          )} */}
+        </View>
+
+        <View style={{ flexDirection: "row", marginBottom: 10 }}>
+          <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Customer Name:
+            </Text>
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.name || "N/A"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Company:
+            </Text>
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.company || "N/A"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Contact Number:
+            </Text>
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.contact_number || "N/A"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Email:
+            </Text>
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.email || "N/A"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 50 }}></View>
+        </View>
+
+        <View style={{ marginBottom: 10 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#999",
+              fontWeight: "bold",
+              marginBottom: 4,
+            }}
+          >
+            Trip Report:
+          </Text>
+          <Text style={{ fontSize: 14, color: "#444" }}>
+            {expense.expense_report || "N/A"}
+          </Text>
+        </View>
+
+        {isEditing && (
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#4CAF50",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={handleSaveEdit}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#9e9e9e",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={handleCancelEdit}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Admin approve/reject */}
+        {role === 0 && expense.approval_status === 0 && !isEditing && (
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#4CAF50",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => handleStatus(expense.id, 1)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#F44336",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => handleStatus(expense.id, 2)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  useEffect(() => {
+    if (selectedExpenseType != 1) return;
+    if (
+      selectedExpenseId &&
+      !filteredExpenses.some((e) => e.id === selectedExpenseId)
+    ) {
+      setSelectedExpenseId(null);
+    }
+  }, [filteredExpenses, selectedExpenseId, selectedExpenseType]);
+
+  useEffect(() => {
+    if (selectedExpenseType != 2) return;
+    if (
+      selectedExpenseId &&
+      !filteredGeneralExpense.some((e) => e.id === selectedExpenseId)
+    ) {
+      setSelectedExpenseId(null);
+    }
+  }, [filteredGeneralExpense, selectedExpenseId, selectedExpenseType]);
+
+  const selectedExpense = filteredExpenses.find(
+    (e) => e.id === selectedExpenseId,
+  );
+
+  const selectedGeneralExpense = filteredGeneralExpense.find(
+    (e) => e.id === selectedExpenseId,
+  );
+
+  return (
+    <View
+      style={{
+        height: "100vh",
+        flexDirection: "column",
+        margin: "10px",
+        color: "#fff",
+      }}
+    >
+      {/* Filter header – fixed at top */}
+      <View style={{ flexShrink: 0 }}>{renderHeader()}</View>
+
+      {/* Two-pane area */}
+      <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
+        {/* LEFT PANEL: 30% width, scrollable list */}
+        <ScrollView
+          style={{
+            width: "30%",
+            borderRightWidth: 1,
+            borderRightColor: "#e0e0e0",
+            backgroundColor: "#fafafa",
+          }}
+        >
+          <View style={{ padding: 16 }}>
+            {filteredExpenses.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={{
+                  backgroundColor:
+                    selectedExpenseId === item.id ? "#e3f2fd" : "#fff",
+                  borderLeftWidth: selectedExpenseId === item.id ? 4 : 0,
+                  borderLeftColor: "#2196F3",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 12,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1,
+                }}
+                onPress={() => {
+                  setSelectedExpenseId(item.id);
+                  setSelectedExpenseType(item.type);
+                  test();
+                }}
+              >
+                <View
                   style={{
-                    backgroundColor:
-                      selectedExpenseId === item.id ? "#e3f2fd" : "#fff",
-                    borderLeftWidth: selectedExpenseId === item.id ? 4 : 0,
-                    borderLeftColor: "#2196F3",
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 12,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 2,
-                    elevation: 1,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
                   }}
-                  onPress={() => setSelectedExpenseId(item.id)}
                 >
                   <Text
-                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 4 }}
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
                   >
                     {item.purpose}
                   </Text>
                   <Text
-                    style={{ fontSize: 12, color: "#666", marginBottom: 8 }}
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
                   >
-                    {item.company} • {item.name}
+                    {expenseTypeMap[String(item.type)]}
                   </Text>
-                  <View
+                </View>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#666",
+                    marginBottom: 8,
+                    fontWeight: "600",
+                  }}
+                >
+                  {item.user_name}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                  {item.company} • {item.name}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: "#888" }}>
+                    {formatDateString(item.date)}
+                  </Text>
+                  <Text
                     style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      color: "#2196F3",
                     }}
                   >
-                    <Text style={{ fontSize: 12, color: "#888" }}>
-                      {formatDateString(item.date)}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "bold",
-                        color: "#2196F3",
-                      }}
-                    >
-                      RM {item.cost.toFixed(2)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-
-          {/* RIGHT PANEL: 70% width, detail view */}
-          <ScrollView style={{ width: "70%", padding: 24 }}>
-            {selectedExpense ? (
-              <View
-                style={{
-                  backgroundColor: "#fff",
-                  borderRadius: 12,
-                  padding: 24,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 8,
-                  elevation: 3,
-                }}
-              >
-                {renderDetailView(selectedExpense)}
-              </View>
-            ) : (
-              <Text
-                style={{
-                  textAlign: "center",
-                  marginTop: 50,
-                  color: "#999",
-                  fontSize: 16,
-                }}
-              >
-                Select an expense from the left to view details
-              </Text>
-            )}
-          </ScrollView>
-        </View>
-
-        {/* Image preview modal (unchanged) */}
-        <Modal
-          visible={!!selectedImage}
-          transparent
-          onRequestClose={() => setSelectedImage(null)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSelectedImage(null)}
-          >
-            <View style={styles.modalContent}>
-              {selectedImage && (
-                <Image
-                  source={{ uri: selectedImage }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              )}
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setSelectedImage(null)}
-              >
-                <Text style={styles.closeButtonText}>Close Preview</Text>
+                    RM {item.cost.toFixed(2)}
+                  </Text>
+                </View>
               </TouchableOpacity>
+            ))}
+            {filteredGeneralExpense.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={{
+                  backgroundColor:
+                    selectedExpenseId === item.id ? "#e3f2fd" : "#fff",
+                  borderLeftWidth: selectedExpenseId === item.id ? 4 : 0,
+                  borderLeftColor: "#2196F3",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 12,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1,
+                }}
+                onPress={() => {
+                  setSelectedExpenseId(item.id);
+                  setSelectedExpenseType(item.type);
+                  test();
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                  >
+                    {item.expense_type}
+                  </Text>
+                  <Text
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                  >
+                    {expenseTypeMap[String(item.type)]}
+                  </Text>
+                </View>
+                <Text
+                  style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                ></Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#666",
+                    marginBottom: 8,
+                    fontWeight: "600",
+                  }}
+                >
+                  {item.user_name}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                  {item.company} • {item.name}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: "#888" }}>
+                    {formatDateString(item.date)}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      color: "#2196F3",
+                    }}
+                  >
+                    RM{" "}
+                    {typeof item.amount === "number"
+                      ? item.amount.toFixed(2)
+                      : item.amount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* RIGHT PANEL: 70% width, detail view */}
+        <ScrollView style={{ width: "70%", padding: 24 }}>
+          {/* {selectedExpense ? (
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 12,
+                padding: 8,
+              }}
+            >
+              {renderDetailView(selectedExpense)}
             </View>
-          </Pressable>
-        </Modal>
+          ) : (
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 50,
+                color: "#999",
+                fontSize: 16,
+              }}
+            >
+              Select an expense from the left to view details
+            </Text>
+          )} */}
+          {renderExpenseDetail()}
+        </ScrollView>
       </View>
-    );
-  }
+
+      {/* Image preview modal (unchanged) */}
+      <Modal
+        visible={!!selectedImage}
+        transparent
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setSelectedImage(null)}
+        >
+          <View style={styles.modalContent}>
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setSelectedImage(null)}
+            >
+              <Text style={styles.closeButtonText}>Close Preview</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
 }
 
 const htmlSelectStyle = {
