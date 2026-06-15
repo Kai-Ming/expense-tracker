@@ -2196,6 +2196,48 @@ export default function ExpensesWebScreen() {
                         ))}
                   </select>
                 </View>
+
+                {/* {role == 0 && (
+                  <View
+                    style={{
+                      flex: 1,
+                      marginRight: 12,
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 11,
+                        marginBottom: 4,
+                        fontWeight: "600",
+                      }}
+                    >
+                      User
+                    </Text>
+                    <Text style={inputBase}>test</Text>
+                  </View>
+                )} */}
+
+                {/* <View
+                  style={{
+                    flex: 1,
+                    marginRight: 12,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      marginBottom: 4,
+                      fontWeight: "600",
+                    }}
+                  >
+                    User
+                  </Text>
+                  <Text style={inputBase}>test</Text>
+                </View> */}
                 <TouchableOpacity
                   style={{
                     backgroundColor: "rgba(255,255,255,0.15)",
@@ -2680,12 +2722,12 @@ export default function ExpensesWebScreen() {
                 return trip ? (
                   <View key={tripId} style={styles.tripItem}>
                     <Text style={styles.descriptionText}>
-                      {trip.from_address} → {trip.to_address} (
-                      {trip.distance?.toFixed(2)} km)
+                      {trip.platform === 1 ? "Web" : "Mobile"}
                     </Text>
                     <Text style={styles.tripRemark}>{trip.remark}</Text>
-                    <Text style={styles.tripRemark}>
-                      {trip.platform === 1 ? "Web" : "Mobile"}
+                    <Text style={styles.tripAddress}>
+                      {trip.from_address} → {trip.to_address} (
+                      {trip.distance?.toFixed(2)} km)
                     </Text>
                     <Text style={styles.tripRemark}>
                       {trip.to_home === true ? "Going Home" : ""}
@@ -2734,7 +2776,7 @@ export default function ExpensesWebScreen() {
         )}
 
         {/* Admin approve/reject */}
-        {role === 0 && expense.approval_status === 0 && !isEditing && (
+        {/* {role === 0 && expense.approval_status === 0 && !isEditing && (
           <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
             <TouchableOpacity
               style={{
@@ -2761,7 +2803,7 @@ export default function ExpensesWebScreen() {
               <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject</Text>
             </TouchableOpacity>
           </View>
-        )}
+        )} */}
       </View>
     );
   };
@@ -2950,7 +2992,7 @@ export default function ExpensesWebScreen() {
         )}
 
         {/* Admin approve/reject */}
-        {role === 0 && expense.approval_status === 0 && !isEditing && (
+        {/* {role === 0 && expense.approval_status === 0 && !isEditing && (
           <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
             <TouchableOpacity
               style={{
@@ -2977,7 +3019,7 @@ export default function ExpensesWebScreen() {
               <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject</Text>
             </TouchableOpacity>
           </View>
-        )}
+        )} */}
       </View>
     );
   };
@@ -3013,7 +3055,7 @@ export default function ExpensesWebScreen() {
   return (
     <View
       style={{
-        height: "100vh",
+        flex: 1,
         flexDirection: "column",
         margin: "10px",
         color: "#fff",
@@ -3474,6 +3516,11 @@ const styles = StyleSheet.create({
   tripRemark: {
     fontSize: 12,
     color: "#666",
+    marginTop: 2,
+  },
+  tripAddress: {
+    fontSize: 12,
+    color: "#000",
     marginTop: 2,
   },
   btn: { backgroundColor: "#10b981", padding: 14, borderRadius: 6 },

@@ -158,13 +158,19 @@ export default function TabLayout() {
           ), */
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="trips"
         options={{
           title: "View Trips",
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="compass" color={color} />
           ),
+        }}
+      /> */}
+      <Tabs.Screen
+        name="trips"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
