@@ -97,6 +97,18 @@ interface Trip {
   created_at: any;
 }
 
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  ess_no: string;
+  department: string;
+  grade: string;
+  cost_center: string;
+  role: number;
+  active: boolean;
+}
+
 export default function ExpensesWebScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
@@ -122,6 +134,7 @@ export default function ExpensesWebScreen() {
   const [appliedExpenseType, setAppliedExpenseType] = useState<string>("All");
   const [appliedExpensePurpose, setAppliedExpensePurpose] =
     useState<string>("");
+  const [showUserModal, setShowUserModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
   const [mileageRate, setMileageRate] = useState<number>(0.8);
@@ -135,6 +148,8 @@ export default function ExpensesWebScreen() {
   const editInputBRef = useRef<any>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [addedUsers, setAddedUsers] = useState<any[]>([]);
 
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null,
@@ -241,6 +256,19 @@ export default function ExpensesWebScreen() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (role !== 0) return;
+    const q = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userData: User[] = [];
+      snapshot.forEach((doc) => {
+        userData.push({ id: doc.id, ...doc.data() } as User);
+      });
+      setAllUsers(userData);
+    });
+    return () => unsubscribe();
+  }, [role]);
 
   useEffect(() => {
     if (!userId) return;
@@ -2218,9 +2246,12 @@ export default function ExpensesWebScreen() {
                     <TouchableOpacity
                       onPress={() => {
                         console.log("aa");
+                        setShowUserModal(true);
                       }}
                     >
-                      <Text style={inputBase}>test</Text>
+                      <Text style={[inputBase, { paddingVertical: 5 }]}>
+                        {usernameFilter || "Select a user..."}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -2258,7 +2289,8 @@ export default function ExpensesWebScreen() {
                     setAppliedExpenseType(expenseType);
                     setAppliedExpensePurpose(expensePurpose);
                     console.log(appliedExpensePurpose);
-                    console.log(appliedExpenseType);
+                    console.log(usernameFilter);
+                    console.log(appliedUsername);
                   }}
                 >
                   <Text
@@ -2308,6 +2340,8 @@ export default function ExpensesWebScreen() {
               >
                 <Text style={styles.exportButtonText}>Generate PDF Report</Text>
               </TouchableOpacity>
+
+              {renderSelectUserModal()}
             </View>
           )}
         </>
@@ -3030,6 +3064,64 @@ export default function ExpensesWebScreen() {
     );
   };
 
+  const renderSelectUserModal = () => {
+    return (
+      <Modal
+        visible={showUserModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUserModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserModal(false)}
+        >
+          <View style={styles.userModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a User</Text>
+              <TouchableOpacity onPress={() => setShowUserModal(false)}>
+                <Text style={styles.modalCloseButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {allUsers.map((user) => {
+                const isAdded = addedUsers.some(
+                  (added) => added.id === user.id,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={[
+                      styles.modalUserItem,
+                      isAdded && styles.disabledUserItem,
+                    ]}
+                    onPress={() => {
+                      if (isAdded) return;
+                      setUsenameFilter(user.username);
+                      setShowUserModal(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.userInfoText,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      <Text style={styles.boldLabel}>Username: </Text>
+                      {user.username}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   useEffect(() => {
     if (selectedExpenseType != 1) return;
     if (
@@ -3445,6 +3537,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "transparent",
   },
+  userModalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "white",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
   closeButton: {
     marginTop: 20,
     backgroundColor: "#2196F3",
@@ -3532,6 +3631,32 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: "#10b981", padding: 14, borderRadius: 6 },
   disabled: { backgroundColor: "#a7f3d0" },
   btnText: { color: "#fff", fontWeight: "600" },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  modalList: { maxHeight: 400 },
+  modalUserItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  disabledUserItem: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
+  },
+  userInfoText: { fontSize: 13, color: "#444", marginTop: 2 },
+  disabledText: {
+    color: "#9e9e9e", // grey text
+  },
+  boldLabel: { fontWeight: "bold", color: "#333" },
+
+  modalCloseButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
 });
 
 const webTableStyles = {
