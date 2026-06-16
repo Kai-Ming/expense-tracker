@@ -2197,7 +2197,7 @@ export default function ExpensesWebScreen() {
                   </select>
                 </View>
 
-                {/* {role == 0 && (
+                {role == 0 && (
                   <View
                     style={{
                       flex: 1,
@@ -2215,9 +2215,15 @@ export default function ExpensesWebScreen() {
                     >
                       User
                     </Text>
-                    <Text style={inputBase}>test</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log("aa");
+                      }}
+                    >
+                      <Text style={inputBase}>test</Text>
+                    </TouchableOpacity>
                   </View>
-                )} */}
+                )}
 
                 {/* <View
                   style={{

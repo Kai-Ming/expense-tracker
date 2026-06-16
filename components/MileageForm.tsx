@@ -187,7 +187,7 @@ export default function MileageForm() {
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
-            const homeCoord = userData.home_coordinates; // This is a Firebase GeoPoint
+            const homeCoord = userData.home_coordinates;
 
             if (homeCoord) {
               setHomeCoords({

@@ -27,6 +27,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -37,6 +38,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { auth, db } from "../../firebaseConfig";
+
+const { height: screenHeight } = Dimensions.get("window");
 
 interface User {
   id: string;
@@ -135,6 +138,20 @@ export default function settings() {
           setUsername(userData.username);
           setEmail(userData.email);
           setRole(userData.role);
+          const homeCoord = userData.home_coordinates;
+
+          if (homeCoord) {
+            try {
+              const address = await getAddressFromCoords(
+                homeCoord.latitude,
+                homeCoord.longitude,
+              );
+              setHomeAddress(address || "");
+            } catch (error) {
+              console.log("Error fetching home address");
+              console.log(error);
+            }
+          }
 
           // FIX 2: Save the actual Firestore document auto-generated key name
           setFirestoreDocId(userDoc.id);
@@ -152,7 +169,7 @@ export default function settings() {
 
     const unsubscribe = onSnapshot(
       doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
-      (docSnap) => {
+      async (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.mileage_rate) setMileageRate(data.mileage_rate.toString());
@@ -168,6 +185,20 @@ export default function settings() {
             setOutstationDistance(data.outstation_distance.toString());
           if (data.arrival_distance)
             setDistance((data.arrival_distance * 1000).toString());
+          const officeCoord = data.office_coordinates;
+
+          if (officeCoord) {
+            try {
+              const address = await getAddressFromCoords(
+                officeCoord.latitude,
+                officeCoord.longitude,
+              );
+              setOfficeAddress(address || "");
+            } catch (error) {
+              console.log("Error fetching office address");
+              console.log(error);
+            }
+          }
         }
       },
     );
@@ -186,6 +217,71 @@ export default function settings() {
     });
     return () => unsubscribe();
   }, [role]);
+
+  const getAddressFromCoords = async (
+    lat: number,
+    lng: number,
+  ): Promise<string> => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is undefined");
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+      return "Address not found";
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === "OK" && data.results.length > 0) {
+        return data.results[0].formatted_address
+          .replace(/\b\d{5}\b,?\s*/g, "")
+          .trim();
+      }
+
+      // ── Fallback to native if Google fails ────────────────────────
+      console.warn(
+        "Google geocoding failed, falling back to native:",
+        data.status,
+      );
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+
+      return "Address not found";
+    } catch (error) {
+      console.error("Geocoding fetch error:", error);
+      // ── Fallback to native on network error ───────────────────────
+      try {
+        const geo = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        if (geo.length > 0) {
+          const g = geo[0];
+          return [g.name, g.street, g.city].filter(Boolean).join(", ");
+        }
+      } catch (nativeError) {
+        console.error("Native geocoding also failed:", nativeError);
+      }
+      return "Address not found";
+    }
+  };
 
   const getUserById = (userId: string): User | undefined => {
     return allUsers.find((user) => user.id === userId);
@@ -990,7 +1086,7 @@ export default function settings() {
                   <Text style={styles.modalSubtitle}>Home Address:</Text>
                   <View style={{ width: "100%" }}>
                     <PlacesInput
-                      value={officeAddress}
+                      value={homeAddress}
                       placeholder="Search home..."
                       onPlaceSelected={(address, location) => {
                         setHomeAddress(address);
@@ -1387,7 +1483,13 @@ export default function settings() {
       {role === 0 && (
         <>
           <TouchableOpacity
-            onPress={() => setUserModalVisible(true)}
+            onPress={() => {
+              setUserModalVisible(true);
+              console.log("home address");
+              console.log(homeAddress);
+              console.log("office address");
+              console.log(officeAddress);
+            }}
             style={styles.button}
           >
             <Text style={styles.buttonText}>Create User</Text>
@@ -1476,117 +1578,97 @@ export default function settings() {
                         keyboardType="default"
                       />
 
-                      <Text style={styles.modalSubtitle}>Department:</Text>
-                      {/* <TextInput
-                        style={styles.input}
-                        placeholder="Enter Department"
-                        placeholderTextColor="#999999"
-                        value={formDepartment}
-                        onChangeText={setFormDepartment}
-                        editable={!isSaving}
-                        keyboardType="default"
-                      /> */}
-
-                      <select
-                        value={formDepartment}
-                        onChange={(e) => setFormDepartment(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a department...
-                        </option>
-                        <option value="CSD">CSD</option>
-                        <option value="FINANCE">FINANCE</option>
-                        <option value="MARKETING">MARKETING</option>
-                        <option value="MD OFFICE">MD OFFICE</option>
-                        <option value="OPERATIONS">OPERATIONS</option>
-                        <option value="PROJECT">PROJECT</option>
-                        <option value="SALES PL1">SALES PL1</option>
-                        <option value="SALES PL2">SALES PL2</option>
-                        <option value="SALES PL3">SALES PL3</option>
-                        <option value="SALES PL4 PNG">SALES PL4</option>
-                        <option value="SC">SC</option>
-                        <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
-                        <option value="OPERATIONS PNG">OPERATIONS PNG</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Grade:</Text>
-                      {/* <TextInput
-                        style={styles.input}
-                        placeholder="Enter Grade"
-                        placeholderTextColor="#999999"
-                        value={formGrade}
-                        onChangeText={setFormGrade}
-                        editable={!isSaving}
-                        keyboardType="default"
-                      /> */}
-                      <select
-                        value={formGrade}
-                        onChange={(e) => setFormGrade(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a grade...
-                        </option>
-                        <option value="S4">S4</option>
-                        <option value="S3">S3</option>
-                        <option value="S2">S2</option>
-                        <option value="S1">S1</option>
-                        <option value="B4">B4</option>
-                        <option value="B3">B3</option>
-                        <option value="B2">B2</option>
-                        <option value="B1">B1</option>
-                        <option value="A4">A4</option>
-                        <option value="A3">A3</option>
-                        <option value="A2">A2</option>
-                        <option value="A1">A1</option>
-                        <option value="M4">M4</option>
-                        <option value="M3">M3</option>
-                        <option value="M2">M2</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Cost Center:</Text>
-                      {/* <TextInput
-                        style={styles.input}
-                        placeholder="Enter Cost Center"
-                        placeholderTextColor="#999999"
-                        value={formCostCenter}
-                        onChangeText={setFormCostCenter}
-                        editable={!isSaving}
-                        keyboardType="default"
-                      /> */}
-                      <select
-                        value={formCostCenter}
-                        onChange={(e) => setFormCostCenter(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a cost center...
-                        </option>
-                        <option value="CSD">CSD</option>
-                        <option value="HQ">HQ</option>
-                        <option value="PROJECT">PROJECT</option>
-                        <option value="P_LINE1">P_LINE1</option>
-                        <option value="P_LINE2">P_LINE2</option>
-                        <option value="P_LINE3">P_LINE3</option>
-                        <option value="P_LINE4">P_LINE4</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Role:</Text>
-
-                      <select
-                        value={formRole}
-                        onChange={(e) => setFormRole(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a Role...
-                        </option>
-                        <option value="0">Admin</option>
-                        <option value="1">User</option>
-                        <option value="2">Manager</option>
-                        <option value="3">Supervisor</option>
-                      </select>
+                      <View style={styles.modalRow}>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Department:</Text>
+                          <select
+                            value={formDepartment}
+                            onChange={(e) => setFormDepartment(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a department...
+                            </option>
+                            <option value="CSD">CSD</option>
+                            <option value="FINANCE">FINANCE</option>
+                            <option value="MARKETING">MARKETING</option>
+                            <option value="MD OFFICE">MD OFFICE</option>
+                            <option value="OPERATIONS">OPERATIONS</option>
+                            <option value="PROJECT">PROJECT</option>
+                            <option value="SALES PL1">SALES PL1</option>
+                            <option value="SALES PL2">SALES PL2</option>
+                            <option value="SALES PL3">SALES PL3</option>
+                            <option value="SALES PL4 PNG">SALES PL4</option>
+                            <option value="SC">SC</option>
+                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="OPERATIONS PNG">
+                              OPERATIONS PNG
+                            </option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Grade:</Text>
+                          <select
+                            value={formGrade}
+                            onChange={(e) => setFormGrade(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a grade...
+                            </option>
+                            <option value="S4">S4</option>
+                            <option value="S3">S3</option>
+                            <option value="S2">S2</option>
+                            <option value="S1">S1</option>
+                            <option value="B4">B4</option>
+                            <option value="B3">B3</option>
+                            <option value="B2">B2</option>
+                            <option value="B1">B1</option>
+                            <option value="A4">A4</option>
+                            <option value="A3">A3</option>
+                            <option value="A2">A2</option>
+                            <option value="A1">A1</option>
+                            <option value="M4">M4</option>
+                            <option value="M3">M3</option>
+                            <option value="M2">M2</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Cost Center:</Text>
+                          <select
+                            value={formCostCenter}
+                            onChange={(e) => setFormCostCenter(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a cost center...
+                            </option>
+                            <option value="CSD">CSD</option>
+                            <option value="HQ">HQ</option>
+                            <option value="PROJECT">PROJECT</option>
+                            <option value="P_LINE1">P_LINE1</option>
+                            <option value="P_LINE2">P_LINE2</option>
+                            <option value="P_LINE3">P_LINE3</option>
+                            <option value="P_LINE4">P_LINE4</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Role:</Text>
+                          <select
+                            value={formRole}
+                            onChange={(e) => setFormRole(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a Role...
+                            </option>
+                            <option value="0">Admin</option>
+                            <option value="2">Manager</option>
+                            <option value="3">Supervisor</option>
+                            <option value="1">User</option>
+                          </select>
+                        </View>
+                      </View>
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -1698,88 +1780,97 @@ export default function settings() {
                         keyboardType="default"
                       />
 
-                      <Text style={styles.modalSubtitle}>Department:</Text>
-                      <select
-                        value={formDepartment}
-                        onChange={(e) => setFormDepartment(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a department...
-                        </option>
-                        <option value="CSD">CSD</option>
-                        <option value="FINANCE">FINANCE</option>
-                        <option value="MARKETING">MARKETING</option>
-                        <option value="MD OFFICE">MD OFFICE</option>
-                        <option value="OPERATIONS">OPERATIONS</option>
-                        <option value="PROJECT">PROJECT</option>
-                        <option value="SALES PL1">SALES PL1</option>
-                        <option value="SALES PL2">SALES PL2</option>
-                        <option value="SALES PL3">SALES PL3</option>
-                        <option value="SALES PL4 PNG">SALES PL4</option>
-                        <option value="SC">SC</option>
-                        <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
-                        <option value="OPERATIONS PNG">OPERATIONS PNG</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Grade:</Text>
-                      <select
-                        value={formGrade}
-                        onChange={(e) => setFormGrade(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a grade...
-                        </option>
-                        <option value="S4">S4</option>
-                        <option value="S3">S3</option>
-                        <option value="S2">S2</option>
-                        <option value="S1">S1</option>
-                        <option value="B4">B4</option>
-                        <option value="B3">B3</option>
-                        <option value="B2">B2</option>
-                        <option value="B1">B1</option>
-                        <option value="A4">A4</option>
-                        <option value="A3">A3</option>
-                        <option value="A2">A2</option>
-                        <option value="A1">A1</option>
-                        <option value="M4">M4</option>
-                        <option value="M3">M3</option>
-                        <option value="M2">M2</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Cost Center:</Text>
-                      <select
-                        value={formCostCenter}
-                        onChange={(e) => setFormCostCenter(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a cost center...
-                        </option>
-                        <option value="CSD">CSD</option>
-                        <option value="HQ">HQ</option>
-                        <option value="PROJECT">PROJECT</option>
-                        <option value="P_LINE1">P_LINE1</option>
-                        <option value="P_LINE2">P_LINE2</option>
-                        <option value="P_LINE3">P_LINE3</option>
-                        <option value="P_LINE4">P_LINE4</option>
-                      </select>
-
-                      <Text style={styles.modalSubtitle}>Role:</Text>
-                      <select
-                        value={formRole}
-                        onChange={(e) => setFormRole(e.target.value)}
-                        style={dropdownInput}
-                      >
-                        <option value="" disabled>
-                          Select a Role...
-                        </option>
-                        <option value="0">Admin</option>
-                        <option value="1">User</option>
-                        <option value="2">Manager</option>
-                        <option value="3">Supervisor</option>
-                      </select>
+                      <View style={styles.modalRow}>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Department:</Text>
+                          <select
+                            value={formDepartment}
+                            onChange={(e) => setFormDepartment(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a department...
+                            </option>
+                            <option value="CSD">CSD</option>
+                            <option value="FINANCE">FINANCE</option>
+                            <option value="MARKETING">MARKETING</option>
+                            <option value="MD OFFICE">MD OFFICE</option>
+                            <option value="OPERATIONS">OPERATIONS</option>
+                            <option value="PROJECT">PROJECT</option>
+                            <option value="SALES PL1">SALES PL1</option>
+                            <option value="SALES PL2">SALES PL2</option>
+                            <option value="SALES PL3">SALES PL3</option>
+                            <option value="SALES PL4 PNG">SALES PL4</option>
+                            <option value="SC">SC</option>
+                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="OPERATIONS PNG">
+                              OPERATIONS PNG
+                            </option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Grade:</Text>
+                          <select
+                            value={formGrade}
+                            onChange={(e) => setFormGrade(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a grade...
+                            </option>
+                            <option value="S4">S4</option>
+                            <option value="S3">S3</option>
+                            <option value="S2">S2</option>
+                            <option value="S1">S1</option>
+                            <option value="B4">B4</option>
+                            <option value="B3">B3</option>
+                            <option value="B2">B2</option>
+                            <option value="B1">B1</option>
+                            <option value="A4">A4</option>
+                            <option value="A3">A3</option>
+                            <option value="A2">A2</option>
+                            <option value="A1">A1</option>
+                            <option value="M4">M4</option>
+                            <option value="M3">M3</option>
+                            <option value="M2">M2</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Cost Center:</Text>
+                          <select
+                            value={formCostCenter}
+                            onChange={(e) => setFormCostCenter(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a cost center...
+                            </option>
+                            <option value="CSD">CSD</option>
+                            <option value="HQ">HQ</option>
+                            <option value="PROJECT">PROJECT</option>
+                            <option value="P_LINE1">P_LINE1</option>
+                            <option value="P_LINE2">P_LINE2</option>
+                            <option value="P_LINE3">P_LINE3</option>
+                            <option value="P_LINE4">P_LINE4</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Role:</Text>
+                          <select
+                            value={formRole}
+                            onChange={(e) => setFormRole(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a Role...
+                            </option>
+                            <option value="0">Admin</option>
+                            <option value="1">User</option>
+                            <option value="2">Manager</option>
+                            <option value="3">Supervisor</option>
+                          </select>
+                        </View>
+                      </View>
 
                       <Text style={styles.modalSubtitle}>Active:</Text>
                       <Switch
@@ -1898,6 +1989,7 @@ const styles = StyleSheet.create({
   modalScrollWrapper: {
     flex: 1,
     width: "100%",
+    maxHeight: "80%",
   },
   modalScrollContent: {
     flexGrow: 1,
@@ -1923,6 +2015,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
+  },
+  modalRow: {
+    flexDirection: "row",
+    width: "100%",
+  },
+  modalUser: {
+    flexDirection: "column",
+    marginRight: 10,
   },
   modalSubtitle: {
     fontSize: 16,
