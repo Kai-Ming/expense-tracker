@@ -2524,33 +2524,43 @@ export default function ExpensesWebScreen() {
           <Text style={{ fontSize: 20, fontWeight: "600" }}>
             Expense Details
           </Text>
-          {/* {!isEditing &&
-            expense.approval_status === 0 &&
-            expense.user_id === userId && (
+          <View style={{ flexDirection: "row" }}>
+            {!isEditing &&
+              expense.approval_status === 0 &&
+              expense.user_id === userId && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#FF9800",
+                    padding: 8,
+                    borderRadius: 6,
+                    minWidth: 60,
+                    alignItems: "center",
+                  }}
+                  onPress={() => handleEdit(expense)}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+              )}
+            {!isEditing && (
               <TouchableOpacity
                 style={{
-                  backgroundColor: "#FF9800",
+                  backgroundColor: "#F44336",
                   padding: 8,
                   borderRadius: 6,
+                  marginLeft: 8,
+                  minWidth: 60,
+                  alignItems: "center",
                 }}
-                onPress={() => handleEdit(expense)}
+                onPress={() => handleDelete(expense.id)}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>Edit</Text>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Delete
+                </Text>
               </TouchableOpacity>
-            )} */}
-          {!isEditing && (
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#F44336",
-                padding: 8,
-                borderRadius: 6,
-                marginLeft: 8,
-              }}
-              onPress={() => handleDelete(expense.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Delete</Text>
-            </TouchableOpacity>
-          )}
+            )}
+          </View>
         </View>
 
         <View style={{ marginBottom: 16 }}>
@@ -2591,9 +2601,20 @@ export default function ExpensesWebScreen() {
               >
                 Customer Name:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.name || "N/A"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.name}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, name: text })
+                  }
+                  placeholder="Customer Name"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.name || "N/A"}
+                </Text>
+              )}
             </View>
             <View style={{ flexDirection: "column", marginRight: 50 }}>
               <Text
@@ -2606,9 +2627,20 @@ export default function ExpensesWebScreen() {
               >
                 Company:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.company || "N/A"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.company}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, company: text })
+                  }
+                  placeholder="Company"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.company || "N/A"}
+                </Text>
+              )}
             </View>
             <View style={{ flexDirection: "column", marginRight: 50 }}>
               <Text
@@ -2621,9 +2653,20 @@ export default function ExpensesWebScreen() {
               >
                 Contact Number:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.contact_number || "N/A"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.contact_number}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, contact_number: text })
+                  }
+                  placeholder="Contact Number"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.contact_number || "N/A"}
+                </Text>
+              )}
             </View>
             <View style={{ flexDirection: "column", marginRight: 50 }}>
               <Text
@@ -2636,9 +2679,21 @@ export default function ExpensesWebScreen() {
               >
                 Email:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.email || "N/A"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.email}
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, email: text })
+                  }
+                  placeholder="Email"
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.email || "N/A"}
+                </Text>
+              )}
             </View>
             <View style={{ flexDirection: "column", marginRight: 50 }}></View>
           </View>
@@ -2768,9 +2823,24 @@ export default function ExpensesWebScreen() {
           >
             Trip Report:
           </Text>
-          <Text style={{ fontSize: 14, color: "#444" }}>
-            {expense.trip_report || "N/A"}
-          </Text>
+          {isEditing ? (
+            <TextInput
+              style={[
+                styles.inlineInput,
+                { minHeight: 200, width: "100%", maxWidth: "100%" },
+              ]}
+              value={editFormData.trip_report}
+              multiline
+              onChangeText={(text) =>
+                setEditFormData({ ...editFormData, trip_report: text })
+              }
+              placeholder="Trip Report"
+            />
+          ) : (
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.trip_report || "N/A"}
+            </Text>
+          )}
 
           {expense.trip_ids && expense.trip_ids.length > 0 && (
             <View style={styles.section}>
@@ -2820,7 +2890,7 @@ export default function ExpensesWebScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={{
-                backgroundColor: "#9e9e9e",
+                backgroundColor: "#F44336",
                 padding: 12,
                 borderRadius: 6,
                 flex: 1,
