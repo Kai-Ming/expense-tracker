@@ -988,6 +988,7 @@ export default function settings() {
                     onChangeText={setCurrentPassword}
                     secureTextEntry
                     editable={!isSaving}
+                    autoComplete="new-password"
                   />
                 </View>
 
@@ -1535,6 +1536,7 @@ export default function settings() {
                         onChangeText={setFormUsername}
                         editable={!isSaving}
                         keyboardType="default"
+                        autoComplete="off"
                       />
 
                       <Text style={styles.modalSubtitle}>Email:</Text>
@@ -1558,6 +1560,7 @@ export default function settings() {
                         editable={!isSaving}
                         keyboardType="default"
                         secureTextEntry
+                        autoComplete="new-password"
                       />
 
                       <Text style={styles.modalSubtitle}>

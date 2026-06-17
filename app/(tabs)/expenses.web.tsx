@@ -3411,7 +3411,11 @@ export default function ExpensesWebScreen() {
                   <Text
                     style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
                   >
-                    {expenseTypeMap[String(item.type)]}
+                    {
+                      expenseTypeMap[
+                        String(item.type) as keyof typeof expenseTypeMap
+                      ]
+                    }
                   </Text>
                 </View>
                 <Text
@@ -3487,7 +3491,11 @@ export default function ExpensesWebScreen() {
                   <Text
                     style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
                   >
-                    {expenseTypeMap[String(item.type)]}
+                    {
+                      expenseTypeMap[
+                        String(item.type) as keyof typeof expenseTypeMap
+                      ]
+                    }
                   </Text>
                 </View>
                 <Text
