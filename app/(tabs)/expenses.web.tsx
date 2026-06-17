@@ -2643,20 +2643,38 @@ export default function ExpensesWebScreen() {
             <View style={{ flexDirection: "column", marginRight: 50 }}></View>
           </View>
 
-          <View style={{ marginBottom: 10 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Distance:
-            </Text>
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.distance} km
-            </Text>
+          <View style={{ flexDirection: "row", marginBottom: 10 }}>
+            <View style={{ flexDirection: "column", marginRight: 30 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Distance:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.distance} km
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 30 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Time:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.from_time} - {expense.to_time} ({expense.duration})
+              </Text>
+            </View>
+            <View style={{ flexDirection: "column", marginRight: 30 }}></View>
           </View>
 
           <View style={{ flexDirection: "row", marginBottom: 10 }}>

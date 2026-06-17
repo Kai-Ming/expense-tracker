@@ -743,33 +743,41 @@ export default function settings() {
                       handleSelectUser(user.id);
                     }}
                   >
-                    <Text
-                      style={[
-                        styles.userInfoText,
-                        isAdded && styles.disabledText,
-                      ]}
-                    >
-                      <Text style={styles.boldLabel}>Username: </Text>
-                      {user.username}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.userInfoText,
-                        isAdded && styles.disabledText,
-                      ]}
-                    >
-                      <Text style={styles.boldLabel}>Email: </Text>
-                      {user.email}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.userInfoText,
-                        isAdded && styles.disabledText,
-                      ]}
-                    >
-                      <Text style={styles.boldLabel}>Department: </Text>
-                      {user.department}
-                    </Text>
+                    <View style={styles.modalRow}>
+                      <View style={styles.selectUser}>
+                        <Text
+                          style={[
+                            styles.userInfoText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          <Text style={styles.boldLabel}>Username: </Text>
+                          {user.username}
+                        </Text>
+                      </View>
+                      <View style={styles.selectUser}>
+                        <Text
+                          style={[
+                            styles.userInfoText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          <Text style={styles.boldLabel}>Email: </Text>
+                          {user.email}
+                        </Text>
+                      </View>
+                      <View style={styles.selectUser}>
+                        <Text
+                          style={[
+                            styles.userInfoText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          <Text style={styles.boldLabel}>Department: </Text>
+                          {user.department}
+                        </Text>
+                      </View>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -2051,6 +2059,9 @@ const styles = StyleSheet.create({
   textStyle: {
     color: "white",
     fontWeight: "bold",
+  },
+  selectUser: {
+    marginRight: 10,
   },
   boldLabel: { fontWeight: "bold", color: "#333" },
   userInfoText: { fontSize: 13, color: "#444", marginTop: 2 },
