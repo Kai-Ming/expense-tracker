@@ -3356,14 +3356,12 @@ export default function ExpensesWebScreen() {
       style={{
         flex: 1,
         flexDirection: "column",
-        margin: "10px",
-        color: "#fff",
+        padding: 10,
+        backgroundColor: "#fff",
       }}
     >
-      {/* Filter header – fixed at top */}
       <View style={{ flexShrink: 0 }}>{renderHeader()}</View>
 
-      {/* Two-pane area */}
       <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
         {/* LEFT PANEL: 30% width, scrollable list */}
         <ScrollView
