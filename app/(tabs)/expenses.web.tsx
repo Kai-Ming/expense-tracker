@@ -137,6 +137,9 @@ export default function ExpensesWebScreen() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
+  const [editFormDataGeneral, setEditFormDataGeneral] = useState<
+    Partial<GeneralExpense>
+  >({});
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [isDashboardVisible, setIsDashboardVisible] = useState(true);
   const [tempPoints, setTempPoints] = useState<
@@ -553,7 +556,7 @@ export default function ExpensesWebScreen() {
     }
   };
 
-  const handleEdit = async (expense: Expense) => {
+  const handleEditMileage = async (expense: Expense) => {
     setEditingId(expense.id);
     setEditFormData({ ...expense });
     /* setTempPolyline(null);
@@ -575,7 +578,29 @@ export default function ExpensesWebScreen() {
     } */
   };
 
-  const handleSaveEdit = async () => {
+  const handleEditGeneral = async (expense: GeneralExpense) => {
+    setEditingId(expense.id);
+    setEditFormDataGeneral({ ...expense });
+    /* setTempPolyline(null);
+    if ((window as any).google) {
+      const geocoder = new (window as any).google.maps.Geocoder();
+      const geocode = (addr: string) =>
+        new Promise<google.maps.LatLngLiteral | null>((res) =>
+          geocoder.geocode({ address: addr }, (r, s) =>
+            res(
+              s === "OK" ? r?.[0]?.geometry?.location?.toJSON() || null : null,
+            ),
+          ),
+        );
+      const [p0, p1] = await Promise.all([
+        geocode(expense.from_address),
+        geocode(expense.to_address),
+      ]);
+      setTempPoints([p0, p1]);
+    } */
+  };
+
+  const handleSaveEditMileage = async () => {
     if (!editingId) return;
     try {
       let routeImageUrl = editFormData.route_image_url || "";
@@ -603,10 +628,22 @@ export default function ExpensesWebScreen() {
       Alert.alert("Error", "Failed to update expense.");
     }
   };
+  const handleSaveEditGeneral = async () => {
+    if (!editingId) return;
+    try {
+      await updateDoc(doc(db, "expenses", editingId), {
+        ...editFormDataGeneral,
+      });
+      setEditingId(null);
+    } catch (err) {
+      Alert.alert("Error", "Failed to update expense.");
+    }
+  };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditFormData({});
+    setEditFormDataGeneral({});
   };
 
   const handleStatus = async (id: string, status: number) => {
@@ -1580,7 +1617,7 @@ export default function ExpensesWebScreen() {
                           <>
                             <TouchableOpacity
                               style={styles.approveButton}
-                              onPress={() => handleSaveEdit()}
+                              onPress={() => handleSaveEditMileage()}
                             >
                               <Text style={styles.approveButtonText}>Save</Text>
                             </TouchableOpacity>
@@ -1597,7 +1634,7 @@ export default function ExpensesWebScreen() {
                           item.approval_status === 0 && (
                             <TouchableOpacity
                               style={styles.editButton}
-                              onPress={() => handleEdit(item)}
+                              onPress={() => handleEditMileage(item)}
                             >
                               <Text style={styles.editButtonText}>Edit</Text>
                             </TouchableOpacity>
@@ -1977,7 +2014,7 @@ export default function ExpensesWebScreen() {
                       style={styles.approveButton}
                       onPress={(e) => {
                         e.stopPropagation();
-                        handleSaveEdit();
+                        handleSaveEditMileage();
                       }}
                     >
                       <Text style={styles.approveButtonText}>Save</Text>
@@ -1997,7 +2034,7 @@ export default function ExpensesWebScreen() {
                     style={styles.editButton}
                     onPress={(e) => {
                       e.stopPropagation();
-                      handleEdit(item);
+                      handleEditMileage(item);
                     }}
                   >
                     <Text style={styles.editButtonText}>Edit</Text>
@@ -2423,7 +2460,7 @@ export default function ExpensesWebScreen() {
                 <>
                   <button
                     style={webCardStyles.saveBtn}
-                    onClick={handleSaveEdit}
+                    onClick={handleSaveEditMileage}
                   >
                     Save
                   </button>
@@ -2438,7 +2475,7 @@ export default function ExpensesWebScreen() {
                 item.approval_status === 0 && (
                   <button
                     style={webCardStyles.editBtn}
-                    onClick={() => handleEdit(item)}
+                    onClick={() => handleEditMileage(item)}
                   >
                     Edit
                   </button>
@@ -2536,7 +2573,7 @@ export default function ExpensesWebScreen() {
                     minWidth: 60,
                     alignItems: "center",
                   }}
-                  onPress={() => handleEdit(expense)}
+                  onPress={() => handleEditMileage(expense)}
                 >
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>
                     Edit
@@ -2884,7 +2921,7 @@ export default function ExpensesWebScreen() {
                 flex: 1,
                 alignItems: "center",
               }}
-              onPress={handleSaveEdit}
+              onPress={handleSaveEditMileage}
             >
               <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
             </TouchableOpacity>
@@ -2954,37 +2991,47 @@ export default function ExpensesWebScreen() {
           <Text style={{ fontSize: 20, fontWeight: "600" }}>
             Expense Details
           </Text>
-          {/* {!isEditing &&
-            expense.approval_status === 0 &&
-            expense.user_id === userId && (
+          <View style={{ flexDirection: "row" }}>
+            {!isEditing &&
+              expense.approval_status === 0 &&
+              expense.user_id === userId && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#FF9800",
+                    padding: 8,
+                    borderRadius: 6,
+                    minWidth: 60,
+                    alignItems: "center",
+                  }}
+                  onPress={() => handleEditGeneral(expense)}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+              )}
+            {!isEditing && (
               <TouchableOpacity
                 style={{
-                  backgroundColor: "#FF9800",
+                  backgroundColor: "#F44336",
                   padding: 8,
                   borderRadius: 6,
+                  marginLeft: 8,
+                  minWidth: 60,
+                  alignItems: "center",
                 }}
-                onPress={() => handleEdit(expense)}
+                onPress={() => handleDelete(expense.id)}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>Edit</Text>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Delete
+                </Text>
               </TouchableOpacity>
-            )} */}
-          {!isEditing && (
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#F44336",
-                padding: 8,
-                borderRadius: 6,
-                marginLeft: 8,
-              }}
-              onPress={() => handleDelete(expense.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Delete</Text>
-            </TouchableOpacity>
-          )}
+            )}
+          </View>
         </View>
 
-        <View style={{ marginBottom: 16 }}>
-          {/* <Text
+        {/* <View style={{ marginBottom: 16 }}>
+          <Text
             style={{
               fontSize: 12,
               color: "#999",
@@ -3007,8 +3054,8 @@ export default function ExpensesWebScreen() {
             <Text style={{ fontSize: 14, color: "#444" }}>
               {expense.date || "N/A"}
             </Text>
-          )} */}
-        </View>
+          )}
+        </View> */}
 
         <View style={{ flexDirection: "row", marginBottom: 10 }}>
           <View style={{ flexDirection: "column", marginRight: 50 }}>
@@ -3022,9 +3069,20 @@ export default function ExpensesWebScreen() {
             >
               Customer Name:
             </Text>
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.name || "N/A"}
-            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.name || "N/A"}
+              </Text>
+            )}
           </View>
           <View style={{ flexDirection: "column", marginRight: 50 }}>
             <Text
@@ -3037,9 +3095,20 @@ export default function ExpensesWebScreen() {
             >
               Company:
             </Text>
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.company || "N/A"}
-            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.company}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, company: text })
+                }
+                placeholder="Company"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.company || "N/A"}
+              </Text>
+            )}
           </View>
           <View style={{ flexDirection: "column", marginRight: 50 }}>
             <Text
@@ -3052,9 +3121,24 @@ export default function ExpensesWebScreen() {
             >
               Contact Number:
             </Text>
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.contact_number || "N/A"}
-            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.contact_number}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({
+                    ...editFormData,
+                    contact_number: text,
+                  })
+                }
+                placeholder="Contact Number"
+                keyboardType="numeric"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.contact_number || "N/A"}
+              </Text>
+            )}
           </View>
           <View style={{ flexDirection: "column", marginRight: 50 }}>
             <Text
@@ -3067,9 +3151,20 @@ export default function ExpensesWebScreen() {
             >
               Email:
             </Text>
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.email || "N/A"}
-            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.email}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, email: text })
+                }
+                placeholder="Email"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.email || "N/A"}
+              </Text>
+            )}
           </View>
           <View style={{ flexDirection: "column", marginRight: 50 }}></View>
         </View>
@@ -3085,9 +3180,27 @@ export default function ExpensesWebScreen() {
           >
             Trip Report:
           </Text>
-          <Text style={{ fontSize: 14, color: "#444" }}>
-            {expense.expense_report || "N/A"}
-          </Text>
+          {isEditing ? (
+            <TextInput
+              style={[
+                styles.inlineInput,
+                { minHeight: 200, width: "100%", maxWidth: "100%" },
+              ]}
+              value={editFormDataGeneral.expense_report}
+              multiline
+              onChangeText={(text) =>
+                setEditFormDataGeneral({
+                  ...editFormData,
+                  expense_report: text,
+                })
+              }
+              placeholder="Expense Report"
+            />
+          ) : (
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.expense_report || "N/A"}
+            </Text>
+          )}
         </View>
 
         {isEditing && (
@@ -3100,13 +3213,13 @@ export default function ExpensesWebScreen() {
                 flex: 1,
                 alignItems: "center",
               }}
-              onPress={handleSaveEdit}
+              onPress={handleSaveEditGeneral}
             >
               <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{
-                backgroundColor: "#9e9e9e",
+                backgroundColor: "#F44336",
                 padding: 12,
                 borderRadius: 6,
                 flex: 1,
