@@ -1,10 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
+  createUserWithEmailAndPassword,
   getReactNativePersistence,
   initializeAuth,
+  signOut,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -44,7 +46,6 @@ export const auth = initializeAuth(app, {
       : getReactNativePersistence(AsyncStorage),
 });
 
-// Log the storage bucket name to the console during development to verify it matches CLI configuration
 if (__DEV__) {
   console.log(
     "🛠️ Firebase Storage targeting bucket:",
@@ -54,3 +55,43 @@ if (__DEV__) {
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+export const createNewUser = async (email: string, password: string) => {
+  const secondaryAppName = "SecondaryAuthApp";
+  let secondaryApp;
+
+  // Check if the secondary app already exists to prevent duplicate initialization errors
+  if (
+    !getApps()
+      .map((a) => a.name)
+      .includes(secondaryAppName)
+  ) {
+    secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+  } else {
+    secondaryApp = getApp(secondaryAppName);
+  }
+
+  // Initialize an isolated auth instance that won't overwrite your primary 'auth' export session
+  const secondaryAuth = initializeAuth(secondaryApp, {
+    persistence:
+      Platform.OS === "web"
+        ? browserLocalPersistence
+        : getReactNativePersistence(AsyncStorage),
+  });
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      secondaryAuth,
+      email,
+      password,
+    );
+    const newUid = userCredential.user.uid;
+
+    // Instantly sign out of the secondary instance so it does not linger in memory
+    await signOut(secondaryAuth);
+
+    return newUid;
+  } catch (error) {
+    throw error;
+  }
+};

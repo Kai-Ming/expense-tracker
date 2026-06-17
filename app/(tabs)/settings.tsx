@@ -2,13 +2,11 @@ import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import {
-  createUserWithEmailAndPassword,
   EmailAuthProvider,
   getAuth,
   onAuthStateChanged,
   reauthenticateWithCredential,
   updatePassword,
-  updateProfile,
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
@@ -37,7 +35,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { auth, db } from "../../firebaseConfig";
+import { createNewUser, db } from "../../firebaseConfig";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -590,20 +588,18 @@ export default function settings() {
     setIsSaving(true);
     try {
       // createUserWithEmailAndPassword automatically signs the user in
-      const userCredential = await createUserWithEmailAndPassword(
+      /* const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email.trim(),
-        password,
-      );
+        formEmail.trim(),
+        formPassword,
+      ); */
 
-      await updateProfile(userCredential.user, {
-        displayName: username.trim(),
-      });
+      const newUid = await createNewUser(formEmail.trim(), formPassword);
 
       const role = parseInt(formRole);
 
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        uid: userCredential.user.uid,
+      await setDoc(doc(db, "users", newUid), {
+        uid: newUid,
         username: formUsername.trim(),
         email: formEmail.trim(),
         created_at: serverTimestamp(),
@@ -614,6 +610,8 @@ export default function settings() {
         cost_center: formCostCenter.trim(),
         active: true,
       });
+
+      setUserModalVisible(false);
     } catch (error) {
       const err = error as any;
       console.error("Signup error:", err.code, err.message);
@@ -664,6 +662,7 @@ export default function settings() {
       setFormGrade(userToAdd.grade || "");
       setFormActive(userToAdd.active || true);
       setFormRole(userToAdd.role.toString() || "");
+      setFormDepartment(userToAdd.department || "");
     }
   };
 
@@ -1568,8 +1567,8 @@ export default function settings() {
                         style={styles.input}
                         placeholder="Enter Password"
                         placeholderTextColor="#999999"
-                        value={formPassword}
-                        onChangeText={setFormPassword}
+                        value={formConfirmPassword}
+                        onChangeText={setFormConfirmPassword}
                         editable={!isSaving}
                         keyboardType="default"
                         secureTextEntry
@@ -2027,6 +2026,7 @@ const styles = StyleSheet.create({
   modalRow: {
     flexDirection: "row",
     width: "100%",
+    marginTop: 2,
   },
   modalUser: {
     flexDirection: "column",
