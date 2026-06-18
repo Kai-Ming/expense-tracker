@@ -1,3 +1,4 @@
+// FIX User Filters
 import { Text, View } from "@/components/Themed";
 /* import {
   StyleSheet as PdfStyle
@@ -856,6 +857,7 @@ export default function ExpensesWebScreen() {
 
   const exportToPdf = () => {
     // Normalize a mileage expense
+    console.log("export");
     const normalizeMileage = (item) => ({
       date: item.date || "",
       typeOfExpense: "Local Mileage",
@@ -875,16 +877,16 @@ export default function ExpensesWebScreen() {
     const normalizeGeneral = (item) => ({
       date: item.date || "",
       typeOfExpense: "General Expense",
-      purpose: item.expense_purpose || "",
+      purpose: item.purpose || "",
       name: item.name || "",
       email: item.email || "",
       contactNumber: item.contact_number || "",
       parking: 0,
       toll: 0,
       mileage: 0,
-      expense: item.expense || 0,
+      expense: parseFloat(item.amount) || 0,
       expensePurpose: item.expense_type || "",
-      subTotal: item.cost || 0,
+      subTotal: parseFloat(item.amount) || 0,
     });
 
     const combinedData = [
@@ -949,9 +951,6 @@ export default function ExpensesWebScreen() {
             }
 
             .print-container {
-              position: absolute;
-              top: 0;
-              left: 0;
               width: 100%;
               box-sizing: border-box;
             }
@@ -1071,6 +1070,11 @@ export default function ExpensesWebScreen() {
               display: flex;
               flex-direction: row;
               margin-right: 20px;
+            }
+
+            .page-break {
+              page-break-before: always;
+              break-before: page;
             }
           </style>
         </head>
@@ -1453,6 +1457,9 @@ export default function ExpensesWebScreen() {
                         RM {item.parking.toFixed(2)}
                       </Text>
                     )}
+                    <Text style={styles.descriptionText}>
+                      RM {item.parking.toFixed(2)}
+                    </Text>
 
                     <Text style={styles.descriptionLabel}>Toll:</Text>
                     {isEditing ? (
@@ -2627,7 +2634,7 @@ export default function ExpensesWebScreen() {
           )} */}
 
           <View style={{ flexDirection: "row", marginBottom: 10 }}>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2653,7 +2660,7 @@ export default function ExpensesWebScreen() {
                 </Text>
               )}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2679,7 +2686,7 @@ export default function ExpensesWebScreen() {
                 </Text>
               )}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2705,7 +2712,7 @@ export default function ExpensesWebScreen() {
                 </Text>
               )}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2724,7 +2731,6 @@ export default function ExpensesWebScreen() {
                     setEditFormData({ ...editFormData, email: text })
                   }
                   placeholder="Email"
-                  keyboardType="numeric"
                 />
               ) : (
                 <Text style={{ fontSize: 14, color: "#444" }}>
@@ -2732,7 +2738,7 @@ export default function ExpensesWebScreen() {
                 </Text>
               )}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}></View>
+            <View style={{ flexDirection: "column", marginRight: 20 }}></View>
           </View>
 
           <View style={{ flexDirection: "row", marginBottom: 10 }}>
@@ -2781,6 +2787,24 @@ export default function ExpensesWebScreen() {
               >
                 Parking:
               </Text>
+              {/* {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.parking?.toString()}
+                  onChangeText={(text) =>
+                    setEditFormData({
+                      ...editFormData,
+                      parking: parseFloat(text),
+                    })
+                  }
+                  placeholder="Parking"
+                  keyboardType="decimal-pad"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  RM {expense.parking.toFixed(2)}
+                </Text>
+              )} */}
               <Text style={{ fontSize: 14, color: "#444" }}>
                 RM {expense.parking.toFixed(2)}
               </Text>
@@ -3058,7 +3082,7 @@ export default function ExpensesWebScreen() {
         </View> */}
 
         <View style={{ flexDirection: "row", marginBottom: 10 }}>
-          <View style={{ flexDirection: "column", marginRight: 50 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -3084,7 +3108,7 @@ export default function ExpensesWebScreen() {
               </Text>
             )}
           </View>
-          <View style={{ flexDirection: "column", marginRight: 50 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -3110,7 +3134,7 @@ export default function ExpensesWebScreen() {
               </Text>
             )}
           </View>
-          <View style={{ flexDirection: "column", marginRight: 50 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -3140,7 +3164,7 @@ export default function ExpensesWebScreen() {
               </Text>
             )}
           </View>
-          <View style={{ flexDirection: "column", marginRight: 50 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -3166,7 +3190,7 @@ export default function ExpensesWebScreen() {
               </Text>
             )}
           </View>
-          <View style={{ flexDirection: "column", marginRight: 50 }}></View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}></View>
         </View>
 
         <View style={{ marginBottom: 10 }}>
@@ -3393,7 +3417,6 @@ export default function ExpensesWebScreen() {
                 onPress={() => {
                   setSelectedExpenseId(item.id);
                   setSelectedExpenseType(item.type);
-                  test();
                 }}
               >
                 <View
@@ -3811,6 +3834,7 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 8,
     fontSize: 14,
+    maxWidth: 130,
   },
   businessCardImage: {
     width: "100%",

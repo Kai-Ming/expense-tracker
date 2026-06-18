@@ -125,7 +125,9 @@ export default function GeneralExpenseForm() {
                 onChange={(e) => setFormDate(e.target.value)}
                 style={htmlInputStyle}
               />
-              <Text style={styles.fieldLabel}>Expense Purpose:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Expense Purpose:
+              </Text>
               <select
                 value={formExpenseType}
                 onChange={(e) => setFormExpenseType(e.target.value)}
@@ -143,7 +145,9 @@ export default function GeneralExpenseForm() {
               </select>
               <Text style={styles.fieldLabel}></Text>
 
-              <Text style={styles.fieldLabel}>Amount (RM):</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Amount (RM):
+              </Text>
               <TextInput
                 value={formAmount}
                 onChangeText={setFormAmount}
@@ -198,7 +202,9 @@ export default function GeneralExpenseForm() {
                 { marginTop: 10, alignItems: "flex-start" },
               ]}
             >
-              <Text style={styles.fieldLabel}>Expense Report:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Expense Report:
+              </Text>
               <TextInput
                 value={formExpenseReport}
                 onChangeText={setFormExpenseReport}
@@ -457,4 +463,5 @@ const styles = StyleSheet.create({
   disabledText: {
     color: "#9e9e9e",
   },
+  fieldLabelMandatory: { color: "#2196F3" },
 });

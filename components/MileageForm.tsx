@@ -607,7 +607,7 @@ export default function MileageForm() {
       return;
     }
     if (!formTripFromTime || !formTripToTime) {
-      alert("Please fill in both 'From' and 'To' times.");
+      alert("Please fill in both 'Departure' and 'Arrival' times.");
       return;
     }
     if (!userId) {
@@ -623,14 +623,20 @@ export default function MileageForm() {
       let subToll = await fetchTollCost(originCoord, destCoord);
       if (formGoingHome) {
         const distToCurrent = getHaversineDistance(originCoord, destCoord);
-        const distToOffice = getHaversineDistance(originCoord, officeCoords);
+        const distToOffice = getHaversineDistance(
+          originCoord,
+          officeCoords || { lat: 0, lng: 0 },
+        );
 
         if (distToOffice < distToCurrent) {
           console.log(`Route Comparison: Using Current.`);
         } else {
           console.log(`Route Comparison: Using Office.`);
           subDistance = parseFloat(distToOffice.toFixed(2));
-          subToll = await fetchTollCost(originCoord, officeCoords);
+          subToll = await fetchTollCost(
+            originCoord,
+            officeCoords || { lat: 0, lng: 0 },
+          );
           if (officeCoords) {
             subToAddress = await getAddressFromCoords(
               officeCoords.lat,
@@ -729,12 +735,11 @@ export default function MileageForm() {
       dist === 0 ||
       !formPurpose.trim() ||
       !formDate ||
-      addedTrips.length === 0 ||
       !formContactNumber.trim() ||
       !formEmail.trim() ||
       !formName.trim() ||
-      !formPurpose.trim() ||
       !formTripReport ||
+      !formCompany.trim() ||
       otherExpenseValidation
     ) {
       alert("Please ensure all required fields are filled.");
@@ -966,7 +971,12 @@ export default function MileageForm() {
                         <Text style={styles.modalTitle}>Add Trip</Text>
 
                         <View style={styles.formGroup}>
-                          <Text style={styles.modalSubtitle}>
+                          <Text
+                            style={[
+                              styles.modalSubtitle,
+                              styles.fieldLabelMandatory,
+                            ]}
+                          >
                             From (Starting location):
                           </Text>
                           <PlacesInput
@@ -978,7 +988,11 @@ export default function MileageForm() {
                             }}
                           />
                           <Text
-                            style={[styles.modalSubtitle, { marginTop: 10 }]}
+                            style={[
+                              styles.modalSubtitle,
+                              styles.fieldLabelMandatory,
+                              { marginTop: 10 },
+                            ]}
                           >
                             To (Destination):
                           </Text>
@@ -992,7 +1006,11 @@ export default function MileageForm() {
                             disabled={formGoingHome}
                           />
                           <Text
-                            style={[styles.modalSubtitle, { marginTop: 10 }]}
+                            style={[
+                              styles.modalSubtitle,
+                              styles.fieldLabelMandatory,
+                              { marginTop: 10 },
+                            ]}
                           >
                             Departure Time:
                           </Text>
@@ -1008,7 +1026,12 @@ export default function MileageForm() {
                             disabled={isSaving}
                           />
 
-                          <Text style={styles.modalSubtitle}>
+                          <Text
+                            style={[
+                              styles.modalSubtitle,
+                              styles.fieldLabelMandatory,
+                            ]}
+                          >
                             Arrival Time:
                           </Text>
                           <input
@@ -1033,7 +1056,14 @@ export default function MileageForm() {
                               handleUpdateHome(newValue)
                             }
                           />
-                          <Text style={styles.modalSubtitle}>Remark:</Text>
+                          <Text
+                            style={[
+                              styles.modalSubtitle,
+                              styles.fieldLabelMandatory,
+                            ]}
+                          >
+                            Remark:
+                          </Text>
                           <TextInput
                             style={[
                               styles.input,
@@ -1307,7 +1337,9 @@ export default function MileageForm() {
                 { marginTop: 10, alignItems: "flex-start" },
               ]}
             >
-              <Text style={styles.fieldLabel}>Purpose:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Purpose:
+              </Text>
               <select
                 value={formPurpose}
                 onChange={(e) => setFormPurpose(e.target.value)}
@@ -1338,21 +1370,27 @@ export default function MileageForm() {
             </View>
 
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Company/Site:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Company/Site:
+              </Text>
               <TextInput
                 value={formCompany}
                 onChangeText={setFormCompany}
                 style={styles.webTextInput}
                 placeholder="Company/Site"
               />
-              <Text style={styles.fieldLabel}>Name:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Name:
+              </Text>
               <TextInput
                 value={formName}
                 onChangeText={setFormName}
                 style={styles.webTextInput}
                 placeholder="Name"
               />
-              <Text style={styles.fieldLabel}>Contact:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Contact:
+              </Text>
               <TextInput
                 value={formContactNumber}
                 onChangeText={(text) =>
@@ -1361,7 +1399,9 @@ export default function MileageForm() {
                 style={styles.webTextInput}
                 placeholder="Contact Number"
               />
-              <Text style={styles.fieldLabel}>Email:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Email:
+              </Text>
               <TextInput
                 value={formEmail}
                 onChangeText={setFormEmail}
@@ -1437,7 +1477,9 @@ export default function MileageForm() {
                 { marginTop: 10, alignItems: "flex-start" },
               ]}
             >
-              <Text style={styles.fieldLabel}>Trip Report:</Text>
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Trip Report:
+              </Text>
               <TextInput
                 value={formTripReport}
                 onChangeText={setFormTripReport}
@@ -1547,6 +1589,7 @@ const styles = StyleSheet.create({
   },
   inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
+  fieldLabelMandatory: { color: "#2196F3" },
   fieldValue: { fontSize: 14, flex: 1 },
   button: {
     backgroundColor: "#2196F3",
