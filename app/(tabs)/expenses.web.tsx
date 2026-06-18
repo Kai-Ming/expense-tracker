@@ -608,7 +608,9 @@ export default function ExpensesWebScreen() {
       const updatedCost =
         (editFormData.mileage || 0) +
         (editFormData.parking || 0) +
-        (editFormData.toll || 0);
+        (editFormData.toll || 0) +
+        (editFormData.expense || 0);
+
       if (tempPolyline && tempPoints[0] && tempPoints[1]) {
         const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${tempPolyline}&markers=color:red|label:A|${tempPoints[0].lat},${tempPoints[0].lng}&markers=color:blue|label:B|${tempPoints[1].lat},${tempPoints[1].lng}&key=${apiKey}`;
         const res = await fetch(staticMapUrl);
@@ -619,6 +621,18 @@ export default function ExpensesWebScreen() {
           );
         }
       }
+
+      const otherExpenseValidation =
+        editFormData.expense !== 0 && !editFormData.expense_purpose;
+      if (otherExpenseValidation) {
+        alert("Missing expense purpose");
+        return;
+      }
+
+      if (editFormData.expense === 0) {
+        editFormData.expense_purpose = "";
+      }
+
       await updateDoc(doc(db, "expenses", editingId), {
         ...editFormData,
         route_image_url: routeImageUrl,
@@ -2776,7 +2790,7 @@ export default function ExpensesWebScreen() {
           </View>
 
           <View style={{ flexDirection: "row", marginBottom: 10 }}>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2787,16 +2801,18 @@ export default function ExpensesWebScreen() {
               >
                 Parking:
               </Text>
-              {/* {isEditing ? (
+              {isEditing ? (
                 <TextInput
                   style={styles.inlineInput}
                   value={editFormData.parking?.toString()}
-                  onChangeText={(text) =>
+                  onChangeText={(text) => {
+                    const parsedValue = text === "" ? 0 : parseFloat(text);
+
                     setEditFormData({
                       ...editFormData,
-                      parking: parseFloat(text),
-                    })
-                  }
+                      parking: isNaN(parsedValue) ? 0 : parsedValue,
+                    });
+                  }}
                   placeholder="Parking"
                   keyboardType="decimal-pad"
                 />
@@ -2804,12 +2820,12 @@ export default function ExpensesWebScreen() {
                 <Text style={{ fontSize: 14, color: "#444" }}>
                   RM {expense.parking.toFixed(2)}
                 </Text>
-              )} */}
-              <Text style={{ fontSize: 14, color: "#444" }}>
+              )}
+              {/* <Text style={{ fontSize: 14, color: "#444" }}>
                 RM {expense.parking.toFixed(2)}
-              </Text>
+              </Text> */}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2820,11 +2836,28 @@ export default function ExpensesWebScreen() {
               >
                 Toll:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {expense.toll.toFixed(2)}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.toll?.toString()}
+                  onChangeText={(text) => {
+                    const parsedValue = text === "" ? 0 : parseFloat(text);
+
+                    setEditFormData({
+                      ...editFormData,
+                      toll: isNaN(parsedValue) ? 0 : parsedValue,
+                    });
+                  }}
+                  placeholder="Toll"
+                  keyboardType="decimal-pad"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  RM {expense.toll.toFixed(2)}
+                </Text>
+              )}
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2839,7 +2872,7 @@ export default function ExpensesWebScreen() {
                 RM {expense.mileage.toFixed(2)}
               </Text>
             </View>
-            <View style={{ flexDirection: "column", marginRight: 50 }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -2850,12 +2883,29 @@ export default function ExpensesWebScreen() {
               >
                 Expense:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM{" "}
-                {typeof expense.expense === "number"
-                  ? expense.expense.toFixed(2)
-                  : "0.00"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.inlineInput}
+                  value={editFormData.expense?.toString()}
+                  onChangeText={(text) => {
+                    const parsedValue = text === "" ? 0 : parseFloat(text);
+
+                    setEditFormData({
+                      ...editFormData,
+                      expense: isNaN(parsedValue) ? 0 : parsedValue,
+                    });
+                  }}
+                  placeholder="Expense"
+                  keyboardType="decimal-pad"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  RM{" "}
+                  {typeof expense.expense === "number"
+                    ? expense.expense.toFixed(2)
+                    : "0.00"}
+                </Text>
+              )}
             </View>
             <View style={{ flexDirection: "column", marginRight: 50 }}>
               <Text
@@ -2868,9 +2918,32 @@ export default function ExpensesWebScreen() {
               >
                 Expense Purpose:
               </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
+              {isEditing ? (
+                <select
+                  value={editFormData.expense_purpose?.toString()}
+                  onChange={(e) => {
+                    setEditFormData({
+                      ...editFormData,
+                      expense_purpose: e.target.value,
+                    });
+                  }}
+                  style={htmlSelectStyle}
+                >
+                  <option value="">Select a purpose...</option>
+                  <option value="Meal with customer">Meal with customer</option>
+                  <option value="Meal with supplier">Meal with supplier</option>
+                  <option value="Purchase of goods">Purchase of goods</option>
+                  <option value="Staff benefits">Staff benefits</option>
+                  <option value="Others">Others</option>
+                </select>
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.expense_purpose || "N/A"}
+                </Text>
+              )}
+              {/* <Text style={{ fontSize: 14, color: "#444" }}>
                 {expense.expense_purpose || "N/A"}
-              </Text>
+              </Text> */}
             </View>
           </View>
 

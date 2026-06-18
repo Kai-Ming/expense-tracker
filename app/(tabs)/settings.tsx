@@ -108,6 +108,7 @@ export default function settings() {
   const [formGrade, setFormGrade] = useState<string>("");
   const [formCostCenter, setFormCostCenter] = useState<string>("");
   const [formRole, setFormRole] = useState<string>("");
+  const [formOffice, setFormOffice] = useState<string>("");
   const [formActive, setFormActive] = useState(true);
 
   const [editUserModalVisible, setEditUserModalVisible] = useState(false);
@@ -609,6 +610,8 @@ export default function settings() {
         grade: formGrade.trim(),
         cost_center: formCostCenter.trim(),
         active: true,
+        permission: 0,
+        subordinates: [],
       });
 
       setUserModalVisible(false);
@@ -774,6 +777,17 @@ export default function settings() {
                         >
                           <Text style={styles.boldLabel}>Department: </Text>
                           {user.department}
+                        </Text>
+                      </View>
+                      <View style={styles.selectUser}>
+                        <Text
+                          style={[
+                            styles.userInfoText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          <Text style={styles.boldLabel}>Role: </Text>
+                          {user.role}
                         </Text>
                       </View>
                     </View>
@@ -1664,6 +1678,22 @@ export default function settings() {
                         </View>
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Role:</Text>
+                          <select
+                            value={formRole}
+                            onChange={(e) => setFormRole(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select a Role...
+                            </option>
+                            <option value="0">Admin</option>
+                            <option value="2">Manager</option>
+                            <option value="3">Supervisor</option>
+                            <option value="1">User</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Office:</Text>
                           <select
                             value={formRole}
                             onChange={(e) => setFormRole(e.target.value)}

@@ -737,6 +737,9 @@ export default function MileageForm() {
       setFormOtherExpenseType("");
     }
 
+    const otherExpensePurpose =
+      parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
+
     if (
       !formPurpose.trim() ||
       !formDate ||
@@ -795,7 +798,7 @@ export default function MileageForm() {
         toll: parseFloat(formToll),
         mileage: parseFloat(calculateMileage()),
         expense: parseFloat(formOtherExpense),
-        expense_purpose: formOtherExpenseType,
+        expense_purpose: otherExpensePurpose,
         cost: parseFloat(calculateCost()),
         type: 1, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,

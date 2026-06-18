@@ -72,7 +72,17 @@ export default function GeneralExpenseForm() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!formExpenseType || !formDate || parseFloat(formAmount) === 0) {
+    const expensePurposeValidation =
+      (formExpenseType === "1" || formExpenseType === "2") &&
+      (!formCompany || !formContactNumber || !formEmail || !formName);
+
+    console.log(expensePurposeValidation);
+    if (
+      !formExpenseType ||
+      !formDate ||
+      parseFloat(formAmount) === 0 ||
+      expensePurposeValidation
+    ) {
       alert("Please ensure all required fields are filled.");
       return;
     }
@@ -103,7 +113,7 @@ export default function GeneralExpenseForm() {
   const resetForm = () => {
     setFormExpenseType("");
     setFormPurpose("");
-    setFormAmount("");
+    setFormAmount("0.00");
     setFormCompany("");
     setFormName("");
     setFormContactNumber("");
@@ -158,7 +168,7 @@ export default function GeneralExpenseForm() {
               <TextInput
                 value={formAmount}
                 onChangeText={setFormAmount}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 style={styles.webTextInput}
                 editable={!isSaving}
               />
@@ -166,21 +176,27 @@ export default function GeneralExpenseForm() {
 
             {(formExpenseType === "1" || formExpenseType === "2") && (
               <View style={[styles.inputRow, { marginTop: 10 }]}>
-                <Text style={styles.fieldLabel}>Company/Site:</Text>
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                  Company/Site:
+                </Text>
                 <TextInput
                   value={formCompany}
                   onChangeText={setFormCompany}
                   style={styles.webTextInput}
                   placeholder="Company/Site"
                 />
-                <Text style={styles.fieldLabel}>Name:</Text>
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                  Name:
+                </Text>
                 <TextInput
                   value={formName}
                   onChangeText={setFormName}
                   style={styles.webTextInput}
                   placeholder="Name"
                 />
-                <Text style={styles.fieldLabel}>Contact:</Text>
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                  Contact:
+                </Text>
                 <TextInput
                   value={formContactNumber}
                   onChangeText={(text) =>
@@ -190,7 +206,9 @@ export default function GeneralExpenseForm() {
                   placeholder="Contact Number"
                   placeholderTextColor="#999999"
                 />
-                <Text style={styles.fieldLabel}>Email:</Text>
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                  Email:
+                </Text>
                 <TextInput
                   value={formEmail}
                   onChangeText={setFormEmail}
