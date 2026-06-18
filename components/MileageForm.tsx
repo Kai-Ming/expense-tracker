@@ -731,7 +731,12 @@ export default function MileageForm() {
     const dist = getDistanceValue();
 
     const otherExpenseValidation =
-      parseFloat(formOtherExpense) != 0 || !setFormOtherExpenseType;
+      parseFloat(formOtherExpense) !== 0 && !formOtherExpenseType;
+
+    if (parseFloat(formOtherExpense) === 0) {
+      setFormOtherExpenseType("");
+    }
+
     if (
       !formPurpose.trim() ||
       !formDate ||
@@ -819,6 +824,7 @@ export default function MileageForm() {
     setFormOtherExpenseType("");
     setBusinessCardFile(null);
     setReceiptFiles([]);
+    setFormEmail("");
   };
 
   const renderTripModal = () => (
@@ -1458,9 +1464,7 @@ export default function MileageForm() {
                 onChange={(e) => setFormOtherExpenseType(e.target.value)}
                 style={htmlSelectStyle}
               >
-                <option value="" disabled>
-                  Select a purpose...
-                </option>
+                <option value="">Select a purpose...</option>
                 <option value="Meal with customer">Meal with customer</option>
                 <option value="Meal with supplier">Meal with supplier</option>
                 <option value="Purchase of goods">Purchase of goods</option>

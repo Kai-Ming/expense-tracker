@@ -142,9 +142,7 @@ export default function GeneralExpenseForm() {
                 onChange={(e) => setFormExpenseType(e.target.value)}
                 style={htmlSelectStyle}
               >
-                <option value="" disabled>
-                  Select a purpose...
-                </option>
+                <option value="">Select a purpose...</option>
                 <option value="1">{expenseType["1"]}</option>
                 <option value="2">{expenseType["2"]}</option>
                 <option value="3">{expenseType["3"]}</option>
