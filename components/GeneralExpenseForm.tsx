@@ -111,12 +111,21 @@ export default function GeneralExpenseForm() {
     setFormExpenseReport("");
   };
 
+  const fieldMessage = (
+    <Text
+      style={[{ fontSize: 14, fontWeight: "600", marginTop: 10, width: 500 }]}
+    >
+      Required fields in <Text style={{ color: "#2196F3" }}>blue</Text>.
+    </Text>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
             <Text style={styles.formLabel}>Submit General Expense</Text>
+            {fieldMessage}
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Date:</Text>
               <input

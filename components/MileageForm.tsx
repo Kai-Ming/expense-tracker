@@ -15,6 +15,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,7 +28,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db } from "../firebaseConfig";
+import { db, storage } from "../firebaseConfig";
 
 export default function MileageForm() {
   const [homeCoords, setHomeCoords] = useState<{
@@ -732,7 +733,6 @@ export default function MileageForm() {
     const otherExpenseValidation =
       parseFloat(formOtherExpense) != 0 || !setFormOtherExpenseType;
     if (
-      dist === 0 ||
       !formPurpose.trim() ||
       !formDate ||
       !formContactNumber.trim() ||
@@ -904,13 +904,21 @@ export default function MileageForm() {
     </Modal>
   );
 
+  const fieldMessage = (
+    <Text
+      style={[{ fontSize: 14, fontWeight: "600", marginTop: 10, width: 500 }]}
+    >
+      Required fields in <Text style={{ color: "#2196F3" }}>blue</Text>.
+    </Text>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
             <Text style={styles.formLabel}>Submit Travel Expense</Text>
-
+            {fieldMessage}
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Date:</Text>
               <input
@@ -1114,7 +1122,6 @@ export default function MileageForm() {
                 </View>
               </Modal>
             </View>
-
             {addedTrips.length > 0 && (
               <View style={styles.addedTripsContainer}>
                 <Text style={styles.subsectionTitle}>Selected Trips:</Text>
@@ -1151,7 +1158,6 @@ export default function MileageForm() {
                 </View>
               </View>
             )}
-
             {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <TouchableOpacity
                 onPress={() => setShowTravelModal(true)}
@@ -1325,12 +1331,10 @@ export default function MileageForm() {
                 </View>
               </Modal>
             </View> */}
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Distance:</Text>
               <Text style={styles.fieldValue}>{distance} km</Text>
             </View>
-
             <View
               style={[
                 styles.inputRow,
@@ -1345,9 +1349,7 @@ export default function MileageForm() {
                 onChange={(e) => setFormPurpose(e.target.value)}
                 style={htmlSelectStyle}
               >
-                <option value="" disabled>
-                  Select a purpose...
-                </option>
+                <option value="">Select a purpose...</option>
                 <option value="Application support">Application support</option>
                 <option value="Attending seminar/training">
                   Attending seminar/training
@@ -1368,7 +1370,6 @@ export default function MileageForm() {
                 <option value="Site visitation">Site visitation</option>
               </select>
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                 Company/Site:
@@ -1410,7 +1411,6 @@ export default function MileageForm() {
                 keyboardType="email-address"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Start Trip Time:</Text>
               <Text style={styles.fieldValue}>
@@ -1423,7 +1423,6 @@ export default function MileageForm() {
               <Text style={styles.fieldLabel}>Duration:</Text>
               <Text style={styles.fieldValue}>{calculateDuration()}</Text>
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Mileage (RM):</Text>
               <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
@@ -1445,7 +1444,6 @@ export default function MileageForm() {
               <Text style={styles.fieldLabel}>Cost:</Text>
               <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Other Expenses (RM):</Text>
               <TextInput
@@ -1470,7 +1468,6 @@ export default function MileageForm() {
                 <option value="Others">Others</option>
               </select>
             </View>
-
             <View
               style={[
                 styles.inputRow,
@@ -1491,7 +1488,6 @@ export default function MileageForm() {
                 placeholder="Trip Report"
               />
             </View>
-
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Business Card:</Text>
               <input
@@ -1503,7 +1499,6 @@ export default function MileageForm() {
                 style={htmlInputStyle}
               />
             </View>
-
             {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Receipts:</Text>
               <input
@@ -1527,7 +1522,6 @@ export default function MileageForm() {
                 ))}
               </View>
             )} */}
-
             <TouchableOpacity
               onPress={handleSubmit}
               style={styles.button}
