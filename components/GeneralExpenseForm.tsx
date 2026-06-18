@@ -72,6 +72,10 @@ export default function GeneralExpenseForm() {
   }, []);
 
   const handleSubmit = async () => {
+    if (!formExpenseType || !formDate || parseFloat(formAmount) === 0) {
+      alert("Please ensure all required fields are filled.");
+      return;
+    }
     try {
       await addDoc(collection(db, "expenses"), {
         user_id: userId,
