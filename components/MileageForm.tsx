@@ -265,7 +265,8 @@ export default function MileageForm() {
   const calculateCost = () => {
     const travelCost = getTotalMileage();
     const parking = parseFloat(formParking) || 0;
-    const toll = getTotalToll();
+    //const toll = getTotalToll();
+    const toll = parseFloat(formToll);
     const expense = parseFloat(formOtherExpense) || 0;
     return (travelCost + parking + toll + expense).toFixed(2);
   };
