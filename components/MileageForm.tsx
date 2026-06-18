@@ -15,7 +15,6 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,7 +27,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db, storage } from "../firebaseConfig";
+import { db } from "../firebaseConfig";
 
 export default function MileageForm() {
   const [homeCoords, setHomeCoords] = useState<{
@@ -727,69 +726,19 @@ export default function MileageForm() {
       dist === 0 ||
       !formPurpose.trim() ||
       !formDate ||
-      addedTrips.length === 0
+      addedTrips.length === 0 ||
+      !formContactNumber.trim() ||
+      !formEmail.trim() ||
+      !formName.trim() ||
+      !formPurpose.trim() ||
+      !formTripReport ||
+      parseFloat(formOtherExpense) == 0 ||
+      !setFormOtherExpenseType
     ) {
       alert("Please ensure all required fields are filled.");
       return;
     }
 
-    try {
-      let businessCardUrl = "";
-      if (businessCardFile) {
-        const storageRef = ref(
-          storage,
-          `business-cards/${Date.now()}_${businessCardFile.name}`,
-        );
-        const uploadResult = await uploadBytes(storageRef, businessCardFile);
-        businessCardUrl = await getDownloadURL(uploadResult.ref);
-      }
-
-      const receiptUrls: string[] = [];
-      for (const file of receiptFiles) {
-        const storageRef = ref(
-          storage,
-          `receipts/${userId}/${Date.now()}_${file.name}`,
-        );
-        const uploadResult = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(uploadResult.ref);
-        receiptUrls.push(url);
-      }
-
-      const { fromTime, toTime } = getOverallTimes();
-
-      await addDoc(collection(db, "expenses"), {
-        user_id: userId,
-        user_name: username,
-        date: formDate,
-        purpose: formPurpose,
-        company: formCompany,
-        name: formName,
-        contact_number: formContactNumber,
-        email: formEmail,
-        from_time: fromTime,
-        to_time: toTime,
-        duration: calculateDuration(),
-        distance: dist,
-        trip_report: formTripReport,
-        business_card_url: businessCardUrl,
-        receipt_urls: receiptUrls,
-        parking: parseFloat(formParking),
-        toll: parseFloat(formToll),
-        mileage: parseFloat(calculateMileage()),
-        expense: parseFloat(formOtherExpense),
-        expense_purpose: formOtherExpenseType,
-        cost: parseFloat(calculateCost()),
-        type: 1, // 1 mileage, 2 general, 3 outstation
-        approval_status: 0,
-        created_at: serverTimestamp(),
-        trip_ids: addedTrips.map((trip) => trip.id),
-      });
-      resetForm();
-      alert("Expense submitted successfully!");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to save expense.");
-    }
   };
 
   const resetForm = () => {
