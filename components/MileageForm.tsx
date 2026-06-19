@@ -1,5 +1,6 @@
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
+import { Loader } from "@googlemaps/js-api-loader";
 import * as Location from "expo-location";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -15,7 +16,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,6 +30,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { db, storage } from "../firebaseConfig";
+import { useGoogleMapsDistance } from "./DistanceCalculator";
 
 export default function MileageForm() {
   const [homeCoords, setHomeCoords] = useState<{
@@ -56,6 +58,9 @@ export default function MileageForm() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
   const [mileageRate, setMileageRate] = useState<number>(0.8);
+  const [mileageRateOutstation, setMileageRateOutstation] =
+    useState<number>(0.7);
+  const [outStationDistance, setOutstationDistance] = useState<number>(50);
   const [officeCoords, setOfficeCoords] = useState<{
     lat: number;
     lng: number;
@@ -99,6 +104,9 @@ export default function MileageForm() {
   const [formTravelOthers, setFormTravelOthers] = useState<string>("0.00");
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const { calculateDistance, getRouteImageUrl, sdkLoaded } =
+    useGoogleMapsDistance();
 
   // Fetch all user trips
   useEffect(() => {
@@ -162,6 +170,10 @@ export default function MileageForm() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.mileage_rate) setMileageRate(data.mileage_rate);
+          if (data.mileage_rate_oustation)
+            setMileageRateOutstation(data.mileage_rate_oustation);
+          if (data.outstation_disance)
+            setOutstationDistance(data.outstation_distance);
           if (data.office_coordinates) {
             setOfficeCoords({
               lat: data.office_coordinates.latitude,
@@ -318,7 +330,7 @@ export default function MileageForm() {
 
   const formatDisplayTime = (date: Date | null) => {
     if (!date) return "Select time";
-    const time24 = toTimeString(date) ?? ""; // assuming toTimeString works with Date
+    const time24 = toTimeString(date) ?? "";
     return to12HourTime(time24);
   };
 
@@ -389,7 +401,7 @@ export default function MileageForm() {
     }
   };
 
-  const getRouteImageUrl = async (origin, destination) => {
+  /* const getRouteImageUrl = async (origin, destination) => {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
     const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&key=${apiKey}`;
 
@@ -404,52 +416,9 @@ export default function MileageForm() {
     const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&maptype=roadmap&path=enc:${routePolyline}&markers=color:green|label:S|${origin.lat},${origin.lng}&markers=color:red|label:E|${destination.lat},${destination.lng}&key=${apiKey}`;
 
     return staticMapUrl;
-  };
+  }; */
 
-  const fetchTollCost = async (
-    origin: { lat: number; lng: number },
-    dest: { lat: number; lng: number },
-  ): Promise<number> => {
-    try {
-      const response = await fetch(
-        "https://routes.googleapis.com/directions/v2:computeRoutes",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
-            "X-Goog-FieldMask": "routes.travelAdvisory.tollInfo",
-          },
-          body: JSON.stringify({
-            origin: {
-              location: {
-                latLng: { latitude: origin.lat, longitude: origin.lng },
-              },
-            },
-            destination: {
-              location: { latLng: { latitude: dest.lat, longitude: dest.lng } },
-            },
-            travelMode: "DRIVE",
-            extraComputations: ["TOLLS"],
-            routeModifiers: { vehicleInfo: { emissionType: "GASOLINE" } },
-          }),
-        },
-      );
-
-      const data = await response.json();
-      const tollInfo = data.routes?.[0]?.travelAdvisory?.tollInfo;
-      if (tollInfo?.estimatedPrice?.length > 0) {
-        const price = tollInfo.estimatedPrice[0];
-        return (price.units ?? 0) + (price.nanos ?? 0) / 1e9;
-      }
-      return 0;
-    } catch (error) {
-      console.error("Toll fetch error:", error);
-      return 0;
-    }
-  };
-
-  function getHaversineDistance(
+  /* function getHaversineDistance(
     p1: { lat: number; lng: number },
     p2: { lat: number; lng: number },
   ) {
@@ -464,7 +433,7 @@ export default function MileageForm() {
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
-  }
+  } */
 
   const getAddressFromCoords = async (
     lat: number,
@@ -534,6 +503,28 @@ export default function MileageForm() {
   const getDrivingDistance = async (
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
+  ) => {
+    try {
+      const data = await calculateDistance(origin, destination);
+      console.log(":Type of data");
+      console.log(typeof data);
+      return data || 0;
+    } catch (error) {
+      console.log(error);
+      alert("Error calculating distance");
+    }
+  };
+
+  const fetchTollCost = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ) => {
+    return 0;
+  };
+
+  const getDrivingDistanced = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
   ): Promise<{ km: number; text: string; duration: string } | null> => {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -541,31 +532,85 @@ export default function MileageForm() {
       return null;
     }
 
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destination.lat},${destination.lng}&key=${apiKey}`;
-
     try {
-      const response = await fetch(url);
-      const data = await response.json();
-      console.log("Full API response:", data);
+      // 1. Initialize the Google Maps Loader
+      const loader = new Loader({
+        apiKey: apiKey,
+        version: "weekly",
+      });
 
-      if (data.status === "OK") {
-        const element = data.rows[0].elements[0];
-        if (element.status === "OK") {
+      // 2. Load the Google Maps core
+      await loader.load();
+
+      // 3. Import the new 'routes' library dynamically
+      const { RouteMatrix } = (await google.maps.importLibrary(
+        "routes",
+      )) as google.maps.RoutesLibrary;
+
+      // 4. Construct the request body for computeRouteMatrix
+      const request: google.maps.routes.ComputeRouteMatrixRequest = {
+        origins: [
+          {
+            waypoint: {
+              location: {
+                latLng: { latitude: origin.lat, longitude: origin.lng },
+              },
+            },
+          },
+        ],
+        destinations: [
+          {
+            waypoint: {
+              location: {
+                latLng: {
+                  latitude: destination.lat,
+                  longitude: destination.lng,
+                },
+              },
+            },
+          },
+        ],
+        travelMode: google.maps.routes.RouteTravelMode.DRIVING,
+      };
+
+      // 5. Execute the Route Matrix request
+      const response = await RouteMatrix.computeRouteMatrix(request);
+
+      // 6. Process the response array
+      if (response && response.length > 0) {
+        const element = response[0];
+
+        // Check if the individual routing element was successful
+        if (element.status?.code === 0 || !element.status) {
+          const distanceMeters = element.distanceMeters ?? 0;
+          const durationSeconds = parseInt(
+            element.duration?.replace("s", "") ?? "0",
+            10,
+          );
+
+          // Format duration nicely (e.g., "15 mins")
+          const durationMinutes = Math.round(durationSeconds / 60);
+          const durationText =
+            durationMinutes >= 60
+              ? `${Math.floor(durationMinutes / 60)} hours ${durationMinutes % 60} mins`
+              : `${durationMinutes} mins`;
+
           return {
-            km: element.distance.value / 1000,
-            text: element.distance.text,
-            duration: element.duration.text,
+            km: distanceMeters / 1000,
+            text: `${(distanceMeters / 1000).toFixed(1)} km`,
+            duration: durationText,
           };
         } else {
-          console.warn("No route:", element.status);
-          return null;
+          console.warn(
+            "Route element failed with status:",
+            element.status.message,
+          );
         }
-      } else {
-        console.error("Distance API error:", data.status);
-        return null;
       }
+
+      return null;
     } catch (error) {
-      console.error("Network error:", error);
+      console.error("Error fetching distance via Routes SDK:", error);
       return null;
     }
   };
@@ -591,6 +636,41 @@ export default function MileageForm() {
       }
     } else {
       setToAddress("");
+    }
+  };
+
+  const saveRouteImageToFirebase = async (origin, destination) => {
+    try {
+      // 1. Get the Google Static Map URL with the polyline
+      const googleMapUrl = await getRouteImageUrl(origin, destination);
+
+      // 2. Fetch the actual image data as a Blob (binary data)
+      // NOTE: Ensure your Google Cloud Console allows your domain to fetch Static Map blobs
+      const response = await fetch(googleMapUrl);
+      const blob = (await response.json)
+        ? await response.blob()
+        : await response.blob();
+
+      // 3. Initialize Firebase Storage and create a unique file path
+      const storage = getStorage();
+      const fileName = `route-images/trip_${Date.now()}.png`;
+      const storageRef = ref(storage, fileName);
+
+      // 4. Upload the raw blob to Firebase Storage
+      const uploadResult = await uploadBytes(storageRef, blob, {
+        contentType: "image/png",
+      });
+
+      // 5. Grab the secure Firebase download URL (No Google API keys inside this!)
+      const firebaseDownloadUrl = await getDownloadURL(uploadResult.ref);
+
+      return firebaseDownloadUrl;
+    } catch (error) {
+      console.error(
+        "Failed to process and save route image to Firebase:",
+        error,
+      );
+      throw error;
     }
   };
 
@@ -620,11 +700,15 @@ export default function MileageForm() {
 
     try {
       let subToAddress = toAddress;
-      let subDistance = getHaversineDistance(originCoord, destCoord);
+      const distanceResult = await getDrivingDistance(originCoord, destCoord);
+      let subDistance = 0;
+      if (distanceResult) {
+        subDistance = parseFloat(distanceResult.toFixed(2));
+      }
       let subToll = await fetchTollCost(originCoord, destCoord);
       if (formGoingHome) {
-        const distToCurrent = getHaversineDistance(originCoord, destCoord);
-        const distToOffice = getHaversineDistance(
+        const distToCurrent = getDrivingDistance(originCoord, destCoord);
+        const distToOffice = getDrivingDistance(
           originCoord,
           officeCoords || { lat: 0, lng: 0 },
         );
@@ -633,7 +717,11 @@ export default function MileageForm() {
           console.log(`Route Comparison: Using Current.`);
         } else {
           console.log(`Route Comparison: Using Office.`);
-          subDistance = parseFloat(distToOffice.toFixed(2));
+          let subDistance: number = 0;
+          const distanceValue = await distToOffice;
+          if (distanceValue !== undefined) {
+            subDistance = parseFloat(distanceValue.toFixed(2));
+          }
           subToll = await fetchTollCost(
             originCoord,
             officeCoords || { lat: 0, lng: 0 },
@@ -649,7 +737,7 @@ export default function MileageForm() {
           }
         }
       }
-      //const distanceData = getHaversineDistance(originCoord, destCoord);
+      //const distanceData = getDrivingDistance(originCoord, destCoord);
       if (!subDistance) {
         console.log("from", originCoord, "to", destCoord);
         console.log("from", fromAddress, "to", toAddress);
@@ -659,12 +747,18 @@ export default function MileageForm() {
 
       let routeImageUrl = "";
       try {
-        routeImageUrl = await getRouteImageUrl(originCoord, destCoord);
+        routeImageUrl = await saveRouteImageToFirebase(originCoord, destCoord);
       } catch (imageError) {
         console.error("Error generating route image:", imageError);
       }
 
-      let mileage = subDistance * mileageRate;
+      let mileageRateTemp = mileageRate;
+
+      if (subDistance > outStationDistance) {
+        mileageRateTemp = mileageRateOutstation;
+      }
+
+      let mileage = (subDistance ?? 0) * mileageRateTemp;
 
       const tripToSave = {
         user_id: userId,
@@ -703,6 +797,7 @@ export default function MileageForm() {
       setShowTripModal(false);
     } catch (error) {
       console.error("Save error:", error);
+      console.log(error);
       alert("Failed to save trip.");
     } finally {
       setIsSaving(false);

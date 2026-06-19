@@ -48,6 +48,7 @@ interface User {
   grade: string;
   cost_center: string;
   role: number;
+  office: number;
   active: boolean;
 }
 
@@ -120,6 +121,20 @@ export default function settings() {
   const [isSaving, setIsSaving] = useState(false);
 
   const router = useRouter();
+
+  const roles = [
+    { value: "0", label: "Admin" },
+    { value: "2", label: "Manager" },
+    { value: "3", label: "Supervisor" },
+    { value: "1", label: "User" },
+  ];
+
+  const roleMap = {
+    0: "Admin",
+    1: "User",
+    2: "Manager",
+    3: "Supervisor",
+  };
 
   useEffect(() => {
     const auth = getAuth();
@@ -468,7 +483,7 @@ export default function settings() {
         mileage_rate_mobile: parseFloat(mobileMileageRate),
         mileage_rate_oustation: parseFloat(mileageRateOutstation),
         mileage_rate_outstation_mobile: parseFloat(mobileMileageRateOutstation),
-        outstation_disance: parseFloat(oustationDistance),
+        outstation_distance: parseFloat(oustationDistance),
       });
       Alert.alert("Success", "Mileage rate updated successfully!");
       setMileageModalVisible(false);
@@ -575,7 +590,8 @@ export default function settings() {
       formEssNo.trim() === "" ||
       formDepartment.trim() === "" ||
       formGrade.trim() === "" ||
-      formCostCenter.trim() === " "
+      formCostCenter.trim() === "" ||
+      formOffice.trim() === ""
     ) {
       Alert.alert("Signup Error", "Please fill in all fields.");
       return;
@@ -609,6 +625,7 @@ export default function settings() {
         department: formDepartment.trim(),
         grade: formGrade.trim(),
         cost_center: formCostCenter.trim(),
+        office: parseInt(formOffice),
         active: true,
         permission: 0,
         subordinates: [],
@@ -666,6 +683,7 @@ export default function settings() {
       setFormActive(userToAdd.active || true);
       setFormRole(userToAdd.role.toString() || "");
       setFormDepartment(userToAdd.department || "");
+      setFormOffice(userToAdd.office?.toString() || "");
     }
   };
 
@@ -787,7 +805,7 @@ export default function settings() {
                           ]}
                         >
                           <Text style={styles.boldLabel}>Role: </Text>
-                          {user.role}
+                          {roleMap[user.role] || "N/A"}
                         </Text>
                       </View>
                     </View>
@@ -1695,6 +1713,22 @@ export default function settings() {
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Office:</Text>
                           <select
+                            value={formOffice}
+                            onChange={(e) => setFormOffice(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select an Office...
+                            </option>
+                            <option value="1">HQ</option>
+                            <option value="2">Penang</option>
+                          </select>
+                        </View>
+                      </View>
+                      {/* <View style={styles.modalRow}>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Role:</Text>
+                          <select
                             value={formRole}
                             onChange={(e) => setFormRole(e.target.value)}
                             style={dropdownInput}
@@ -1708,7 +1742,7 @@ export default function settings() {
                             <option value="1">User</option>
                           </select>
                         </View>
-                      </View>
+                      </View> */}
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -1908,6 +1942,20 @@ export default function settings() {
                             <option value="1">User</option>
                             <option value="2">Manager</option>
                             <option value="3">Supervisor</option>
+                          </select>
+                        </View>
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>Office:</Text>
+                          <select
+                            value={formOffice}
+                            onChange={(e) => setFormOffice(e.target.value)}
+                            style={dropdownInput}
+                          >
+                            <option value="" disabled>
+                              Select an Office...
+                            </option>
+                            <option value="1">HQ</option>
+                            <option value="2">Penang</option>
                           </select>
                         </View>
                       </View>
