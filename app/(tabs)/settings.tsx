@@ -136,6 +136,11 @@ export default function settings() {
     3: "Supervisor",
   };
 
+  const officeMap = {
+    0: "HQ",
+    1: "Penang",
+  };
+
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -745,7 +750,7 @@ export default function settings() {
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalList}>
+            {/* <ScrollView style={styles.modalList}>
               {allUsers.map((user) => {
                 const isAdded = addedUsers.some(
                   (added) => added.id === user.id,
@@ -814,7 +819,169 @@ export default function settings() {
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </ScrollView> */}
+            <View style={styles.tableContainer}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Username</Text>
+                </View>
+                <View style={{ flex: 2, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Email</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Department</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Grade</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Cost Center</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Office</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Role</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Active</Text>
+                </View>
+              </View>
+
+              {/* Table Body */}
+              <ScrollView style={styles.modalList}>
+                {allUsers.map((user) => {
+                  const isAdded = addedUsers.some(
+                    (added) => added.id === user.id,
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[
+                        styles.tableRow,
+                        isAdded && styles.disabledUserItem,
+                      ]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        setSelectedUserId(user.id);
+                        setSelectUserModalVisible(false);
+                        handleSelectUser(user.id);
+                      }}
+                    >
+                      {/* Username */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.username}
+                        </Text>
+                      </View>
+
+                      {/* Email */}
+                      <View style={{ flex: 2 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.email}
+                        </Text>
+                      </View>
+
+                      {/* Department */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.department}
+                        </Text>
+                      </View>
+
+                      {/* Grade */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.grade}
+                        </Text>
+                      </View>
+
+                      {/* Cost Center */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.cost_center}
+                        </Text>
+                      </View>
+
+                      {/* Office */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {officeMap[user.office] || "N/A"}
+                        </Text>
+                      </View>
+
+                      {/* Role */}
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {roleMap[user.role] || "N/A"}
+                        </Text>
+                      </View>
+
+                      {/* Active */}
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.active === undefined
+                            ? "N/A"
+                            : user.active
+                              ? "True"
+                              : "False"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -2178,5 +2345,37 @@ const styles = StyleSheet.create({
   disabledUserItem: {
     backgroundColor: "#e0e0e0",
     opacity: 0.6,
+  },
+  tableContainer: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+    paddingRight: 12,
+  },
+  tableRow: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    alignItems: "center",
+  },
+  headerCell: {
+    fontWeight: "bold",
+    fontSize: 13,
+    color: "#333",
+  },
+  tableCell: {
+    fontSize: 13,
+    color: "#666",
   },
 });
