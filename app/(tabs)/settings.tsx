@@ -1720,8 +1720,8 @@ export default function settings() {
                             <option value="" disabled>
                               Select an Office...
                             </option>
-                            <option value="1">HQ</option>
-                            <option value="2">Penang</option>
+                            <option value="0">HQ</option>
+                            <option value="1">Penang</option>
                           </select>
                         </View>
                       </View>
@@ -1954,8 +1954,8 @@ export default function settings() {
                             <option value="" disabled>
                               Select an Office...
                             </option>
-                            <option value="1">HQ</option>
-                            <option value="2">Penang</option>
+                            <option value="0">HQ</option>
+                            <option value="1">Penang</option>
                           </select>
                         </View>
                       </View>
