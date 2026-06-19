@@ -664,6 +664,7 @@ export default function settings() {
     setFormCostCenter("");
     setFormRole("");
     setFormActive(true);
+    setFormOffice("");
   };
 
   const handleSelectUser = (userId: string) => {
@@ -706,6 +707,7 @@ export default function settings() {
         grade: formGrade.trim(),
         cost_center: formCostCenter.trim(),
         role: parseInt(formRole.trim()),
+        office: parseInt(formOffice.trim()),
         active: formActive,
       });
 
