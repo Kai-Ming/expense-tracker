@@ -212,12 +212,17 @@ export default function settings() {
                 officeCoord.latitude,
                 officeCoord.longitude,
               );
+              console.log("address");
+              console.log(address);
               setOfficeAddress(address || "");
             } catch (error) {
               console.log("Error fetching office address");
               console.log(error);
             }
           }
+
+          console.log("Office coords");
+          console.log(officeCoord);
         }
       },
     );
