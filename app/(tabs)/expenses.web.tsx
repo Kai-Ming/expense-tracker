@@ -29,7 +29,6 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { Dropdown } from "react-native-paper-dropdown";
 import { db, storage } from "../../firebaseConfig";
 
 interface Expense {
@@ -509,7 +508,7 @@ export default function ExpensesWebScreen() {
     );
   });
 
-  const filteredGeneralExpense = generalExpense.filter((e) => {
+  const filteredGeneralExpenses = generalExpense.filter((e) => {
     if (appliedExpenseType == "Mileage") return false;
     if (
       !e.date ||
@@ -680,196 +679,7 @@ export default function ExpensesWebScreen() {
     return `${day}/${month}/${year}`;
   };
 
-  const exportToHTML = () => {
-    if (Platform.OS !== "web") return;
-
-    const filteredExpenses = expenses.filter((e) => {
-      if (!e.date) return true;
-      const dateVal = e.date;
-      if (appliedStartDate && dateVal < appliedStartDate) return false;
-      if (appliedEndDate && dateVal > appliedEndDate) return false;
-      return true;
-    });
-
-    if (filteredExpenses.length === 0) {
-      alert("No expenses found for the selected date range.");
-      return;
-    }
-
-    // 1. Updated Headers Order
-    const headers = [
-      "Date",
-      "From",
-      "To",
-      "Submitted By",
-      "Purpose",
-      "Company/Site",
-      "Name",
-      "Contact No.",
-      "From Time",
-      "To Time",
-      "Duration",
-      "Parking (RM)",
-      "Toll (RM)",
-      "Mileage (RM)",
-      "Cost (RM)",
-    ];
-
-    // 2. Updated Row Mapping Order
-    const rows = filteredExpenses
-      .map(
-        (e) => `
-      <tr>
-        <td>${e.date}</td>
-        <td>${e.user_name || ""}</td>
-        <td>${e.purpose}</td>
-        <td>${e.company || ""}</td>
-        <td>${e.name}</td>
-        <td>${e.contact_number || ""}</td>
-        <td>${e.from_time || ""}</td>
-        <td>${e.to_time || ""}</td>
-        <td>${e.duration || ""}</td>
-        <td>${e.parking.toFixed(2)}</td>
-        <td>${e.toll.toFixed(2)}</td>
-        <td>${e.mileage.toFixed(2)}</td>
-        <td>${e.cost.toFixed(2)}</td>
-      </tr>
-    `,
-      )
-      .join("");
-
-    const totalParking = filteredExpenses.reduce(
-      (sum, e) => sum + (e.parking || 0),
-      0,
-    );
-    const totalToll = filteredExpenses.reduce(
-      (sum, e) => sum + (e.toll || 0),
-      0,
-    );
-    const totalMileage = filteredExpenses.reduce(
-      (sum, e) => sum + (e.mileage || 0),
-      0,
-    );
-    const totalCost = filteredExpenses.reduce(
-      (sum, e) => sum + (e.cost || 0),
-      0,
-    );
-
-    const footerRow = `
-      <tr style="font-weight: bold; background-color: #eee;">
-        <td colspan="11" style="text-align: right;">TOTAL:</td>
-        <td>${totalParking.toFixed(2)}</td>
-        <td>${totalToll.toFixed(2)}</td>
-        <td>${totalMileage.toFixed(2)}</td>
-        <td>${totalCost.toFixed(2)}</td>
-      </tr>
-    `;
-
-    const detailsHtml = filteredExpenses
-      .map(
-        (e) => `
-      <div class="expense-detail">
-        <h3>${e.company}, ${e.name} - ${e.purpose} (${e.date || "N/A"} ${e.from_time}-${e.to_time})</h3>
-        <p><strong>Purpose:</strong> ${e.purpose}</p>
-        <p><strong>Company/Site:</strong> ${e.company}</p>
-        <p><strong>Name:</strong> ${e.name}</p>
-        <p><strong>Contact No.:</strong> ${e.contact_number}</p>
-        <p><strong>From Time:</strong> ${e.from_time}</p>
-        <p><strong>To Time:</strong> ${e.to_time}</p>
-        <p><strong>Duration:</strong> ${e.duration}</p>
-        <p><strong>Parking (RM):</strong> ${e.parking.toFixed(2)}</p>
-        <p><strong>Toll (RM):</strong> ${e.toll.toFixed(2)}</p>
-        <p><strong>Mileage (RM):</strong> ${e.mileage.toFixed(2)}</p>
-        <p><strong>Cost (RM):</strong> ${e.cost.toFixed(2)}</p>
-        <p><strong>Trip Report:</strong> ${e.trip_report}</p>
-        ${
-          e.route_image_url
-            ? `
-          <div class="image-container">
-            <strong>Route Map:</strong><br/>
-            <img src="${e.route_image_url}" alt="Route Map" />
-          </div>
-        `
-            : ""
-        }
-        ${
-          e.business_card_url
-            ? `
-          <div class="image-container">
-            <strong>Business Card:</strong><br/>
-            <img src="${e.business_card_url}" alt="Business Card" />
-          </div>
-        `
-            : "<p><em>No business card attached</em></p>"
-        }
-      </div>
-    `,
-      )
-      .join(
-        "<hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;' />",
-      );
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Expense Report</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; color: #333; }
-          table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 40px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #808080; color: white; text-transform: uppercase; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-          h2 { color: #808080; }
-          .expense-detail { margin-top: 20px; page-break-inside: avoid; }
-          .expense-detail h3 { border-bottom: 2px solid #808080; padding-bottom: 5px; color: #808080; }
-          .image-container img { max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px; }
-        </style>
-      </head>
-      <body>
-        <h2>Expense Report - Generated on ${new Date().toLocaleDateString()}</h2>
-        <table>
-          <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-          <tbody>
-            ${rows}
-            ${footerRow}
-          </tbody>
-        </table>
-
-        <h2 style="margin-top: 60px;">Detailed Records</h2>
-        ${detailsHtml}
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `expenses_report_${new Date().toISOString().split("T")[0]}.html`,
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const toDataURL = (url) =>
-    fetch(url)
-      .then((res) => res.blob())
-      .then(
-        (blob) =>
-          new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          }),
-      );
-
-  const exportToPdf = () => {
+  const exportToPdf1 = () => {
     // Normalize a mileage expense
     console.log("export");
     const normalizeMileage = (item) => ({
@@ -905,7 +715,7 @@ export default function ExpensesWebScreen() {
 
     const combinedData = [
       ...filteredExpenses.map(normalizeMileage),
-      ...filteredGeneralExpense.map(normalizeGeneral),
+      ...filteredGeneralExpenses.map(normalizeGeneral),
     ];
 
     const totalParking = combinedData.reduce(
@@ -1036,6 +846,8 @@ export default function ExpensesWebScreen() {
               padding-left: 10px;
               padding-right: 10px;
               page-break-inside: avoid;
+              page-break-after: always;
+              break-after: page;
             }
 
             .signature-block {
@@ -1089,6 +901,34 @@ export default function ExpensesWebScreen() {
             .page-break {
               page-break-before: always;
               break-before: page;
+            }
+
+            .details-container {
+              display: flex;
+              flex-direction: column;
+              padding: 10px 0;
+              border-bottom: 1.5px solid #e2e8f0;
+            }
+
+            .details-row {
+              display: flex;
+              flex-direction: row;
+            }
+
+            .details {
+              display: flex;
+              flex-direction: column;
+              margin-right: 30px;
+            }
+
+            .details-label {
+              color: #cccccc;
+              font-size: 9px;
+              font-weight: bold;
+            }
+
+            .details-value {  
+              font-size: 9px;
             }
           </style>
         </head>
@@ -1178,6 +1018,787 @@ export default function ExpensesWebScreen() {
                 <p class="signature-date">Date: </p>
               </div>
             </div>
+            <div>
+              <h1>Detailed Reports from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
+              ${filteredExpenses
+                .map(
+                  (item) => `
+                  <div class="details-container">
+                    <div class="details-row">
+                      <div class="details">
+                        <div class="details-label">Username: </div>
+                        <div class="details-value">${item.user_name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Date: </div>
+                        <div class="details-value">${item.date}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Type: </div>
+                        <div class="details-value">Mileage Expense</div>
+                      </div>
+
+                    </div>
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Customer Name: </div>
+                        <div class="details-value">${item.name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Company: </div>
+                        <div class="details-value">${item.company}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Contact Number: </div>
+                        <div class="details-value">${item.contact_number}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Email: </div>
+                        <div class="details-value">${item.email}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Purpose: </div>
+                        <div class="details-value">${item.purpose}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Distance: </div>
+                        <div class="details-value">${item.distance} km</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Time: </div>
+                        <div class="details-value">${item.from_time} - ${item.to_time} (${item.duration})</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Parking: </div>
+                        <div class="details-value">RM ${item.parking}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Toll: </div>
+                        <div class="details-value">RM ${item.toll}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Mileage: </div>
+                        <div class="details-value">RM ${item.mileage}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Expense: </div>
+                        <div class="details-value">RM ${item.expense}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Expense Purpose: </div>
+                        <div class="details-value">${item.expense_purpose || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Trip Report: </div>
+                        <div class="details-value">${item.trip_report}</div>
+                      </div>
+                    </div>
+
+                  </div>
+                `,
+                )
+                .join("")}
+
+              ${filteredGeneralExpenses
+                .map(
+                  (item) => `
+                  <div class="details-container">
+                    <div class="details-row">
+                      <div class="details">
+                        <div class="details-label">Username: </div>
+                        <div class="details-value">${item.user_name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Date: </div>
+                        <div class="details-value">${item.date}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Type: </div>
+                        <div class="details-value">General Expense</div>
+                      </div>
+
+                    </div>
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Customer Name: </div>
+                        <div class="details-value">${item.name || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Company: </div>
+                        <div class="details-value">${item.company || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Contact Number: </div>
+                        <div class="details-value">${item.contact_number || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Email: </div>
+                        <div class="details-value">${item.email || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Purpose: </div>
+                        <div class="details-value">${item.expense_type}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Parking: </div>
+                        <div class="details-value">RM ${item.amount}</div>
+                      </div>
+                    </div>
+
+
+
+                    <div class="details-row" style="margin-top: 10">
+                      <div class="details">
+                        <div class="details-label">Trip Report: </div>
+                        <div class="details-value">${item.expense_report}</div>
+                      </div>
+                    </div>
+
+                  </div>
+                `,
+                )
+                .join("")}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      document.body.removeChild(iframe);
+    }, 500);
+  };
+
+  const exportToPdf = () => {
+    // Normalize a mileage expense
+    console.log("export");
+
+    // Convert allTrips array to a map for easy lookup
+    const tripsMap = {};
+    allTrips.forEach((trip) => {
+      tripsMap[trip.id] = trip;
+    });
+
+    const normalizeMileage = (item) => ({
+      date: item.date || "",
+      typeOfExpense: "Local Mileage",
+      purpose: item.purpose || "",
+      name: item.name || "",
+      email: item.email || "",
+      contactNumber: item.contact_number || "",
+      parking: item.parking || 0,
+      toll: item.toll || 0,
+      mileage: item.mileage || 0,
+      expense: item.expense || 0,
+      expensePurpose: item.expense_purpose || "",
+      subTotal: item.cost || 0,
+      trip_ids: item.trip_ids || [],
+    });
+
+    // Normalize a general expense
+    const normalizeGeneral = (item) => ({
+      date: item.date || "",
+      typeOfExpense: "General Expense",
+      purpose: item.purpose || "",
+      name: item.name || "",
+      email: item.email || "",
+      contactNumber: item.contact_number || "",
+      parking: 0,
+      toll: 0,
+      mileage: 0,
+      expense: parseFloat(item.amount) || 0,
+      expensePurpose: item.expense_type || "",
+      subTotal: parseFloat(item.amount) || 0,
+      trip_ids: [],
+    });
+
+    // Function to get trip by ID from the tripsMap
+    const getTripById = (tripId) => {
+      return tripsMap[tripId] || null;
+    };
+
+    // Function to format Firebase timestamp to 12-hour time format
+    const formatFirebaseTime = (timestamp) => {
+      if (!timestamp) return "N/A";
+
+      // If it's a Firebase timestamp object with seconds and nanoseconds
+      if (timestamp.seconds !== undefined) {
+        const date = new Date(timestamp.seconds * 1000);
+        return date.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
+
+      // If it's a string, try to parse it
+      if (typeof timestamp === "string") {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+        }
+        return timestamp; // Return as is if not a valid date
+      }
+
+      // If it's a Date object
+      if (timestamp instanceof Date) {
+        return timestamp.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
+
+      return "N/A";
+    };
+
+    // Function to generate trip details HTML
+    const generateTripDetails = (tripIds) => {
+      if (!tripIds || !Array.isArray(tripIds) || tripIds.length === 0) {
+        return "";
+      }
+
+      return tripIds
+        .map((tripId) => {
+          const trip = getTripById(tripId);
+
+          if (trip) {
+            const distance = trip.distance?.toFixed(2) || "0.00";
+            const platform = trip.platform === 1 ? "Web" : "Mobile";
+            const goingHome = trip.to_home === true ? "True" : "False";
+
+            const fromTime = formatFirebaseTime(trip.from_time);
+            const toTime = formatFirebaseTime(trip.to_time);
+
+            return `
+            <div style="margin-bottom: 8px; padding: 5px 0; border-bottom: 1px solid #f0f0f0;">
+              <div style="font-size: 9px; color: #888;"><strong>Platform: </strong>${platform}</div>
+              ${trip.remark ? `<div style="font-size: 9px; color: #666;"><strong>Remark: </strong>${trip.remark}</div>` : ""}
+              <div style="font-size: 9px; color: #888;"><strong>Time: </strong>${fromTime} - ${toTime}</div>
+              <div style="font-size: 10px; color: #333; margin-bottom: 2px;">
+                <strong>Trip: </strong>${trip.from_address || "N/A"} → ${trip.to_address || "N/A"} (${distance} km)
+              </div>
+              
+              
+              <strong>Going Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;"><strong>Going Home: </strong>${goingHome}</div>` : ""}
+              
+              
+            </div>
+          `;
+          } else {
+            return `
+            <div style="font-size: 9px; color: #999; padding: 3px 0;">
+              Trip data not available (ID: ${tripId})
+            </div>
+          `;
+          }
+        })
+        .join("");
+    };
+
+    const combinedData = [
+      ...filteredExpenses.map(normalizeMileage),
+      ...filteredGeneralExpenses.map(normalizeGeneral),
+    ];
+
+    const totalParking = combinedData.reduce(
+      (sum, item) => sum + item.parking,
+      0,
+    );
+    const totalToll = combinedData.reduce((sum, item) => sum + item.toll, 0);
+    const totalMileage = combinedData.reduce(
+      (sum, item) => sum + item.mileage,
+      0,
+    );
+    const totalExpense = combinedData.reduce(
+      (sum, item) => sum + item.expense,
+      0,
+    );
+    const totalAmount = combinedData.reduce(
+      (sum, item) => sum + item.subTotal,
+      0,
+    );
+
+    const formattedParking = totalParking.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formattedToll = totalToll.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formattedMileage = totalMileage.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formattedExpense = totalExpense.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formattedTotal = totalAmount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 15mm 10mm 15mm 10mm;
+              margin-trim: ahead behind;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 0;
+              color: #333;
+            }
+
+            .print-container {
+              width: 100%;
+              box-sizing: border-box;
+            }
+
+            .report-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #e2e8f0;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .header-logo {
+              flex: 1;
+              text-align: left;
+            }
+            .header-logo img {
+              max-height: 60px;
+              width: auto;
+            }
+            .header-title {
+              flex: 2;
+              text-align: center;
+            }
+            .header-title h1 {
+              color: #0284c7;
+              font-size: 24px;
+              margin: 0;
+              border-bottom: none;
+              padding-bottom: 0;
+            }
+            .header-empty {
+              flex: 1;
+            }
+            
+            h1 { color: #0284c7; font-size: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #cbd5e1; padding: 3px; text-align: left; font-size: 9px; }
+            th { background-color: #f1f5f9; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            
+            /* Prevent rows from splitting cleanly down the middle across pages */
+            tr { page-break-inside: avoid; } 
+            td.amount {
+              text-align: right;
+            }
+
+            td.total-label {
+              border: none;
+              text-align: right;
+              font-weight: bold;
+              font-size: 13px;
+              padding: 3px;
+              background-color: transparent;
+            }
+            td.total-amount {
+              border-left: none;
+              border-right: none;
+              border-bottom: none;
+              border-top: 2px solid #0f172a;
+              font-weight: bold;
+              font-size: 13px;
+              padding: 3px;
+            }
+            .signature-container {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 60px;
+              padding-left: 10px;
+              padding-right: 10px;
+              page-break-inside: avoid;
+              page-break-after: always;
+              break-after: page;
+            }
+
+            .signature-block {
+              width: 30%;
+              display: flex;
+              flex-direction: column;
+            }
+
+            .signature-line {
+              border-bottom: 1.5px solid #0f172a;
+              margin-bottom: 8px;
+              margin-top: 50px;
+            }
+
+            .signature-label {
+              font-size: 12px;
+              font-weight: bold;
+              color: #1e293b;
+              margin: 0;
+            }
+
+            .signature-date {
+              font-size: 11px;
+              color: #64748b;
+              margin-top: 6px;
+              margin-bottom: 0;
+            }
+
+            .report-title {
+              margin-bottom: 0;
+              margin-top: 0;
+            }
+
+            .report-due {
+              margin-bottom: 5;
+              margin-top: 0;
+            }
+
+            .employee-info-section {
+              display: flex;
+              flex-direction: row;
+              justify-content: space-between;
+            }
+
+            .employee-info {
+              display: flex;
+              flex-direction: row;
+              margin-right: 20px;
+            }
+
+            .page-break {
+              page-break-before: always;
+              break-before: page;
+            }
+
+            .details-container {
+              display: flex;
+              flex-direction: column;
+              padding: 10px 0;
+              border-bottom: 1.5px solid #e2e8f0;
+            }
+
+            .details-row {
+              display: flex;
+              flex-direction: row;
+              flex-wrap: wrap;
+            }
+
+            .details {
+              display: flex;
+              flex-direction: column;
+              margin-right: 30px;
+              margin-bottom: 5px;
+            }
+
+            .details-label {
+              color: #cccccc;
+              font-size: 9px;
+              font-weight: bold;
+            }
+
+            .details-value {  
+              font-size: 9px;
+            }
+
+            .trip-details-container {
+              width: 100%;
+              margin-top: 5px;
+            }
+
+            .trip-item {
+              margin-bottom: 8px;
+              padding: 5px 0;
+              border-bottom: 1px solid #f0f0f0;
+            }
+
+            .trip-item:last-child {
+              border-bottom: none;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="report-header">
+              <div class="header-logo">
+                <img src="data:image/png;base64,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" alt="" width="100" height="71" />
+              </div>
+              <div class="header-title">
+                <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
+                <strong><p class="report-title">MONTHLY LOCAL TRAVELLING CLAIM</p></strong>
+                <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER EXPENSES INCURRED</p>
+              </div>
+              <div class="header-empty"></div>
+            </div>
+            <h1>Expense Report from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
+            <div class="employee-info-section">
+            <div class="employee-info">Name: <u>${username}</u></div>
+            <div class="employee-info">ESS No: <u>${essNo}</u></div>
+            <div class="employee-info">Department: <u>${department}</u></div>
+            <div class="employee-info">Grade: <u>${grade}</u></div>
+            <div class="employee-info">Cost Center: <u>${costCenter}</u></div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type of Expense</th>
+                  <th>Purpose</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Contact Number</th>
+                  <th>Expense Purpose</th>
+                  <th>Expense</th>
+                  <th>Parking</th>
+                  <th>Toll</th>
+                  <th>Mileage</th>
+                  <th>Sub Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${combinedData
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${formatDateString(item.date)}</td>
+                        <td>${item.typeOfExpense}</td>
+                        <td>${item.purpose}</td>
+                        <td>${item.name}</td>
+                        <td>${item.email}</td>
+                        <td>${item.contactNumber}</td>
+                        <td>${item.expensePurpose}</td>
+                        <td class="amount">${item.expense.toFixed(2)}</td>
+                        <td class="amount">${item.parking.toFixed(2)}</td>
+                        <td class="amount">${item.toll.toFixed(2)}</td>
+                        <td class="amount">${item.mileage.toFixed(2)}</td>
+                        <td class="amount">${item.subTotal.toFixed(2)}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+                  
+                <tr class="total-row">
+                  <td colspan="7" class="total-label">Total:</td>
+                  <td style="font-weight: bold;">${formattedExpense}</td>
+                  <td style="font-weight: bold;">${formattedParking}</td>
+                  <td style="font-weight: bold;">${formattedToll}</td>
+                  <td style="font-weight: bold;">${formattedMileage}</td>
+                  <td style="font-weight: bold;">${formattedTotal}</td>
+                </tr>
+              </tbody>
+              
+            </table>
+            <div class="signature-container">
+              <div class="signature-block">
+                <p class="signature-label">Requested By:</p>
+                <div class="signature-line"></div>
+                <p class="signature-date">Name: ${username}</p>
+                <p class="signature-date">Date: ${getCurrentDate()}</p>
+              </div>
+
+              <div class="signature-block">
+                <p class="signature-label">Approved By:</p>
+                <div class="signature-line"></div>
+                <p class="signature-date">Name: </p>
+                <p class="signature-date">Date: </p>
+              </div>
+            </div>
+            <div>
+              <h1>Detailed Reports from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
+              ${filteredExpenses
+                .map(
+                  (item) => `
+                  <div class="details-container">
+                    <div class="details-row">
+                      <div class="details">
+                        <div class="details-label">Username: </div>
+                        <div class="details-value">${item.user_name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Date: </div>
+                        <div class="details-value">${item.date}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Type: </div>
+                        <div class="details-value">Mileage Expense</div>
+                      </div>
+                    </div>
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Customer Name: </div>
+                        <div class="details-value">${item.name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Company: </div>
+                        <div class="details-value">${item.company}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Contact Number: </div>
+                        <div class="details-value">${item.contact_number}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Email: </div>
+                        <div class="details-value">${item.email}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Purpose: </div>
+                        <div class="details-value">${item.purpose}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Distance: </div>
+                        <div class="details-value">${item.distance} km</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Time: </div>
+                        <div class="details-value">${item.from_time} - ${item.to_time} (${item.duration})</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Parking: </div>
+                        <div class="details-value">RM ${item.parking}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Toll: </div>
+                        <div class="details-value">RM ${item.toll}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Mileage: </div>
+                        <div class="details-value">RM ${item.mileage}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Expense: </div>
+                        <div class="details-value">RM ${item.expense}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Expense Purpose: </div>
+                        <div class="details-value">${item.expense_purpose || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Trip Report: </div>
+                        <div class="details-value">${item.trip_report}</div>
+                      </div>
+                    </div>
+                    
+                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
+                      <div class="details" style="flex: 1; width: 100%;">
+                        <div class="details-label">Trip Details: </div>
+                        <div class="details-value trip-details-container">
+                          ${generateTripDetails(item.trip_ids || [])}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `,
+                )
+                .join("")}
+
+              ${filteredGeneralExpenses
+                .map(
+                  (item) => `
+                  <div class="details-container">
+                    <div class="details-row">
+                      <div class="details">
+                        <div class="details-label">Username: </div>
+                        <div class="details-value">${item.user_name}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Date: </div>
+                        <div class="details-value">${item.date}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Type: </div>
+                        <div class="details-value">General Expense</div>
+                      </div>
+                    </div>
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Customer Name: </div>
+                        <div class="details-value">${item.name || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Company: </div>
+                        <div class="details-value">${item.company || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Contact Number: </div>
+                        <div class="details-value">${item.contact_number || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Email: </div>
+                        <div class="details-value">${item.email || "N/A"}</div>
+                      </div>
+                    </div>
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Purpose: </div>
+                        <div class="details-value">${item.expense_type}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Expense Amount: </div>
+                        <div class="details-value">RM ${item.amount}</div>
+                      </div>
+                    </div>
+                    <div class="details-row" style="margin-top: 10px;">
+                      <div class="details">
+                        <div class="details-label">Trip Report: </div>
+                        <div class="details-value">${item.expense_report}</div>
+                      </div>
+                    </div>
+                  </div>
+                `,
+                )
+                .join("")}
+            </div>
           </div>
         </body>
       </html>
@@ -1212,31 +1833,6 @@ export default function ExpensesWebScreen() {
     { header: "Role", dataKey: "role" },
   ];
 
-  const handleExport = async () => {
-    console.log("exporting");
-    /* if (Platform.OS === "web") {
-      // Dynamic import stops node-specific dependencies from breaking Webpack/Vite bundles
-      const { pdf } = await import("@react-pdf/renderer");
-
-      // Convert the component layout dynamically into a browser file blob
-      const blob = await pdf(<PdfReport data={expenses} />).toBlob();
-
-      // Create a virtual download link in the browser DOM
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "ExportedData.pdf";
-      link.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // For Native Mobile Apps (iOS/Android):
-      // Use expo-print (if using Expo) or react-native-html-to-pdf
-      alert(
-        "Mobile export triggered (Implement using Native FS / Print layout API)",
-      );
-    } */
-  };
-
   const formatDateString = (dateString?: string) => {
     if (!dateString) return "N/A";
 
@@ -1255,6 +1851,35 @@ export default function ExpensesWebScreen() {
     return new Date(timestamp).toLocaleDateString();
   };
 
+  const formatFirebaseTime = (timestamp: any) => {
+    if (!timestamp) return "N/A";
+
+    // 1. Handle standard Firebase Timestamp object
+    if (timestamp && typeof timestamp === "object" && "seconds" in timestamp) {
+      const date = new Date(timestamp.seconds * 1000);
+      return date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+
+    // 2. Fallback: If it's already a native JS Date object
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+
+    // 3. Fallback: If it's a string or anything else, try to force stringify it safely
+    if (typeof timestamp === "string") return timestamp;
+
+    // 4. CRITICAL: Absolute fallback to ensure an object is NEVER returned to React
+    return "N/A";
+  };
+
   const format12Hour = (timeStr?: string) => {
     if (!timeStr) return "";
     const [hours24, minutes] = timeStr.split(":").map(Number);
@@ -1263,842 +1888,6 @@ export default function ExpensesWebScreen() {
     const hoursStr = hours12.toString().padStart(2, "0");
     const minutesStr = minutes.toString().padStart(2, "0");
     return `${hoursStr}:${minutesStr} ${period}`;
-  };
-
-  const renderItem = ({ item }: { item: Expense }) => {
-    const isExpanded = expandedId === item.id;
-    const isEditing = editingId === item.id;
-
-    if (Platform.OS === "web") {
-      return (
-        <React.Fragment key={item.id}>
-          <tr
-            style={{ cursor: "pointer", borderBottom: "1px solid #eee" }}
-            onClick={() => {
-              console.log(role);
-              setExpandedId(isExpanded ? null : item.id);
-            }}
-          >
-            <td style={webTableStyles.td}>{item.user_name || "N/A"}</td>
-            <td style={webTableStyles.td}>
-              {formatDateString(item.date) || "N/A"}
-            </td>
-            <td style={webTableStyles.td}>
-              {format12Hour(item.from_time)} - {format12Hour(item.to_time)} (
-              {item.duration})
-            </td>
-            <td style={webTableStyles.td}>{item.purpose}</td>
-            <td style={webTableStyles.td}>{item.company}</td>
-            <td style={webTableStyles.td}>{item.name}</td>
-            {/* <td style={webTableStyles.td}>{item.id}</td> */}
-            <td
-              style={{
-                ...webTableStyles.td,
-                fontWeight: "bold",
-                color: "#2196F3",
-              }}
-            >
-              RM{" "}
-              {isEditing
-                ? (editFormData.cost || 0).toFixed(2)
-                : item.cost.toFixed(2)}
-            </td>
-          </tr>
-          {isExpanded && (
-            <tr>
-              <td
-                colSpan={7}
-                style={{ padding: "20px", backgroundColor: "#f9f9f9" }}
-              >
-                <View style={styles.expandedContent}>
-                  <View style={styles.section}>
-                    <Text style={styles.descriptionLabel}>Submitted By:</Text>
-                    <Text style={styles.descriptionText}>
-                      {item.user_name || "N/A"}
-                    </Text>
-                  </View>
-
-                  <View style={styles.section}>
-                    <Text style={styles.descriptionLabel}>Date:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.date}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, date: text })
-                        }
-                        placeholder="YYYY-MM-DD"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>{item.date}</Text>
-                    )}
-
-                    {isEditing ? (
-                      <Text style={styles.descriptionLabel}>Purpose:</Text>
-                    ) : (
-                      <></>
-                    )}
-                    {isEditing ? (
-                      <select
-                        value={editFormData.purpose}
-                        onChange={(e) =>
-                          setEditFormData({
-                            ...editFormData,
-                            purpose: e.target.value,
-                          })
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          backgroundColor: "#f9f9f9",
-                          fontSize: "14px",
-                          width: "100%",
-                          maxWidth: 400,
-                          marginBottom: 10,
-                          height: "auto",
-                        }}
-                      >
-                        <option value="" disabled>
-                          Select a purpose...
-                        </option>
-                        {purposeList.map((p) => (
-                          <option key={p.value} value={p.value}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <></>
-                    )}
-
-                    {isEditing ? (
-                      <Text style={styles.descriptionLabel}>Company:</Text>
-                    ) : (
-                      <></>
-                    )}
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.company}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, company: text })
-                        }
-                        placeholder="Company"
-                      />
-                    ) : (
-                      <></>
-                    )}
-
-                    {isEditing ? (
-                      <Text style={styles.descriptionLabel}>Name:</Text>
-                    ) : (
-                      <></>
-                    )}
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={editFormData.name}
-                        onChangeText={(text) =>
-                          setEditFormData({ ...editFormData, name: text })
-                        }
-                        placeholder="Name"
-                      />
-                    ) : (
-                      <></>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>
-                      Time and Duration:
-                    </Text>
-                    {isEditing ? (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          gap: 10,
-                          backgroundColor: "transparent",
-                        }}
-                      >
-                        <TextInput
-                          style={[styles.inlineInput, { flex: 1 }]}
-                          value={editFormData.from_time}
-                          onChangeText={(text) =>
-                            setEditFormData({
-                              ...editFormData,
-                              from_time: text,
-                            })
-                          }
-                          placeholder="Start (e.g. 09:00)"
-                        />
-                        <TextInput
-                          style={[styles.inlineInput, { flex: 1 }]}
-                          value={editFormData.to_time}
-                          onChangeText={(text) =>
-                            setEditFormData({ ...editFormData, to_time: text })
-                          }
-                          placeholder="End (e.g. 17:00)"
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {format12Hour(item.from_time)} -{" "}
-                        {format12Hour(item.to_time)} ({item.duration})
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Parking:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { width: 100 }]}
-                        value={editFormData.parking?.toString()}
-                        onChangeText={(text) =>
-                          setEditFormData((prev) => {
-                            const parking = parseFloat(text) || 0;
-                            return {
-                              ...prev,
-                              parking,
-                              cost:
-                                (prev.mileage || 0) +
-                                parking +
-                                (prev.toll || 0),
-                            };
-                          })
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        RM {item.parking.toFixed(2)}
-                      </Text>
-                    )}
-                    <Text style={styles.descriptionText}>
-                      RM {item.parking.toFixed(2)}
-                    </Text>
-
-                    <Text style={styles.descriptionLabel}>Toll:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { width: 100 }]}
-                        value={editFormData.toll?.toString()}
-                        onChangeText={(text) =>
-                          setEditFormData((prev) => {
-                            const toll = parseFloat(text) || 0;
-                            return {
-                              ...prev,
-                              toll,
-                              cost:
-                                (prev.mileage || 0) +
-                                (prev.parking || 0) +
-                                toll,
-                            };
-                          })
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        RM {item.toll.toFixed(2)}
-                      </Text>
-                    )}
-
-                    <Text style={styles.descriptionLabel}>Mileage:</Text>
-                    <Text style={styles.descriptionText}>
-                      RM{" "}
-                      {isEditing
-                        ? (editFormData.mileage || 0).toFixed(2)
-                        : item.mileage.toFixed(2)}
-                    </Text>
-
-                    <Text style={styles.descriptionLabel}>Trip Report:</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.inlineInput, { minHeight: 60 }]}
-                        value={editFormData.trip_report}
-                        onChangeText={(text) =>
-                          setEditFormData({
-                            ...editFormData,
-                            trip_report: text,
-                          })
-                        }
-                        multiline
-                        placeholder="Trip Summary"
-                      />
-                    ) : (
-                      <Text style={styles.descriptionText}>
-                        {item.trip_report || "N/A"}
-                      </Text>
-                    )}
-
-                    {item.trip_ids && item.trip_ids.length > 0 && (
-                      <View style={styles.section}>
-                        <Text style={styles.descriptionLabel}>Trips:</Text>
-                        {item.trip_ids.map((tripId) => {
-                          const trip = getTripById(tripId);
-                          return trip ? (
-                            <View key={tripId} style={styles.tripItem}>
-                              <Text style={styles.descriptionText}>
-                                {trip.from_address} → {trip.to_address} (
-                                {trip.distance?.toFixed(2)} km)
-                              </Text>
-                              <Text style={styles.tripRemark}>
-                                {trip.remark}
-                              </Text>
-                              <Text style={styles.tripRemark}>
-                                {trip.platform === 1 ? "Web" : "Mobile"}
-                              </Text>
-                              <Text style={styles.tripRemark}>
-                                {trip.to_home === true ? "Going Home" : ""}
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text key={tripId} style={styles.descriptionText}>
-                              Trip data not available
-                            </Text>
-                          );
-                        })}
-                      </View>
-                    )}
-
-                    {item.receipt_urls && item.receipt_urls?.length > 0 && (
-                      <View style={styles.section}>
-                        <Text style={styles.descriptionLabel}>Receipts:</Text>
-                        {item.receipt_urls.map((receiptUrl) => (
-                          <TouchableOpacity
-                            key={receiptUrl}
-                            style={[{ marginBottom: 10 }]}
-                            onPress={(e) => {
-                              console.log(receiptUrl);
-                              handleOpenLink(receiptUrl);
-                            }}
-                          >
-                            <Text
-                              style={[
-                                styles.descriptionText,
-                                { color: "#2196F3", fontWeight: "semibold" },
-                              ]}
-                            >
-                              {receiptUrl}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-
-                    {item.trip_ids && item.trip_ids.length > 0 && (
-                      <View style={styles.section}>
-                        <Text style={styles.descriptionLabel}>
-                          Trip Route Maps:
-                        </Text>
-                        {item.trip_ids.map((tripId) => {
-                          const trip = getTripById(tripId);
-                          if (!trip || !trip.route_image_url) return null;
-                          return (
-                            <TouchableOpacity
-                              key={tripId}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                setSelectedImage(trip.route_image_url || null);
-                              }}
-                            >
-                              <Image
-                                source={{ uri: trip.route_image_url }}
-                                style={styles.businessCardImage}
-                                resizeMode="contain"
-                              />
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
-
-                    {item.business_card_url && (
-                      <>
-                        <Text style={styles.descriptionLabel}>
-                          Business Card:
-                        </Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setSelectedImage(item.business_card_url || null);
-                          }}
-                        >
-                          <Image
-                            source={{ uri: item.business_card_url }}
-                            style={styles.businessCardImage}
-                            resizeMode="contain"
-                          />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                  {/*{item.user_id === userId && (
-                    <>
-                      <View style={styles.actionButtonsContainer}>
-                        {isEditing ? (
-                          <>
-                            <TouchableOpacity
-                              style={styles.approveButton}
-                              onPress={() => handleSaveEditMileage()}
-                            >
-                              <Text style={styles.approveButtonText}>Save</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.rejectButton}
-                              onPress={() => handleCancelEdit()}
-                            >
-                              <Text style={styles.rejectButtonText}>
-                                Cancel
-                              </Text>
-                            </TouchableOpacity>
-                          </>
-                        ) : (
-                          item.approval_status === 0 && (
-                            <TouchableOpacity
-                              style={styles.editButton}
-                              onPress={() => handleEditMileage(item)}
-                            >
-                              <Text style={styles.editButtonText}>Edit</Text>
-                            </TouchableOpacity>
-                          )
-                        )}
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => handleDelete(item.id)}
-                        >
-                          <Text style={styles.deleteButtonText}>Delete</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}*/}
-
-                  {/* <View style={styles.actionButtonsContainer}>
-                    {role === 0 && item.approval_status === 0 && (
-                      <>
-                        <TouchableOpacity
-                          style={styles.approveButton}
-                          onPress={() => handleStatus(item.id, 1)}
-                        >
-                          <Text style={styles.approveButtonText}>Approve</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          onPress={() => handleStatus(item.id, 2)}
-                        >
-                          <Text style={styles.rejectButtonText}>Reject</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View> */}
-                </View>
-              </td>
-            </tr>
-          )}
-        </React.Fragment>
-      );
-    }
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => {
-          if (isEditing) {
-            return;
-          }
-          setExpandedId(isExpanded ? null : item.id);
-        }}
-        style={styles.card}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.purpose}
-          </Text>
-          <Text style={styles.cost}>RM {item.cost.toFixed(2)}</Text>
-        </View>
-        <View style={styles.cardFooter}>
-          <Text style={styles.companyText} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.date}>{item.date || "N/A"}</Text>
-        </View>
-        <View style={[styles.cardFooter, { marginTop: 2 }]}>
-          <Text
-            style={[styles.companyText, { fontSize: 13 }]}
-            numberOfLines={1}
-          >
-            {item.company}
-          </Text>
-          {item.from_time && item.to_time && (
-            <Text style={[styles.date, { fontSize: 13 }]}>
-              {format12Hour(item.from_time)} - {format12Hour(item.to_time)}
-            </Text>
-          )}
-        </View>
-
-        {isExpanded && (
-          <View style={styles.expandedContent}>
-            <View style={styles.separator} />
-
-            <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Date:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.date}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, date: text })
-                  }
-                  placeholder="YYYY-MM-DD"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>{item.date || "N/A"}</Text>
-              )}
-
-              <Text style={styles.descriptionLabel}>Purpose:</Text>
-              {isEditing ? (
-                <Dropdown
-                  label={"Purpose"}
-                  mode={"outlined"}
-                  visible={showPurposeDropDown}
-                  showDropDown={() => setShowPurposeDropDown(true)}
-                  onDismiss={() => setShowPurposeDropDown(false)}
-                  value={editFormData.purpose}
-                  setValue={(val) =>
-                    setEditFormData({ ...editFormData, purpose: val })
-                  }
-                  list={purposeList}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>{item.purpose}</Text>
-              )}
-
-              <Text style={styles.descriptionLabel}>Time and Duration:</Text>
-              {isEditing ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <TextInput
-                    style={[styles.inlineInput, { flex: 1 }]}
-                    value={editFormData.from_time}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, from_time: text })
-                    }
-                    placeholder="Start (e.g. 09:00)"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                  <TextInput
-                    style={[styles.inlineInput, { flex: 1 }]}
-                    value={editFormData.to_time}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, to_time: text })
-                    }
-                    placeholder="End (e.g. 17:00)"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                </View>
-              ) : (
-                item.from_time &&
-                item.to_time && (
-                  <Text style={styles.descriptionText}>
-                    {format12Hour(item.from_time)} -{" "}
-                    {format12Hour(item.to_time)} ({item.duration})
-                  </Text>
-                )
-              )}
-
-              <Text style={styles.descriptionLabel}>Trip Summary:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={[styles.inlineInput, { minHeight: 60 }]}
-                  value={editFormData.trip_report}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, trip_report: text })
-                  }
-                  multiline
-                  placeholder="Trip Summary"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.trip_report || "N/A"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.descriptionLabel}>Company/Site:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.company}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, company: text })
-                  }
-                  placeholder="Company/Site"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.company || "N/A"}
-                </Text>
-              )}
-              <Text style={styles.descriptionLabel}>Name:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.name}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, name: text })
-                  }
-                  placeholder="Name"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>{item.name || "N/A"}</Text>
-              )}
-
-              <Text style={styles.descriptionLabel}>Contact Number:</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inlineInput}
-                  value={editFormData.contact_number}
-                  onChangeText={(text) =>
-                    setEditFormData({ ...editFormData, contact_number: text })
-                  }
-                  keyboardType="phone-pad"
-                  placeholder="Contact Number"
-                  onStartShouldSetResponder={() => true}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <Text style={styles.descriptionText}>
-                  {item.contact_number || "N/A"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Mileage:</Text>
-                <Text style={styles.detailValue}>
-                  RM {item.mileage.toFixed(2)}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Toll:</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={[
-                      styles.inlineInput,
-                      { width: 100, marginBottom: 0 },
-                    ]}
-                    value={editFormData.toll?.toString()}
-                    onChangeText={(text) =>
-                      setEditFormData((prev) => {
-                        const toll = parseFloat(text) || 0;
-                        return {
-                          ...prev,
-                          toll,
-                          cost:
-                            (prev.mileage || 0) + (prev.parking || 0) + toll,
-                        };
-                      })
-                    }
-                    keyboardType="numeric"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <Text style={styles.detailValue}>
-                    RM {item.toll.toFixed(2)}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Parking:</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={[
-                      styles.inlineInput,
-                      { width: 100, marginBottom: 0 },
-                    ]}
-                    value={editFormData.parking?.toString()}
-                    onChangeText={(text) =>
-                      setEditFormData((prev) => {
-                        const parking = parseFloat(text) || 0;
-                        return {
-                          ...prev,
-                          parking,
-                          cost:
-                            (prev.mileage || 0) + parking + (prev.toll || 0),
-                        };
-                      })
-                    }
-                    keyboardType="numeric"
-                    onStartShouldSetResponder={() => true}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <Text style={styles.detailValue}>
-                    RM {item.parking.toFixed(2)}
-                  </Text>
-                )}
-              </View>
-              <View
-                style={[
-                  styles.detailRow,
-                  {
-                    marginTop: 4,
-                    borderTopWidth: 1,
-                    borderTopColor: "#eee",
-                    paddingTop: 4,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.detailLabel,
-                    { fontWeight: "bold", color: "#333" },
-                  ]}
-                >
-                  Total Cost:
-                </Text>
-                <Text
-                  style={[
-                    styles.detailValue,
-                    { fontWeight: "bold", color: "#2196F3" },
-                  ]}
-                >
-                  RM{" "}
-                  {isEditing
-                    ? (
-                        (editFormData.mileage || 0) +
-                        (editFormData.parking || 0) +
-                        (editFormData.toll || 0)
-                      ).toFixed(2)
-                    : item.cost.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            {item.route_image_url && !isEditing && (
-              <>
-                <Text style={styles.sectionHeader}>Route Map</Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedImage(item.route_image_url || null);
-                  }}
-                >
-                  <Image
-                    source={{ uri: item.route_image_url }}
-                    style={styles.businessCardImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-
-            {item.business_card_url && (
-              <>
-                <Text style={styles.sectionHeader}>Business Card</Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedImage(item.business_card_url || null);
-                  }}
-                >
-                  <Image
-                    source={{ uri: item.business_card_url }}
-                    style={styles.businessCardImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-
-            {item.approval_status === 0 && (
-              <View style={styles.actionButtonsContainer}>
-                {isEditing ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.approveButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleSaveEditMileage();
-                      }}
-                    >
-                      <Text style={styles.approveButtonText}>Save</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.rejectButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleCancelEdit();
-                      }}
-                    >
-                      <Text style={styles.rejectButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleEditMileage(item);
-                    }}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleDelete(item.id);
-                  }}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {role === 0 && item.approval_status === 0 && (
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={styles.approveButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleStatus(item.id, 1);
-                  }}
-                >
-                  <Text style={styles.approveButtonText}>Approve</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.rejectButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleStatus(item.id, 2);
-                  }}
-                >
-                  <Text style={styles.rejectButtonText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-    );
   };
 
   const renderHeader = () => (
@@ -2986,13 +2775,23 @@ export default function ExpensesWebScreen() {
                     <Text style={styles.descriptionText}>
                       {trip.platform === 1 ? "Web" : "Mobile"}
                     </Text>
-                    <Text style={styles.tripRemark}>{trip.remark}</Text>
+                    <Text style={styles.tripRemark}>
+                      <strong>Remark: </strong>
+                      {trip.remark}
+                    </Text>
+                    {/* <Text style={styles.tripAddress}>
+                      <strong>Time: </strong>
+                      {formatFirebaseTime(trip.from_time)} →{" "}
+                      {formatFirebaseTime(trip.to_time)}
+                    </Text> */}
                     <Text style={styles.tripAddress}>
+                      <strong>Trip: </strong>
                       {trip.from_address} → {trip.to_address} (
                       {trip.distance?.toFixed(2)} km)
                     </Text>
-                    <Text style={styles.tripRemark}>
-                      {trip.to_home === true ? "Going Home" : ""}
+                    <Text style={styles.tripAddress}>
+                      <strong>Going Home: </strong>
+                      {trip.to_home === true ? "True" : "False"}
                     </Text>
                   </View>
                 ) : (
@@ -3382,7 +3181,7 @@ export default function ExpensesWebScreen() {
                 <Text style={styles.modalCloseButton}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalList}>
+            {/* <ScrollView style={styles.modalList}>
               {allUsers.map((user) => {
                 const isAdded = addedUsers.some(
                   (added) => added.id === user.id,
@@ -3413,7 +3212,118 @@ export default function ExpensesWebScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </ScrollView> */}
+
+            <View style={styles.tableContainer}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Username</Text>
+                </View>
+                <View style={{ flex: 2, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Email</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Department</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Grade</Text>
+                </View>
+                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Cost Center</Text>
+                </View>
+              </View>
+
+              {/* Table Body */}
+              <ScrollView style={styles.modalList}>
+                {allUsers.map((user) => {
+                  const isAdded = addedUsers.some(
+                    (added) => added.id === user.id,
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[
+                        styles.tableRow,
+                        isAdded && styles.disabledUserItem,
+                      ]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        setSelectedUserId(user.id);
+                        setSelectUserModalVisible(false);
+                        handleSelectUser(user.id);
+                      }}
+                    >
+                      {/* Username */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.username}
+                        </Text>
+                      </View>
+
+                      {/* Email */}
+                      <View style={{ flex: 2 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.email}
+                        </Text>
+                      </View>
+
+                      {/* Department */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.department}
+                        </Text>
+                      </View>
+
+                      {/* Grade */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.grade}
+                        </Text>
+                      </View>
+
+                      {/* Cost Center */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.cost_center}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -3434,17 +3344,17 @@ export default function ExpensesWebScreen() {
     if (selectedExpenseType != 2) return;
     if (
       selectedExpenseId &&
-      !filteredGeneralExpense.some((e) => e.id === selectedExpenseId)
+      !filteredGeneralExpenses.some((e) => e.id === selectedExpenseId)
     ) {
       setSelectedExpenseId(null);
     }
-  }, [filteredGeneralExpense, selectedExpenseId, selectedExpenseType]);
+  }, [filteredGeneralExpenses, selectedExpenseId, selectedExpenseType]);
 
   const selectedExpense = filteredExpenses.find(
     (e) => e.id === selectedExpenseId,
   );
 
-  const selectedGeneralExpense = filteredGeneralExpense.find(
+  const selectedGeneralExpense = filteredGeneralExpenses.find(
     (e) => e.id === selectedExpenseId,
   );
 
@@ -3549,7 +3459,7 @@ export default function ExpensesWebScreen() {
                 </View>
               </TouchableOpacity>
             ))}
-            {filteredGeneralExpense.map((item) => (
+            {filteredGeneralExpenses.map((item) => (
               <TouchableOpacity
                 key={item.id}
                 style={{
@@ -3738,230 +3648,6 @@ const inputBase = {
 const dateField = {
   border: "0px",
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  listContent: { padding: 16 },
-  card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-    backgroundColor: "transparent",
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    flex: 1,
-    marginRight: 8,
-  },
-  cost: { fontSize: 16, fontWeight: "bold", color: "#2196F3" },
-  expandedContent: { marginTop: 12, backgroundColor: "transparent" },
-  separator: { height: 1, backgroundColor: "#eee", marginBottom: 12 },
-  descriptionLabel: {
-    fontSize: 12,
-    color: "#999",
-    fontWeight: "bold",
-    marginTop: 8,
-  },
-  descriptionText: { fontSize: 14, color: "#444", marginBottom: 4 },
-  date: { fontSize: 14, color: "#999" },
-  companyText: { fontSize: 14, color: "#666", flex: 1, marginRight: 8 },
-  section: { marginBottom: 16 },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#2196F3",
-    textTransform: "uppercase",
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
-    backgroundColor: "transparent",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fullImage: { width: "90%", height: "80%" },
-  actionButtonsContainer: {
-    flexDirection: "row",
-    marginTop: 16,
-    backgroundColor: "transparent",
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: "#FF9800",
-    padding: 10,
-    borderRadius: 6,
-    flex: 1,
-    alignItems: "center",
-  },
-  editButtonText: { color: "#fff", fontWeight: "bold" },
-  deleteButton: {
-    backgroundColor: "#F44336",
-    padding: 10,
-    borderRadius: 6,
-    flex: 1,
-    alignItems: "center",
-  },
-  deleteButtonText: { color: "#fff", fontWeight: "bold" },
-  detailLabel: { fontSize: 14, color: "#777" },
-  detailValue: { fontSize: 14, color: "#333" },
-  empty: { textAlign: "center", marginTop: 50, color: "#999" },
-  modalContent: {
-    width: "90%",
-    height: "80%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  userModalContent: {
-    width: "90%",
-    maxHeight: "80%",
-    backgroundColor: "white",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  closeButton: {
-    marginTop: 20,
-    backgroundColor: "#2196F3",
-    paddingVertical: 10,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-  },
-  closeButtonText: { color: "white", fontWeight: "bold" },
-  buttonContainer: {
-    flexDirection: "row",
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    paddingTop: 12,
-    backgroundColor: "transparent",
-    maxWidth: 250,
-  },
-  approveButton: {
-    backgroundColor: "#4CAF50",
-    padding: 12,
-    borderRadius: 6,
-    flex: 1,
-    alignItems: "center",
-  },
-  approveButtonText: { color: "#fff", fontWeight: "bold" },
-  rejectButton: {
-    backgroundColor: "#F44336",
-    padding: 12,
-    borderRadius: 6,
-    flex: 1,
-    alignItems: "center",
-  },
-  rejectButtonText: { color: "#fff", fontWeight: "bold" },
-  reportSummaryCard: {
-    backgroundColor: "#2196F3",
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  exportButton: {
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  exportButtonText: { color: "#2196F3", fontWeight: "bold" },
-  filterInput: {
-    backgroundColor: "#fff",
-    padding: 8,
-    borderRadius: 6,
-    flex: 1,
-    borderWidth: 0,
-  },
-  inlineInput: {
-    backgroundColor: "#f9f9f9",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    padding: 8,
-    marginBottom: 8,
-    fontSize: 14,
-    maxWidth: 130,
-  },
-  businessCardImage: {
-    width: "100%",
-    height: 200,
-    marginTop: 4,
-    borderRadius: 4,
-    backgroundColor: "#f9f9f9",
-  },
-  tripItem: {
-    marginBottom: 8,
-    backgroundColor: "#f5f5f5",
-    padding: 8,
-    borderRadius: 4,
-  },
-  tripRemark: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
-  tripAddress: {
-    fontSize: 12,
-    color: "#000",
-    marginTop: 2,
-  },
-  btn: { backgroundColor: "#10b981", padding: 14, borderRadius: 6 },
-  disabled: { backgroundColor: "#a7f3d0" },
-  btnText: { color: "#fff", fontWeight: "600" },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
-  },
-  modalList: { maxHeight: 400 },
-  modalUserItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
-  disabledUserItem: {
-    backgroundColor: "#e0e0e0",
-    opacity: 0.6,
-  },
-  userInfoText: { fontSize: 13, color: "#444", marginTop: 2 },
-  disabledText: {
-    color: "#9e9e9e", // grey text
-  },
-  boldLabel: { fontWeight: "bold", color: "#333" },
-
-  modalCloseButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
-});
 
 const webTableStyles = {
   container: {
@@ -4218,3 +3904,259 @@ const webCardStyles = {
     cursor: "pointer",
   },
 };
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  listContent: { padding: 16 },
+  card: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+    backgroundColor: "transparent",
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    flex: 1,
+    marginRight: 8,
+  },
+  cost: { fontSize: 16, fontWeight: "bold", color: "#2196F3" },
+  expandedContent: { marginTop: 12, backgroundColor: "transparent" },
+  separator: { height: 1, backgroundColor: "#eee", marginBottom: 12 },
+  descriptionLabel: {
+    fontSize: 12,
+    color: "#999",
+    fontWeight: "bold",
+    marginTop: 8,
+  },
+  descriptionText: { fontSize: 14, color: "#444", marginBottom: 4 },
+  date: { fontSize: 14, color: "#999" },
+  companyText: { fontSize: 14, color: "#666", flex: 1, marginRight: 8 },
+  section: { marginBottom: 16 },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#2196F3",
+    textTransform: "uppercase",
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+    backgroundColor: "transparent",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullImage: { width: "90%", height: "80%" },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    marginTop: 16,
+    backgroundColor: "transparent",
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: "#FF9800",
+    padding: 10,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  editButtonText: { color: "#fff", fontWeight: "bold" },
+  deleteButton: {
+    backgroundColor: "#F44336",
+    padding: 10,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  deleteButtonText: { color: "#fff", fontWeight: "bold" },
+  detailLabel: { fontSize: 14, color: "#777" },
+  detailValue: { fontSize: 14, color: "#333" },
+  empty: { textAlign: "center", marginTop: 50, color: "#999" },
+  modalContent: {
+    width: "90%",
+    height: "80%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  userModalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "white",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#2196F3",
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+  },
+  closeButtonText: { color: "white", fontWeight: "bold" },
+  buttonContainer: {
+    flexDirection: "row",
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 12,
+    backgroundColor: "transparent",
+    maxWidth: 250,
+  },
+  approveButton: {
+    backgroundColor: "#4CAF50",
+    padding: 12,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  approveButtonText: { color: "#fff", fontWeight: "bold" },
+  rejectButton: {
+    backgroundColor: "#F44336",
+    padding: 12,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  rejectButtonText: { color: "#fff", fontWeight: "bold" },
+  reportSummaryCard: {
+    backgroundColor: "#2196F3",
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  exportButton: {
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  exportButtonText: { color: "#2196F3", fontWeight: "bold" },
+  filterInput: {
+    backgroundColor: "#fff",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    borderWidth: 0,
+  },
+  inlineInput: {
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+    fontSize: 14,
+    maxWidth: 130,
+  },
+  businessCardImage: {
+    width: "100%",
+    height: 200,
+    marginTop: 4,
+    borderRadius: 4,
+    backgroundColor: "#f9f9f9",
+  },
+  tripItem: {
+    marginBottom: 8,
+    backgroundColor: "#f5f5f5",
+    padding: 8,
+    borderRadius: 4,
+  },
+  tripRemark: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  tripAddress: {
+    fontSize: 12,
+    color: "#000",
+    marginTop: 2,
+  },
+  btn: { backgroundColor: "#10b981", padding: 14, borderRadius: 6 },
+  disabled: { backgroundColor: "#a7f3d0" },
+  btnText: { color: "#fff", fontWeight: "600" },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  modalList: { maxHeight: 400 },
+  modalUserItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  disabledUserItem: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
+  },
+  userInfoText: { fontSize: 13, color: "#444", marginTop: 2 },
+  disabledText: {
+    color: "#9e9e9e", // grey text
+  },
+  boldLabel: { fontWeight: "bold", color: "#333" },
+
+  modalCloseButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
+  tableContainer: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+    paddingRight: 12,
+  },
+  tableRow: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    alignItems: "center",
+  },
+  headerCell: {
+    fontWeight: "bold",
+    fontSize: 13,
+    color: "#333",
+  },
+  tableCell: {
+    fontSize: 13,
+    color: "#666",
+  },
+});
