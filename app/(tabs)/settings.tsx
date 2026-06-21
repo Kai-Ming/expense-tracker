@@ -184,10 +184,13 @@ export default function settings() {
 
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
-    if (!configId) return;
+    if (!configId) {
+      console.error("No Config ID found in environment variables");
+      return;
+    }
 
     const unsubscribe = onSnapshot(
-      doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
+      doc(db, "config", configId),
       async (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
