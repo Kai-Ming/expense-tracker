@@ -3250,9 +3250,9 @@ export default function ExpensesWebScreen() {
                       ]}
                       disabled={isAdded}
                       onPress={() => {
-                        setSelectedUserId(user.id);
-                        setSelectUserModalVisible(false);
-                        handleSelectUser(user.id);
+                        if (isAdded) return;
+                        setUsenameFilter(user.username);
+                        setShowUserModal(false);
                       }}
                     >
                       {/* Username */}
