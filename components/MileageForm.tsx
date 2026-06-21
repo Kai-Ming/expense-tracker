@@ -65,6 +65,15 @@ export default function MileageForm() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [officeLocations, setOfficeLocations] = useState<
+    | [
+        {
+          lat: number;
+          lng: number;
+        },
+      ]
+    | []
+  >([]);
   const [formMileageRate, setFormMileageRate] = useState<number>(0.8);
   const [allUserTrips, setAllUserTrips] = useState<any[]>([]);
   const [tripsForSelectedDate, setTripsForSelectedDate] = useState<any[]>([]);
@@ -164,25 +173,22 @@ export default function MileageForm() {
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
     if (!configId) return;
-    const unsubscribe = onSnapshot(
-      doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.mileage_rate) setMileageRate(data.mileage_rate);
-          if (data.mileage_rate_oustation)
-            setMileageRateOutstation(data.mileage_rate_oustation);
-          if (data.outstation_disance)
-            setOutstationDistance(data.outstation_distance);
-          if (data.office_coordinates) {
-            setOfficeCoords({
-              lat: data.office_coordinates.latitude,
-              lng: data.office_coordinates.longitude,
-            });
-          }
-        }
-      },
-    );
+    const unsubscribe = onSnapshot(doc(db, "config", configId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.mileage_rate) setMileageRate(data.mileage_rate);
+        if (data.mileage_rate_oustation)
+          setMileageRateOutstation(data.mileage_rate_oustation);
+        if (data.outstation_disance)
+          setOutstationDistance(data.outstation_distance);
+        /* if (data.office_coordinates) {
+          setOfficeCoords({
+            lat: data.office_coordinates.latitude,
+            lng: data.office_coordinates.longitude,
+          });
+        } */
+      }
+    });
     return () => unsubscribe();
   }, []);
 
@@ -205,6 +211,17 @@ export default function MileageForm() {
               setHomeCoords({
                 lat: homeCoord.latitude,
                 lng: homeCoord.longitude,
+              });
+            }
+
+            const officeLocation = userData.office;
+
+            if (officeLocation === 0) {
+              setOfficeCoords({ lat: 3.0409332, lng: 101.5453218 });
+            } else {
+              setOfficeCoords({
+                lat: 5.4144228421944005,
+                lng: 100.31619126878057,
               });
             }
           } else {

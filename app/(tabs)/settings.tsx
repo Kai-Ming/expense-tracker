@@ -1539,12 +1539,12 @@ export default function settings() {
       )}
       {role === 0 && (
         <>
-          <TouchableOpacity
+          {/*<TouchableOpacity
             onPress={() => setAddressModalVisible(true)}
             style={styles.button}
           >
             <Text style={styles.buttonText}>Set Office Address</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>*/}
           <Modal
             animationType="fade"
             transparent={true}
