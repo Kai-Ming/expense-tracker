@@ -546,6 +546,7 @@ export default function MileageForm() {
     } catch (error) {
       console.log(error);
       alert("Error calculating distance");
+      return 0;
     }
   };
 
@@ -741,20 +742,26 @@ export default function MileageForm() {
       }
       let subToll = await fetchTollCost(originCoord, destCoord);
       if (formGoingHome) {
-        const distToCurrent = getDrivingDistance(originCoord, destCoord);
-        const distToOffice = getDrivingDistance(
+        const distToCurrent = await getDrivingDistance(originCoord, destCoord);
+        const distToOffice = await getDrivingDistance(
           originCoord,
           officeCoords || { lat: 0, lng: 0 },
         );
+        console.log(distToOffice);
+        console.log(distToCurrent);
 
-        if (distToOffice < distToCurrent) {
+        if (distToOffice > distToCurrent) {
           console.log(`Route Comparison: Using Current.`);
         } else {
           console.log(`Route Comparison: Using Office.`);
-          let subDistance: number = 0;
           const distanceValue = await distToOffice;
           if (distanceValue !== undefined) {
+            console.log("updating subdistance");
+            console.log(distanceValue);
+            console.log(distanceValue.toFixed(2));
             subDistance = parseFloat(distanceValue.toFixed(2));
+            console.log("subdistance");
+            console.log(subDistance);
           }
           subToll = await fetchTollCost(
             originCoord,
@@ -769,6 +776,8 @@ export default function MileageForm() {
               finalToll = await fetchTollCost(currentLocation, officeCoords);
             } */
           }
+
+          console.log(subToAddress);
         }
       }
       //const distanceData = getDrivingDistance(originCoord, destCoord);
@@ -794,10 +803,15 @@ export default function MileageForm() {
 
       let mileage = (subDistance ?? 0) * mileageRateTemp;
 
+      console.log("distance");
+      console.log(subDistance);
+      console.log(subToAddress);
+      console.log(mileage);
+
       const tripToSave = {
         user_id: userId,
         from_address: fromAddress,
-        to_address: toAddress,
+        to_address: subToAddress,
         distance: parseFloat(subDistance.toFixed(2)),
         mileage: parseFloat(mileage.toFixed(2)),
         toll: parseFloat(subToll.toFixed(2)),
