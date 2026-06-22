@@ -9,6 +9,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -131,6 +132,10 @@ export default function ExpensesWebScreen() {
   const [appliedStartDate, setAppliedStartDate] = useState<string>("");
   const [appliedEndDate, setAppliedEndDate] = useState<string>("");
   const [appliedUsername, setAppliedUsername] = useState<string>("");
+  const [appliedEssNo, setAppliedEssNo] = useState<string>("");
+  const [appliedDepartment, setAppliedDepartment] = useState<string>("");
+  const [appliedGrade, setAppliedGrade] = useState<string>("");
+  const [appliedCostCenter, setAppliedCostCenter] = useState<string>("");
   const [appliedExpenseType, setAppliedExpenseType] = useState<string>("All");
   const [appliedExpensePurpose, setAppliedExpensePurpose] =
     useState<string>("");
@@ -488,6 +493,27 @@ export default function ExpensesWebScreen() {
 
   const getTripById = (tripId: string): Trip | undefined => {
     return allTrips.find((trip) => trip.id === tripId);
+  };
+
+  const updateUserFilter = async (username: string) => {
+    if (username === "") return;
+    const q = query(collection(db, "users"), where("username", "==", username));
+
+    const querySnapshot = await getDocs(q);
+
+    // Check if anything was found
+    if (querySnapshot.empty) {
+      console.log("No matching user found.");
+      return null;
+    }
+
+    // Pull out exactly ONE document
+    const docSnapshot = querySnapshot.docs[0];
+    const user = docSnapshot.data();
+    setAppliedEssNo(user.ess_no);
+    setAppliedDepartment(user.department);
+    setAppliedCostCenter(user.cost_center);
+    setAppliedGrade(user.grade);
   };
 
   const filteredExpenses = expenses.filter((e) => {
@@ -1198,6 +1224,19 @@ export default function ExpensesWebScreen() {
   const exportToPdf = () => {
     // Normalize a mileage expense
     console.log("export");
+    let reportUsername = username;
+    let reportEssNo = essNo;
+    let reportDepartment = department;
+    let reportGrade = grade;
+    let reportCostCenter = costCenter;
+
+    if (appliedUsername != "") {
+      reportUsername = appliedUsername;
+      reportEssNo = appliedEssNo;
+      reportDepartment = appliedDepartment;
+      reportGrade = appliedGrade;
+      reportCostCenter = appliedCostCenter;
+    }
 
     // Convert allTrips array to a map for easy lookup
     const tripsMap = {};
@@ -1577,11 +1616,11 @@ export default function ExpensesWebScreen() {
             </div>
             <h1>Expense Report from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
             <div class="employee-info-section">
-            <div class="employee-info">Name: <u>${username}</u></div>
-            <div class="employee-info">ESS No: <u>${essNo}</u></div>
-            <div class="employee-info">Department: <u>${department}</u></div>
-            <div class="employee-info">Grade: <u>${grade}</u></div>
-            <div class="employee-info">Cost Center: <u>${costCenter}</u></div>
+            <div class="employee-info">Name: <u>${reportUsername}</u></div>
+            <div class="employee-info">ESS No: <u>${reportEssNo}</u></div>
+            <div class="employee-info">Department: <u>${reportDepartment}</u></div>
+            <div class="employee-info">Grade: <u>${reportGrade}</u></div>
+            <div class="employee-info">Cost Center: <u>${reportCostCenter}</u></div>
             </div>
             <table>
               <thead>
@@ -2135,9 +2174,7 @@ export default function ExpensesWebScreen() {
                     setAppliedUsername(usernameFilter);
                     setAppliedExpenseType(expenseType);
                     setAppliedExpensePurpose(expensePurpose);
-                    console.log(appliedExpensePurpose);
-                    console.log(usernameFilter);
-                    console.log(appliedUsername);
+                    updateUserFilter(usernameFilter);
                   }}
                 >
                   <Text
@@ -2163,6 +2200,10 @@ export default function ExpensesWebScreen() {
                     setAppliedUsername("");
                     setExpenseType("All");
                     setExpensePurpose("");
+                    setAppliedCostCenter("");
+                    setAppliedEssNo("");
+                    setAppliedDepartment("");
+                    setAppliedGrade("");
                   }}
                 >
                   <Text
