@@ -12,7 +12,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -356,12 +355,30 @@ export default function MileageForm() {
     return dateString.split("-").reverse().join("-");
   };
 
-  const formatTripTime = (timestamp: Timestamp | undefined | null): string => {
-    if (!timestamp || typeof timestamp.toDate !== "function") {
+  const formatTripTime = (timestamp: any): string => {
+    if (!timestamp) return "--:--";
+
+    let date: Date;
+
+    // 1. Check if it's a Firestore-style Timestamp object (your 2nd case)
+    if (typeof timestamp.toDate === "function") {
+      date = timestamp.toDate();
+    }
+    // 2. Check if it's an object with seconds/nanoseconds (raw Firestore data)
+    else if (typeof timestamp.seconds === "number") {
+      date = new Date(timestamp.seconds * 1000);
+    }
+    // 3. Handle Date objects or Date strings (your 1st case, e.g., "Mon Jun 22 2026...")
+    else {
+      date = new Date(timestamp);
+    }
+
+    // Fallback if the date turns out to be invalid
+    if (isNaN(date.getTime())) {
       return "--:--";
     }
 
-    return timestamp.toDate().toLocaleTimeString("en-US", {
+    return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
@@ -806,6 +823,9 @@ export default function MileageForm() {
         created_at: new Date(), // local timestamp for display; Firestore will have serverTimestamp
       };
 
+      console.log("new trip");
+      console.log(newTrip);
+
       // Add to addedTrips directly
       setAddedTrips((prev) => [...prev, newTrip]);
 
@@ -1052,7 +1072,11 @@ export default function MileageForm() {
               <View style={styles.dropdownInput}>
                 <TouchableOpacity
                   style={styles.dropdownButton}
-                  onPress={() => setIsDropdownOpen(true)}
+                  onPress={() => {
+                    setIsDropdownOpen(true);
+
+                    console.log(addedTrips);
+                  }}
                 >
                   <Text style={styles.buttonText}>
                     {selectedTripId
