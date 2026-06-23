@@ -119,6 +119,14 @@ export default function MileageForm() {
   const { calculateDistance, getRouteImageUrl, sdkLoaded } =
     useGoogleMapsDistance();
 
+  const locations = [
+    { lat: 3.0409332, lng: 101.5453218 },
+    {
+      lat: 5.333704064834522,
+      lng: 100.29405526266623,
+    },
+  ];
+
   // Fetch all user trips
   useEffect(() => {
     if (!userId) return;
@@ -219,12 +227,9 @@ export default function MileageForm() {
             const officeLocation = userData.office;
 
             if (officeLocation === 0) {
-              setOfficeCoords({ lat: 3.0409332, lng: 101.5453218 });
+              setOfficeCoords(locations[0]);
             } else {
-              setOfficeCoords({
-                lat: 5.4144228421944005,
-                lng: 100.31619126878057,
-              });
+              setOfficeCoords(locations[1]);
             }
           } else {
             setUsername(user.displayName || "User");
@@ -723,14 +728,6 @@ export default function MileageForm() {
   };
 
   const selectDefault = async (index: number, direction: number) => {
-    const locations = [
-      { lat: 3.0409332, lng: 101.5453218 },
-      {
-        lat: 5.4144228421944005,
-        lng: 100.31619126878057,
-      },
-    ];
-
     if (index === 0) {
       return;
     }
@@ -759,7 +756,10 @@ export default function MileageForm() {
         const location = locations[1];
         let address = await getAddressFromCoords(location.lat, location.lng);
 
+        console.log("penang");
         console.log(location);
+        console.log(address);
+        console.log(locations);
         setFromAddress(address);
         setOriginCoord(location);
       } else if (index === 3) {
@@ -791,7 +791,10 @@ export default function MileageForm() {
         const location = locations[1];
         let address = await getAddressFromCoords(location.lat, location.lng);
 
+        console.log("penang");
         console.log(location);
+        console.log(address);
+        console.log(locations);
         setToAddress(address);
         setDestCoord(location);
       } else if (index === 3) {
