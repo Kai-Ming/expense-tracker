@@ -1252,24 +1252,25 @@ export default function MileageForm() {
                           >
                             From (Starting location):
                           </Text>
-
-                          <View style={[{ flexDirection: "row" }]}>
-                            <PlacesInput
-                              value={fromAddress}
-                              placeholder="Search starting location"
-                              onPlaceSelected={(address, location) => {
-                                setFromAddress(address);
-                                setOriginCoord(location);
-                              }}
-                              disabled={selectedFromIndex !== 0}
-                            />
+                          <PlacesInput
+                            value={fromAddress}
+                            placeholder="Search starting location"
+                            onPlaceSelected={(address, location) => {
+                              setFromAddress(address);
+                              setOriginCoord(location);
+                            }}
+                            disabled={selectedFromIndex !== 0}
+                          />
+                          <View
+                            style={[{ flexDirection: "row", marginTop: 5 }]}
+                          >
                             <TouchableOpacity
                               style={[
                                 styles.dialogButton,
                                 selectedFromIndex === 1
                                   ? styles.submitButtonActive
                                   : styles.submitButton,
-                                { marginLeft: 15 },
+                                { marginLeft: 0 },
                               ]}
                               onPress={() => {
                                 selectDefault(1, 0);
@@ -1342,23 +1343,25 @@ export default function MileageForm() {
                           >
                             To (Destination):
                           </Text>
-                          <View style={[{ flexDirection: "row" }]}>
-                            <PlacesInput
-                              value={toAddress}
-                              placeholder="Search destination…"
-                              onPlaceSelected={(address, location) => {
-                                setToAddress(address);
-                                setDestCoord(location);
-                              }}
-                              disabled={selectedGoingIndex !== 0}
-                            />
+                          <PlacesInput
+                            value={toAddress}
+                            placeholder="Search destination…"
+                            onPlaceSelected={(address, location) => {
+                              setToAddress(address);
+                              setDestCoord(location);
+                            }}
+                            disabled={selectedGoingIndex !== 0}
+                          />
+                          <View
+                            style={[{ flexDirection: "row", marginTop: 5 }]}
+                          >
                             <TouchableOpacity
                               style={[
                                 styles.dialogButton,
                                 selectedGoingIndex === 1
                                   ? styles.submitButtonActive
                                   : styles.submitButton,
-                                { marginLeft: 15 },
+                                { marginLeft: 0 },
                               ]}
                               onPress={() => {
                                 selectDefault(1, 1);
