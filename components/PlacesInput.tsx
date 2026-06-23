@@ -14,7 +14,7 @@ function PlacesInput({
   placeholder,
   onPlaceSelected,
   value,
-  disabled = false, // new optional prop
+  disabled = false,
 }: {
   placeholder: string;
   onPlaceSelected: (
@@ -33,7 +33,6 @@ function PlacesInput({
     setQuery(value);
   }, [value]);
 
-  // Close dropdown when disabled becomes true
   useEffect(() => {
     if (disabled) {
       setIsDropdownOpen(false);
@@ -41,7 +40,6 @@ function PlacesInput({
     }
   }, [disabled]);
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -73,7 +71,7 @@ function PlacesInput({
   };
 
   const handleChange = (text: string) => {
-    if (disabled) return; // ignore changes when disabled
+    if (disabled) return;
     setQuery(text);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => fetchPredictions(text), 350);
@@ -125,7 +123,7 @@ function PlacesInput({
           setTimeout(() => setIsDropdownOpen(false), 200);
         }}
         editable={!disabled}
-        pointerEvents={disabled ? "none" : "auto"} // optional: prevents any tap interaction
+        pointerEvents={disabled ? "none" : "auto"}
       />
       {!disabled && isDropdownOpen && predictions.length > 0 && (
         <FlatList
@@ -144,6 +142,26 @@ function PlacesInput({
             },
           ]}
           keyboardShouldPersistTaps="handled"
+          // --- ADDED: List Header containing your 2 elements ---
+          ListHeaderComponent={
+            <View style={styles.headerContainer}>
+              <TouchableOpacity
+                style={styles.headerItem}
+                onPress={() => console.log("Header Item 1 pressed")}
+              >
+                <Text style={styles.headerText}>📍 Use Current Location</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.headerItem}
+                onPress={() => console.log("Header Item 2 pressed")}
+              >
+                <Text style={styles.headerText}>⭐ Saved Places</Text>
+              </TouchableOpacity>
+            </View>
+          }
+          // ----------------------------------------------------
+
           renderItem={({ item }: any) => (
             <TouchableOpacity
               style={styles.row}
@@ -187,6 +205,23 @@ const styles = StyleSheet.create({
   row: { padding: 13, borderBottomWidth: 0.5, borderBottomColor: "#eee" },
   mainText: { fontSize: 14, color: "#111", fontWeight: "500" },
   secondaryText: { fontSize: 12, color: "#888", marginTop: 2 },
+
+  // --- ADDED: Styles for the top items ---
+  headerContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    backgroundColor: "#fcfcfc",
+  },
+  headerItem: {
+    padding: 13,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#eee",
+  },
+  headerText: {
+    fontSize: 14,
+    color: "#007AFF", // iOS blue styling example
+    fontWeight: "600",
+  },
 });
 
 export default PlacesInput;

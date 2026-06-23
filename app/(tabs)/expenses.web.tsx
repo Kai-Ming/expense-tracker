@@ -1676,7 +1676,7 @@ export default function ExpensesWebScreen() {
               <div class="signature-block">
                 <p class="signature-label">Requested By:</p>
                 <div class="signature-line"></div>
-                <p class="signature-date">Name: ${username}</p>
+                <p class="signature-date">Name: ${reportUsername}</p>
                 <p class="signature-date">Date: ${getCurrentDate()}</p>
               </div>
 

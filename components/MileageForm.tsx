@@ -24,7 +24,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
@@ -95,6 +94,10 @@ export default function MileageForm() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [formFromDefault, setFormFromDefault] = useState<number>(0);
+  const [formGoingDefault, setFormGoingDefault] = useState<number>(0);
+  const [selectedFromIndex, setSelectedFromIndex] = useState<number>(0);
+  const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
 
   const [showTravelModal, setShowTravelModal] = useState(false);
   const [formAirfare, setFormAirfare] = useState<string>("0.00");
@@ -709,6 +712,105 @@ export default function MileageForm() {
     }
   };
 
+  const clearAddress = (direction: number) => {
+    if (direction === 0) {
+      setFromAddress("");
+      setOriginCoord(null);
+    } else if (direction === 1) {
+      setToAddress("");
+      setDestCoord(null);
+    }
+  };
+
+  const selectDefault = async (index: number, direction: number) => {
+    const locations = [
+      { lat: 3.0409332, lng: 101.5453218 },
+      {
+        lat: 5.4144228421944005,
+        lng: 100.31619126878057,
+      },
+    ];
+
+    if (index === 0) {
+      return;
+    }
+
+    /* if (officeLocation === 0) {
+      setOfficeCoords({ lat: 3.0409332, lng: 101.5453218 });
+    } else {
+      setOfficeCoords({
+        lat: 5.4144228421944005,
+        lng: 100.31619126878057,
+      });
+    } */
+
+    if (direction === 0) {
+      if (selectedFromIndex === index) {
+        setSelectedFromIndex(0);
+        clearAddress(0);
+      } else if (index === 1) {
+        setSelectedFromIndex(index);
+        const location = locations[0];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+        setFromAddress(address);
+        setOriginCoord(location);
+      } else if (index === 2) {
+        setSelectedFromIndex(index);
+        const location = locations[1];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+
+        console.log(location);
+        setFromAddress(address);
+        setOriginCoord(location);
+      } else if (index === 3) {
+        setSelectedFromIndex(index);
+        const location = locations[1];
+        let homeAddress = await getAddressFromCoords(
+          homeCoords.lat,
+          homeCoords.lng,
+        );
+        console.log("home address");
+        console.log(homeAddress);
+        console.log(homeCoords);
+        setFromAddress(homeAddress);
+        setOriginCoord(homeCoords);
+      }
+    } else if (direction === 1) {
+      setFormGoingHome(false);
+      if (selectedGoingIndex === index) {
+        setSelectedGoingIndex(0);
+        clearAddress(0);
+      } else if (index === 1) {
+        setSelectedGoingIndex(index);
+        const location = locations[0];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+        setToAddress(address);
+        setDestCoord(location);
+      } else if (index === 2) {
+        setSelectedGoingIndex(index);
+        const location = locations[1];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+
+        console.log(location);
+        setToAddress(address);
+        setDestCoord(location);
+      } else if (index === 3) {
+        setFormGoingHome(true);
+        setSelectedGoingIndex(index);
+        const location = locations[1];
+        let homeAddress = await getAddressFromCoords(
+          homeCoords.lat,
+          homeCoords.lng,
+        );
+        console.log("home address");
+        console.log(homeAddress);
+        console.log(homeCoords);
+        setToAddress(homeAddress);
+        setDestCoord(homeCoords);
+      }
+    }
+  };
+
   const saveTrip = async () => {
     if (!fromAddress.trim() || !toAddress.trim()) {
       alert("Please fill in both 'From' and 'To' addresses.");
@@ -862,6 +964,10 @@ export default function MileageForm() {
     setFormTripFromTime(null);
     setFormTripToTime(null);
     setFormGoingHome(false);
+    setOriginCoord(null);
+    setDestCoord(null);
+    setSelectedFromIndex(0);
+    setSelectedGoingIndex(0);
   };
 
   const saveTravel = async () => {
@@ -1146,14 +1252,87 @@ export default function MileageForm() {
                           >
                             From (Starting location):
                           </Text>
-                          <PlacesInput
-                            value={fromAddress}
-                            placeholder="Search starting location"
-                            onPlaceSelected={(address, location) => {
-                              setFromAddress(address);
-                              setOriginCoord(location);
-                            }}
-                          />
+
+                          <View style={[{ flexDirection: "row" }]}>
+                            <PlacesInput
+                              value={fromAddress}
+                              placeholder="Search starting location"
+                              onPlaceSelected={(address, location) => {
+                                setFromAddress(address);
+                                setOriginCoord(location);
+                              }}
+                              disabled={selectedFromIndex !== 0}
+                            />
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedFromIndex === 1
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(1, 0);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedFromIndex === 1
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                HQ
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedFromIndex === 2
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(2, 0);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedFromIndex === 2
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                Penang
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedFromIndex === 3
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(3, 0);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedFromIndex === 3
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                Home
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                           <Text
                             style={[
                               styles.modalSubtitle,
@@ -1163,15 +1342,87 @@ export default function MileageForm() {
                           >
                             To (Destination):
                           </Text>
-                          <PlacesInput
-                            value={toAddress}
-                            placeholder="Search destination…"
-                            onPlaceSelected={(address, location) => {
-                              setToAddress(address);
-                              setDestCoord(location);
-                            }}
-                            disabled={formGoingHome}
-                          />
+                          <View style={[{ flexDirection: "row" }]}>
+                            <PlacesInput
+                              value={toAddress}
+                              placeholder="Search destination…"
+                              onPlaceSelected={(address, location) => {
+                                setToAddress(address);
+                                setDestCoord(location);
+                              }}
+                              disabled={selectedGoingIndex !== 0}
+                            />
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedGoingIndex === 1
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(1, 1);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedGoingIndex === 1
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                HQ
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedGoingIndex === 2
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(2, 1);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedGoingIndex === 2
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                Penang
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.dialogButton,
+                                selectedGoingIndex === 3
+                                  ? styles.submitButtonActive
+                                  : styles.submitButton,
+                                { marginLeft: 15 },
+                              ]}
+                              onPress={() => {
+                                selectDefault(3, 1);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  selectedGoingIndex === 3
+                                    ? styles.textStyleActive
+                                    : styles.textStyle,
+                                  { fontWeight: "normal" },
+                                ]}
+                              >
+                                Home
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
                           <Text
                             style={[
                               styles.modalSubtitle,
@@ -1213,7 +1464,7 @@ export default function MileageForm() {
                             disabled={isSaving}
                           />
 
-                          <Text style={styles.modalSubtitle}>Going Home:</Text>
+                          {/* <Text style={styles.modalSubtitle}>Going Home:</Text>
                           <Switch
                             trackColor={{ false: "#767577", true: "#81b0ff" }}
                             thumbColor="#2196F3"
@@ -1222,7 +1473,7 @@ export default function MileageForm() {
                             onValueChange={(newValue) =>
                               handleUpdateHome(newValue)
                             }
-                          />
+                          /> */}
                           <Text
                             style={[
                               styles.modalSubtitle,
@@ -1879,12 +2130,20 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: "#2196F3",
   },
+  submitButtonActive: {
+    backgroundColor: "transparent",
+    borderColor: "#2196F3",
+    borderWidth: 1,
+  },
   cancelButton: {
     backgroundColor: "#f44336",
   },
   textStyle: {
     color: "white",
     fontWeight: "bold",
+  },
+  textStyleActive: {
+    color: "#2196F3",
   },
   input: {
     width: "100%",
