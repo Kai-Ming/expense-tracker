@@ -494,7 +494,7 @@ export default function settings() {
       await updateDoc(docRef, {
         mileage_rate: parseFloat(mileageRate),
         mileage_rate_mobile: parseFloat(mobileMileageRate),
-        mileage_rate_oustation: parseFloat(mileageRateOutstation),
+        mileage_rate_outstation: parseFloat(mileageRateOutstation),
         mileage_rate_outstation_mobile: parseFloat(mobileMileageRateOutstation),
         outstation_distance: parseFloat(oustationDistance),
       });

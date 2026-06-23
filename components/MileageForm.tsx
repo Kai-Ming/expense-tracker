@@ -187,7 +187,7 @@ export default function MileageForm() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.mileage_rate) setMileageRate(data.mileage_rate);
-        if (data.mileage_rate_oustation)
+        if (data.mileage_rate_outstation)
           setMileageRateOutstation(data.mileage_rate_oustation);
         if (data.outstation_disance)
           setOutstationDistance(data.outstation_distance);
