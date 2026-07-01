@@ -15,11 +15,14 @@ import {
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   DeviceEventEmitter,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
+  ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   TouchableOpacity,
 } from "react-native";
@@ -38,7 +41,7 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, ({ data, error }: any) => {
   if (data) {
     const { locations } = data;
     if (locations && locations.length > 0) {
-      const location = locations[0]; // ← take the first location object
+      const location = locations[0];
       const latLng = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -63,7 +66,6 @@ export default function SubmitExpenseScreen() {
   const mapRef = useRef<any>(null);
   const remarkRef = useRef("");
   const fromTimeRef = useRef<Date | null>(null);
-  // Ref to hold the location subscription so we can stop it
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(
     null,
   );
@@ -93,13 +95,15 @@ export default function SubmitExpenseScreen() {
     lng: number;
   } | null>(null);
 
+  const [selectedFromIndex, setSelectedFromIndex] = useState<number>(0);
+  const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
+
   const [formRemark, setFormRemark] = useState<string>("");
   const [fromTime, setFromTime] = useState<Date | null>(null);
   const [toTime, setToTime] = useState<Date | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
 
-  // Trip active state — tracking only starts after Confirm is pressed
   const [tripActive, setTripActive] = useState<boolean>(false);
   const [toHome, setToHome] = useState<boolean>(false);
 
@@ -108,11 +112,20 @@ export default function SubmitExpenseScreen() {
   >([]);
 
   const [mileageRate, setMileageRate] = useState<number>(0);
+  const [mileageRateOutstation, setMileageRateOutstation] = useState<number>(0);
+  const [outStationDistance, setOutstationDistance] = useState<number>(50);
+  const [homeCoords, setHomeCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [endTripReason, setEndTripReason] = useState<string>("");
+  const [showEndTripModal, setShowEndTripModal] = useState(false);
   const [officeCoords, setOfficeCoords] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
   const [arrivalDistance, setArrivalDistance] = useState<number>(0.1);
+  const [drivingDistance, setDrivingDistance] = useState<number>(0);
   const [toll, setToll] = useState<string>("");
   const totalTraveledDistanceRef = useRef<number>(0);
   const toAddressRef = useRef<string>("");
@@ -126,9 +139,19 @@ export default function SubmitExpenseScreen() {
   ]);
   const lastCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const isSubmittingRef = useRef(false);
+  const roadDistanceRef = useRef<number>(0);
+  const hasReachedDestinationRef = useRef<boolean>(false);
 
   const OFFICE_COORDINATES = { lat: 3.0277632, lng: 101.4693888 };
   const MIN_TRAVEL_DISTANCE = 0.04;
+
+  const locations = [
+    { lat: 3.0409332, lng: 101.5453218 },
+    {
+      lat: 5.333704064834522,
+      lng: 100.29405526266623,
+    },
+  ];
 
   useEffect(() => {
     pointsRef.current = points;
@@ -164,7 +187,6 @@ export default function SubmitExpenseScreen() {
 
   useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
-    if (!configId) return;
 
     const unsubscribe = onSnapshot(
       doc(db, "config", "7HTZfcBtebPsm0zlZB3c"),
@@ -173,6 +195,10 @@ export default function SubmitExpenseScreen() {
           const data = docSnap.data();
           if (data.mileage_rate_mobile)
             setMileageRate(data.mileage_rate_mobile);
+          if (data.mileage_rate_outstation_mobile)
+            setMileageRateOutstation(data.mileage_rate_outstation_mobile);
+          if (data.outstation_disance)
+            setOutstationDistance(data.outstation_distance);
 
           if (data.office_coordinates) {
             setOfficeCoords({
@@ -202,7 +228,6 @@ export default function SubmitExpenseScreen() {
   }, [currentLocation]);
 
   useEffect(() => {
-    // Request notification permission on mount
     Notifications.requestPermissionsAsync();
   }, []);
 
@@ -230,7 +255,7 @@ export default function SubmitExpenseScreen() {
         body: `${distance.toFixed(2)} km • RM ${total.toFixed(2)} total`,
         sound: true,
       },
-      trigger: null, // null = fire immediately
+      trigger: null,
     });
   };
 
@@ -244,6 +269,8 @@ export default function SubmitExpenseScreen() {
 
     setFromAddress("");
     setToAddress("");
+    setSelectedGoingIndex(0);
+    setEndTripReason("");
     setDistance(null);
     setTotalTraveledDistance(0);
     setRouteCoords([]);
@@ -258,12 +285,12 @@ export default function SubmitExpenseScreen() {
     setTripActive(false);
     setCurrentLocation(null);
     currentLocationRef.current = null;
+    roadDistanceRef.current = 0;
+    hasReachedDestinationRef.current = false;
 
-    // Stop any active tracking
     locationSubscriptionRef.current?.remove();
     locationSubscriptionRef.current = null;
 
-    // Re-fetch current location after reset to repopulate the From field
     fetchCurrentLocation();
   };
 
@@ -273,11 +300,9 @@ export default function SubmitExpenseScreen() {
     apiKey: string | undefined,
     storage: any,
   ): Promise<string> => {
-    // Return empty string if data is missing to avoid crashing the upload
     if (!points || !points || !apiKey) return "";
 
     try {
-      // Generate URL: Use polyline if available, otherwise just markers
       const pathParam = polyline ? `path=enc:${polyline}` : "";
       const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&${pathParam}&markers=color:red|label:A|${points.lat},${points.lng}&markers=color:blue|label:B|${points.lat},${points.lng}&key=${apiKey}`;
 
@@ -295,10 +320,22 @@ export default function SubmitExpenseScreen() {
     }
   };
 
-  const fetchTollCost = async (
+  const fetchRoadDistanceAndToll = async (
     origin: { lat: number; lng: number },
     dest: { lat: number; lng: number },
-  ): Promise<number> => {
+  ) => {
+    return {
+      distance: getHaversineDistance(origin, dest),
+      toll: 0,
+      polyline: "",
+    };
+  };
+
+  // NEW: Fetch road distance and toll using Google Directions API
+  const fetchRoadDistanceAndToll1 = async (
+    origin: { lat: number; lng: number },
+    dest: { lat: number; lng: number },
+  ): Promise<{ distance: number; toll: number; polyline: string }> => {
     try {
       const response = await fetch(
         "https://routes.googleapis.com/directions/v2:computeRoutes",
@@ -307,7 +344,8 @@ export default function SubmitExpenseScreen() {
           headers: {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
-            "X-Goog-FieldMask": "routes.travelAdvisory.tollInfo",
+            "X-Goog-FieldMask":
+              "routes.distanceMeters,routes.polyline.encodedPolyline",
           },
           body: JSON.stringify({
             origin: {
@@ -319,42 +357,71 @@ export default function SubmitExpenseScreen() {
               location: { latLng: { latitude: dest.lat, longitude: dest.lng } },
             },
             travelMode: "DRIVE",
-            extraComputations: ["TOLLS"],
-            routeModifiers: { vehicleInfo: { emissionType: "GASOLINE" } },
           }),
         },
       );
 
       const data = await response.json();
-      const tollInfo = data.routes?.[0]?.travelAdvisory?.tollInfo;
+      const route = data.routes?.[0];
+
+      if (!route) {
+        console.warn("No route found");
+        return { distance: 0, toll: 0, polyline: "" };
+      }
+
+      // Extract distance in kilometers
+      const distanceMeters = route.distanceMeters || 0;
+      const distanceKm = distanceMeters / 1000;
+
+      // Extract toll cost
+      let tollCost = 0;
       if (tollInfo?.estimatedPrice?.length > 0) {
         const price = tollInfo.estimatedPrice[0];
-        return (price.units ?? 0) + (price.nanos ?? 0) / 1e9;
+        tollCost = (price.units ?? 0) + (price.nanos ?? 0) / 1e9;
       }
-      return 0;
+
+      // Extract polyline for map display
+      const polyline = route.polyline?.encodedPolyline || "";
+
+      return { distance: distanceKm, toll: tollCost, polyline };
     } catch (error) {
-      console.error("Toll fetch error:", error);
-      return 0;
+      console.error("Directions API error:", error);
+      return { distance: 0, toll: 0, polyline: "" };
     }
   };
 
-  const checkAndAutoSubmit = async (
+  // NEW: Check if user has reached destination using road distance
+  const checkAndAutoSubmitWithRoadDistance = async (
     currentCoords: { lat: number; lng: number },
-    totalTraveled: number,
+    origin: { lat: number; lng: number },
   ) => {
     const dest = destinationRef.current;
-    if (!dest) return false;
-    if (totalTraveled < MIN_TRAVEL_DISTANCE) return false;
-    if (isSubmittingRef.current) return false; // ← guard
+    if (!dest || isSubmittingRef.current || hasReachedDestinationRef.current)
+      return false;
 
-    const distToDest = getHaversineDistance(currentCoords, dest);
-    if (distToDest <= arrivalDistanceRef.current) {
-      isSubmittingRef.current = true; // ← lock
+    // Use FREE local math to see if they are near destination
+    const localDistanceToDest = getHaversineDistance(currentCoords, dest);
+
+    // If they are within your arrival threshold (e.g., 0.05 km / 50 meters)
+    if (localDistanceToDest <= arrivalDistanceRef.current) {
+      hasReachedDestinationRef.current = true;
+      isSubmittingRef.current = true;
+
+      try {
+        // CALL GOOGLE API EXACTLY ONCE HERE - At the very end of the trip!
+        const totalResult = await fetchRoadDistanceAndToll(origin, dest);
+        roadDistanceRef.current = totalResult.distance;
+        // If you still need tolls, totalResult.toll is captured here ONCE.
+      } catch (e) {
+        console.error(
+          "Final distance fetch failed, falling back to local math",
+          e,
+        );
+        roadDistanceRef.current = totalTraveledDistanceRef.current;
+      }
+
       await stopTracking();
       await submitTripInBackground();
-      totalTraveledDistanceRef.current = 0;
-      routeCoordsRef.current = [];
-      lastCoordsRef.current = null;
       isSubmittingRef.current = false;
       return true;
     }
@@ -366,41 +433,62 @@ export default function SubmitExpenseScreen() {
     finalDistance: number,
     finalEndTime: Date,
     finalImageUrl: string,
+    endTripReason: string,
+    finalToll: number = 0,
   ) => {
     const currentLoc = currentLocationRef.current;
 
     let subToAddress = finalToAddress;
     let subDistance = finalDistance;
-    let finalToll = 0;
+    let finalTollAmount = finalToll;
 
     // Perform comparison if going home and we have a valid starting point
     if (toHome && points && currentLocation) {
-      const distToCurrent = getHaversineDistance(points, currentLocation);
-      const distToOffice = getHaversineDistance(points, officeCoords);
+      const resultToCurrent = await fetchRoadDistanceAndToll(
+        points,
+        currentLocation,
+      );
 
-      if (distToOffice < distToCurrent) {
-        console.log(`Route Comparison: Using Current.`);
-      } else {
-        console.log(`Route Comparison: Using Office.`);
-        subDistance = parseFloat(distToOffice.toFixed(2));
+      if (resultToCurrent.distance * 1.2 > drivingDistance) {
+        resultToCurrent.distance = drivingDistance;
+      }
+
+      const resultToOffice = await fetchRoadDistanceAndToll(
+        points,
+        officeCoords,
+      );
+
+      if (resultToOffice.distance < resultToCurrent.distance) {
+        subDistance = resultToOffice.distance;
         if (officeCoords) {
           subToAddress = await getAddressFromCoords(
             officeCoords.lat,
             officeCoords.lng,
           );
-          if (currentLocation) {
-            finalToll = await fetchTollCost(currentLocation, officeCoords);
-          }
+          finalTollAmount = resultToOffice.toll;
         }
+      } else {
+        finalTollAmount = resultToCurrent.toll;
       }
     }
-    if (finalToll === 0 && currentLocation && destination) {
-      finalToll = await fetchTollCost(currentLocation, destination);
+
+    // If toll wasn't calculated above and we have origin/destination
+    if (finalTollAmount === 0 && currentLocation && destination) {
+      const result = await fetchRoadDistanceAndToll(
+        currentLocation,
+        destination,
+      );
+      finalTollAmount = result.toll;
+    }
+
+    let mileageRateTemp = mileageRate;
+
+    if (subDistance > outStationDistance) {
+      mileageRateTemp = mileageRateOutstation;
     }
 
     let mileage = subDistance * mileageRate;
-    let total = mileage + finalToll;
-    // ────────────────────────────────────────────────────────────────────────
+    let total = mileage + finalTollAmount;
 
     try {
       await addDoc(collection(db, "trips"), {
@@ -408,7 +496,7 @@ export default function SubmitExpenseScreen() {
         from_address: fromAddress,
         to_address: subToAddress,
         distance: subDistance,
-        toll: parseFloat(finalToll.toFixed(2)), // ← new field
+        toll: parseFloat(finalTollAmount.toFixed(2)),
         mileage: parseFloat(mileage.toFixed(2)),
         total: parseFloat(total.toFixed(2)),
         remark: remarkRef.current || formRemark,
@@ -416,6 +504,7 @@ export default function SubmitExpenseScreen() {
         to_time: finalEndTime,
         to_home: toHome,
         route_image_url: finalImageUrl,
+        endTripReason: endTripReason,
         date: new Date().toISOString().split("T")[0],
         platform: 1,
         created_at: serverTimestamp(),
@@ -432,12 +521,11 @@ export default function SubmitExpenseScreen() {
   };
 
   const startTracking = async () => {
-    // 1. Check Foreground Permission
+    await calculateDistance();
     const { status: fgStatus } =
       await Location.requestForegroundPermissionsAsync();
     if (fgStatus !== "granted") return;
 
-    // 2. Check Background Permission (Crucial!)
     const { status: bgStatus } =
       await Location.requestBackgroundPermissionsAsync();
     if (bgStatus !== "granted") {
@@ -448,12 +536,10 @@ export default function SubmitExpenseScreen() {
       return;
     }
 
-    // 3. Start Background Updates
     await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
       accuracy: Location.Accuracy.High,
       distanceInterval: 10,
       deferredUpdatesInterval: 1000,
-      // This keeps a notification visible so Android doesn't kill the app
       foregroundService: {
         notificationTitle: "Trip in Progress",
         notificationBody: "Tracking your location for the expense report.",
@@ -496,7 +582,6 @@ export default function SubmitExpenseScreen() {
   ) => {
     if (coords.length === 0) return null;
 
-    // ── 1. Sample points to stay under URL limit ──────────────────
     const MAX_POINTS = 50;
     const sampled =
       coords.length <= MAX_POINTS
@@ -508,12 +593,10 @@ export default function SubmitExpenseScreen() {
               i % Math.floor(coords.length / MAX_POINTS) === 0,
           );
 
-    // ── 2. Build path string ───────────────────────────────────────
     const pathString = sampled
       .map((c) => `${c.latitude},${c.longitude}`)
       .join("|");
 
-    // ── 3. Start and end markers ───────────────────────────────────
     const start = coords[0];
     const end = coords[coords.length - 1];
     const markerA = `markers=color:green|label:A|${start.latitude},${start.longitude}`;
@@ -531,7 +614,6 @@ export default function SubmitExpenseScreen() {
 
     const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join("&")}`;
 
-    // ── 4. Safety check — log if still too long ───────────────────
     if (url.length > 8192) {
       console.warn("Static map URL too long:", url.length, "chars");
     }
@@ -543,23 +625,17 @@ export default function SubmitExpenseScreen() {
     coords: { latitude: number; longitude: number }[],
     tripId: string,
   ) => {
-    const staticImageUrl = getStaticMapUrl(coords); // Use the helper from the previous step
+    const staticImageUrl = getStaticMapUrl(coords);
     if (!staticImageUrl) return null;
 
     try {
-      // 1. Fetch the image from Google as a blob
       const response = await fetch(staticImageUrl);
       const blob = await response.blob();
 
-      // 2. Initialize Storage and reference the folder
       const storage = getStorage();
-      // Path: route-images/trip_12345.jpg
       const storageRef = ref(storage, `route-images/${tripId}.jpg`);
 
-      // 3. Upload to Firebase
       const snapshot = await uploadBytes(storageRef, blob);
-
-      // 4. Get the permanent Firebase URL to save in Firestore
       const downloadURL = await getDownloadURL(snapshot.ref);
       return downloadURL;
     } catch (error) {
@@ -599,7 +675,6 @@ export default function SubmitExpenseScreen() {
           .trim();
       }
 
-      // ── Fallback to native if Google fails ────────────────────────
       console.warn(
         "Google geocoding failed, falling back to native:",
         data.status,
@@ -616,7 +691,6 @@ export default function SubmitExpenseScreen() {
       return "Address not found";
     } catch (error) {
       console.error("Geocoding fetch error:", error);
-      // ── Fallback to native on network error ───────────────────────
       try {
         const geo = await Location.reverseGeocodeAsync({
           latitude: lat,
@@ -650,7 +724,6 @@ export default function SubmitExpenseScreen() {
     return R * c;
   }
 
-  // ─── 1. Fetch current location ONCE on mount (for the From field only) ───────
   const fetchCurrentLocation = async () => {
     setLocationLoading(true);
     try {
@@ -661,8 +734,6 @@ export default function SubmitExpenseScreen() {
         return;
       }
 
-      // Use a slightly lower accuracy or a timeout for the initial fix
-      // to ensure it doesn't hang indefinitely
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -685,7 +756,6 @@ export default function SubmitExpenseScreen() {
     }
   };
 
-  // ─── 2. Auth + initial location fetch on mount ────────────────────────────────
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -700,6 +770,22 @@ export default function SubmitExpenseScreen() {
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
+
+            const homeCoord = userData.home_coordinates;
+            if (homeCoord) {
+              setHomeCoords({
+                lat: homeCoord.latitude,
+                lng: homeCoord.longitude,
+              });
+            }
+
+            const officeLocation = userData.office;
+
+            if (officeLocation === 0) {
+              setOfficeCoords(locations[0]);
+            } else {
+              setOfficeCoords(locations[1]);
+            }
           } else {
             setUsername(user.displayName || "User");
           }
@@ -721,29 +807,21 @@ export default function SubmitExpenseScreen() {
     };
   }, []);
 
-  // ─── 3. Start path tracking ONLY when tripActive becomes true ────────────────
+  // UPDATED: Track with road distance calculation
   useEffect(() => {
     if (!tripActive) return;
 
     let isMounted = true;
+    let originCoords = currentLocationRef.current;
 
-    // Helper function to handle coordinate math and state updating
-    const handleNewCoordinate = (lat: number, lng: number) => {
+    const handleNewCoordinate = async (lat: number, lng: number) => {
       if (!tripActiveRef.current) return;
 
       const curr = { lat, lng };
-
-      // Update all state for UI
       setCurrentLocation(curr);
       currentLocationRef.current = curr;
-      setPoints((prev) => [curr, prev[1]]);
-      setRouteCoords((prev) => {
-        const updated = [...prev, { latitude: lat, longitude: lng }];
-        routeCoordsRef.current = updated;
-        return updated;
-      });
 
-      // ── Distance calculation using ONLY refs (no nested setState) ──
+      // Calculate distance locally from previous point to map out incremental progress
       const prev = lastCoordsRef.current;
       if (prev) {
         const delta = getHaversineDistance(prev, curr);
@@ -753,8 +831,8 @@ export default function SubmitExpenseScreen() {
         setTotalTraveledDistance(newTotal);
         setDistance(`${newTotal.toFixed(2)} km`);
 
-        // ── Auto-submit check runs OUTSIDE any setState callback ──
-        checkAndAutoSubmit(curr, newTotal);
+        // Check arrival status locally
+        await checkAndAutoSubmitWithRoadDistance(curr, originCoords);
       }
 
       lastCoordsRef.current = curr;
@@ -767,6 +845,7 @@ export default function SubmitExpenseScreen() {
 
       if (currentLocation) {
         setLastCoords(currentLocation);
+        originCoords = currentLocation;
         setRouteCoords([
           { latitude: currentLocation.lat, longitude: currentLocation.lng },
         ]);
@@ -781,7 +860,6 @@ export default function SubmitExpenseScreen() {
         (loc) => {
           handleNewCoordinate(loc.coords.latitude, loc.coords.longitude);
 
-          // Optional: Mirror map panning while foreground is active
           if (mapRef.current) {
             mapRef.current.animateToRegion(
               {
@@ -799,7 +877,6 @@ export default function SubmitExpenseScreen() {
       locationSubscriptionRef.current = subscription;
     })();
 
-    // 2. Listen to Background Stream events when app wakes back up / runs in background
     const backgroundSubscription = DeviceEventEmitter.addListener(
       BG_LOCATION_EVENT,
       (coords) => {
@@ -815,8 +892,140 @@ export default function SubmitExpenseScreen() {
     };
   }, [tripActive]);
 
+  const selectDefault = async (index: number) => {
+    console.log(tripActive);
+    if (index === 0) {
+      return;
+    }
+
+    setToHome(false);
+    if (selectedGoingIndex === index) {
+      setSelectedGoingIndex(0);
+      clearAddress();
+    } else if (index === 1) {
+      setSelectedGoingIndex(index);
+      const location = locations[0];
+      let address = await getAddressFromCoords(location.lat, location.lng);
+      setToAddress(address);
+      updateDestination(location);
+    } else if (index === 2) {
+      setSelectedGoingIndex(index);
+      const location = locations[1];
+      let address = await getAddressFromCoords(location.lat, location.lng);
+
+      setToAddress(address);
+      updateDestination(location);
+    } else if (index === 3) {
+      setToHome(true);
+      setSelectedGoingIndex(index);
+      let homeAddress = await getAddressFromCoords(
+        homeCoords.lat,
+        homeCoords.lng,
+      );
+      setToAddress(homeAddress);
+      updateDestination(homeCoords);
+    }
+  };
+
+  const clearAddress = () => {
+    setToAddress("");
+    setDestination(null);
+  };
+
+  // Add this function to your component
+  const getRoadDistance = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ) => {
+    const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!key) {
+      throw new Error("Google Maps API key is required");
+    }
+
+    try {
+      const response = await fetch(
+        "https://routes.googleapis.com/directions/v2:computeRoutes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key,
+            "X-Goog-FieldMask":
+              "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+          },
+          body: JSON.stringify({
+            origin: {
+              location: {
+                latLng: {
+                  latitude: origin.lat,
+                  longitude: origin.lng,
+                },
+              },
+            },
+            destination: {
+              location: {
+                latLng: {
+                  latitude: destination.lat,
+                  longitude: destination.lng,
+                },
+              },
+            },
+            travelMode: "DRIVE",
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || "Failed to calculate route");
+      }
+
+      const route = data.routes?.[0];
+
+      if (!route) {
+        throw new Error("No route found");
+      }
+
+      const distanceMeters = route.distanceMeters || 0;
+      const distanceKm = distanceMeters / 1000;
+      const durationSeconds = route.duration || 0;
+
+      return {
+        distance: distanceKm,
+        distanceMeters: distanceMeters,
+        duration: durationSeconds,
+        durationMinutes: durationSeconds / 60,
+        polyline: route.polyline?.encodedPolyline || "",
+      };
+    } catch (error) {
+      console.error("Error calculating road distance:", error);
+      throw error;
+    }
+  };
+
+  // Then use it anywhere in your component:
+  const calculateDistance = async () => {
+    try {
+      const origin = currentLocation;
+      const dest = destination;
+
+      const result = await getRoadDistance(origin, dest);
+      console.log(`Distance: ${result.distance.toFixed(2)} km`);
+      console.log(`Duration: ${result.durationMinutes.toFixed(0)} min`);
+
+      // Use the distance for calculations
+      const mileageCost = result.distance * mileageRate;
+      console.log(`Mileage cost: RM ${mileageCost.toFixed(2)}`);
+      setDrivingDistance(result.distance);
+    } catch (error) {
+      console.error("Failed to get distance:", error);
+    }
+  };
+
   const submitTrip = async () => {
-    const currentLoc = currentLocationRef.current; // ← ref, not state
+    const currentLoc = currentLocationRef.current;
     if (!currentLoc) return;
 
     try {
@@ -838,6 +1047,7 @@ export default function SubmitExpenseScreen() {
         parseFloat(finalDistance.toFixed(2)),
         endTime,
         routeImageUrl ?? "",
+        endTripReason,
       );
     } catch (error) {
       console.error("Submission error:", error);
@@ -846,7 +1056,7 @@ export default function SubmitExpenseScreen() {
   };
 
   const submitTripInBackground = async () => {
-    const startPoint = pointsRef.current?.[0]; // add a ref for points
+    const startPoint = pointsRef.current?.[0];
     const currentLoc = currentLocationRef.current;
     const dest = destinationRef.current;
 
@@ -858,20 +1068,37 @@ export default function SubmitExpenseScreen() {
       let finalToll = 0;
       let finalRouteCoords = routeCoordsRef.current;
 
-      // toHome logic
+      // toHome logic with road distance
       if (toHome && startPoint && officeCoords) {
-        const distToCurrent = getHaversineDistance(startPoint, currentLoc);
-        const distToOffice = getHaversineDistance(startPoint, officeCoords);
-        if (distToOffice < distToCurrent) {
-          finalDistance = distToOffice;
+        const resultToCurrent = await fetchRoadDistanceAndToll(
+          startPoint,
+          currentLoc,
+        );
+        const resultToOffice = await fetchRoadDistanceAndToll(
+          startPoint,
+          officeCoords,
+        );
+
+        if (resultToOffice.distance < resultToCurrent.distance) {
+          finalDistance = resultToOffice.distance;
           finalToAddress = await getAddressFromCoords(
             officeCoords.lat,
             officeCoords.lng,
           );
-          finalToll = await fetchTollCost(currentLoc, officeCoords);
+          finalToll = resultToOffice.toll;
+        } else {
+          finalToll = resultToCurrent.toll;
         }
       } else if (dest) {
-        finalToll = await fetchTollCost(currentLoc, dest);
+        const result = await fetchRoadDistanceAndToll(currentLoc, dest);
+        finalToll = result.toll;
+        // Use the road distance from origin to destination if available
+        if (roadDistanceRef.current > 0) {
+          finalDistance = roadDistanceRef.current;
+        } else {
+          // Fallback: use the accumulated distance
+          finalDistance = totalTraveledDistanceRef.current;
+        }
       }
 
       const mileage = finalDistance * mileageRate;
@@ -897,7 +1124,6 @@ export default function SubmitExpenseScreen() {
         created_at: serverTimestamp(),
       });
 
-      // Silent notification (optional)
       await sendTripSavedNotification(finalDistance, total);
     } catch (error) {
       console.error("Background submission failed:", error);
@@ -910,16 +1136,16 @@ export default function SubmitExpenseScreen() {
       });
     } finally {
       await stopTracking();
-      // Reset only the tracking refs, not the UI fields
       totalTraveledDistanceRef.current = 0;
       routeCoordsRef.current = [];
       toAddressRef.current = "";
-      // Do NOT reset fromAddress, destination, etc. – user might start another trip
+      roadDistanceRef.current = 0;
+      hasReachedDestinationRef.current = false;
     }
   };
 
   const submitTripEarly = async () => {
-    const currentLoc = currentLocationRef.current; // ← ref, not state
+    const currentLoc = currentLocationRef.current;
     if (!currentLoc) {
       Alert.alert(
         "Error",
@@ -958,6 +1184,7 @@ export default function SubmitExpenseScreen() {
         parseFloat(finalDistance.toFixed(2)),
         endTime,
         routeImageUrl ?? "",
+        endTripReason,
       );
     } catch (error) {
       console.error("Submission error:", error);
@@ -965,17 +1192,100 @@ export default function SubmitExpenseScreen() {
     }
   };
 
+  const renderEndTripModal = () => {
+    let isSaving = false;
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showEndTripModal}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isSaving && setShowEndTripModal(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>End Trip Early?</Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.modalSubtitle}>
+                    Do you want to end trip early? Please give a reason.
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    Distance Travelled: {distance}
+                  </Text>
+
+                  <Text style={styles.modalSubtitle}>Reason:</Text>
+                  <TextInput
+                    style={[styles.input, styles.textbox]}
+                    placeholder="End Trip Reason"
+                    placeholderTextColor="#999999"
+                    value={endTripReason}
+                    onChangeText={setEndTripReason}
+                    editable={!isSaving}
+                    keyboardType="default"
+                    numberOfLines={3}
+                    multiline={true}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowEndTripModal(false);
+                      setEndTripReason("");
+                    }}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
+                    onPress={() => {
+                      console.log("a");
+                      submitTripEarly();
+                    }}
+                    disabled={isSaving || endTripReason === ""}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Confirm</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    );
+  };
+
   const resetBackgroundState = () => {
-    // Reset refs (no state setters)
     totalTraveledDistanceRef.current = 0;
     toAddressRef.current = "";
     routeCoordsRef.current = [];
-    //lastCoordsRef.current = null;
     currentLocationRef.current = null;
     remarkRef.current = "";
     fromTimeRef.current = null;
-    // Optionally reset flags
-    setTripActive(false); // but you'll need to manage this carefully
+    roadDistanceRef.current = 0;
+    hasReachedDestinationRef.current = false;
+    setTripActive(false);
   };
 
   const defaultRegion = {
@@ -1030,18 +1340,81 @@ export default function SubmitExpenseScreen() {
               setToAddress(address);
               updateDestination(location);
             }}
+            disabled={selectedGoingIndex !== 0}
           />
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Going Home:</Text>
-            <Switch
-              trackColor={{ false: "#767577", true: "#81b0ff" }}
-              thumbColor={tripActive ? "#2196F3" : "#f4f3f4"}
-              ios_backgroundColor="#3e3e3e"
-              value={toHome}
-              onValueChange={(newValue) => setToHome(newValue)}
+          <View style={[{ flexDirection: "row", marginTop: 5 }]}>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 1
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 0 },
+              ]}
+              onPress={() => {
+                selectDefault(1);
+              }}
               disabled={tripActive}
-            />
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 1
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                HQ
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 2
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 15 },
+              ]}
+              onPress={() => {
+                selectDefault(2);
+              }}
+              disabled={tripActive}
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 2
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                Penang
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 3
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 15 },
+              ]}
+              onPress={() => {
+                selectDefault(3);
+              }}
+              disabled={tripActive}
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 3
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                Home
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.label}>Remark (Optional):</Text>
@@ -1057,9 +1430,7 @@ export default function SubmitExpenseScreen() {
 
           {distance && (
             <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>
-                📏 Actual Distance: {distance}
-              </Text>
+              <Text style={styles.distanceText}>📏 Distance: {distance}</Text>
               <Text style={styles.addressPreview} numberOfLines={1}>
                 {fromAddress} → {toAddress}
               </Text>
@@ -1115,14 +1486,17 @@ export default function SubmitExpenseScreen() {
               style={[
                 styles.button,
                 { backgroundColor: "#f44336", marginTop: 10 },
-                (!currentLocation || locationLoading) && styles.buttonDisabled,
+                (!currentLocation || locationLoading || !formRemark) &&
+                  styles.buttonDisabled,
               ]}
-              onPress={submitTripEarly}
+              onPress={() => setShowEndTripModal(true)}
               disabled={!currentLocation || locationLoading}
             >
               <Text style={styles.buttonText}>End Trip Early</Text>
             </TouchableOpacity>
           )}
+
+          {renderEndTripModal()}
         </View>
       </KeyboardAwareScrollView>
     </View>
@@ -1178,4 +1552,83 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#aaa" },
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  textStyle: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  textStyleActive: {
+    color: "#2196F3",
+  },
+  submitButton: {
+    backgroundColor: "#2196F3",
+  },
+  submitButtonActive: {
+    backgroundColor: "#fff",
+    borderColor: "#2196F3",
+    borderWidth: 1,
+  },
+  dialogButton: {
+    borderRadius: 8,
+    padding: 12,
+    flex: 1,
+    alignItems: "center",
+  },
+  screenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  modalScrollWrapper: {
+    flex: 1,
+    width: "100%",
+    maxHeight: "80%",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  modalView: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 25,
+    alignItems: "stretch",
+    shadowColor: "#000",
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+    elevation: 0,
+  },
+  cancelButton: {
+    backgroundColor: "#f44336",
+  },
+  formGroup: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: "normal",
+    marginBottom: 8,
+    color: "#666",
+  },
+  textbox: {
+    height: 100,
+    paddingTop: 10,
+    width: "100%",
+  },
 });
