@@ -98,6 +98,60 @@ interface Trip {
   created_at: any;
 }
 
+interface OutstationExpense {
+  id: string;
+  user_id: string;
+  user_name: string;
+  request_id: string;
+  start_date: string;
+  end_date: string;
+  trip_title: string;
+  date: string;
+  country: string;
+  location: string;
+  airfare: number;
+  airfare_remark: string;
+  parking: number;
+  parking_remark: string;
+  transport: number;
+  transport_remark: string;
+  hotel: number;
+  hotel_remark: string;
+  own_acc: number;
+  own_acc_sharing: string;
+  own_acc_remark: string;
+  entertainment: number;
+  entertainment_remark: string;
+  laundry: number;
+  laundry_remark: string;
+  others: number;
+  others_remark: string;
+  total: number;
+  departure_time: string;
+  arrival_time: string;
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+  trip_report: string;
+  customer: any[];
+  business_card_urls: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
+
+interface ExpenseGroup {
+  request_id: string;
+  user_id: string;
+  user_name: string;
+  trip_title: string;
+  start_date: string;
+  end_date: string;
+  data: OutstationExpense[];
+  total_amount: number;
+  type: number;
+}
+
 interface User {
   id: string;
   username: string;
@@ -120,6 +174,9 @@ export default function ExpensesWebScreen() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [generalExpense, setGeneralExpense] = useState<GeneralExpense[]>([]);
+  const [oustationExpense, setOutstationExpense] = useState<
+    OutstationExpense[]
+  >([]);
   const [allTripIds, setAllTripIds] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -162,6 +219,13 @@ export default function ExpensesWebScreen() {
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null,
   );
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
+    null,
+  );
+  const [selectedTripIndex, setSelectedTripIndex] = useState(0);
+  const [selectedOutstationId, setSelectedOutstationId] = useState<
+    string | null
+  >(null);
   const [selectedExpenseType, setSelectedExpenseType] = useState<number>(1);
 
   const purposeList = [
@@ -299,6 +363,7 @@ export default function ExpensesWebScreen() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const expensesData: Expense[] = [];
       const generalExpenseData: GeneralExpense[] = [];
+      const outstationExpenseData: OutstationExpense[] = [];
       /* querySnapshot.forEach((doc) =>
         expensesData.push({ id: doc.id, ...doc.data() } as Expense),
       ); */
@@ -308,6 +373,11 @@ export default function ExpensesWebScreen() {
           expensesData.push({ id: doc.id, ...data } as Expense);
         } else if (data.type === 2) {
           generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
+        } else if (data.type === 3) {
+          outstationExpenseData.push({
+            id: doc.id,
+            ...data,
+          } as OutstationExpense);
         }
       });
       setExpenses(expensesData);
@@ -315,6 +385,7 @@ export default function ExpensesWebScreen() {
       setAllTripIds([...new Set(allTripIds)]);
 
       setGeneralExpense(generalExpenseData);
+      setOutstationExpense(outstationExpenseData);
     });
 
     return () => unsubscribe();
@@ -517,7 +588,8 @@ export default function ExpensesWebScreen() {
   };
 
   const filteredExpenses = expenses.filter((e) => {
-    if (appliedExpenseType == "General") return false;
+    if (appliedExpenseType == "General" || appliedExpenseType == "Outstation")
+      return false;
     if (
       !e.date ||
       (!appliedStartDate &&
@@ -535,7 +607,8 @@ export default function ExpensesWebScreen() {
   });
 
   const filteredGeneralExpenses = generalExpense.filter((e) => {
-    if (appliedExpenseType == "Mileage") return false;
+    if (appliedExpenseType == "Mileage" || appliedExpenseType == "Outstation")
+      return false;
     if (
       !e.date ||
       (!appliedStartDate &&
@@ -550,6 +623,91 @@ export default function ExpensesWebScreen() {
       !(appliedUsername && e.user_name != appliedUsername) &&
       !(appliedExpensePurpose && e.expense_type != appliedExpensePurpose)
     );
+  });
+
+  const filteredOutstationExpense = oustationExpense.filter((e) => {
+    if (appliedExpenseType == "Mileage" || appliedExpenseType == "General")
+      return false;
+    if (
+      !e.date ||
+      (!appliedStartDate &&
+        !appliedEndDate &&
+        !usernameFilter &&
+        (expenseType != "Oustation" || !appliedExpensePurpose))
+    )
+      return true;
+
+    return (
+      !(appliedStartDate && e.date < appliedStartDate) &&
+      !(appliedEndDate && e.date > appliedEndDate) &&
+      !(appliedUsername && e.user_name != appliedUsername)
+    );
+  });
+
+  const groupedExpenses = filteredOutstationExpense.reduce<ExpenseGroup[]>(
+    (acc, expense) => {
+      const tripTitle = expense.trip_title || "Untitled Trip";
+      const existingGroup = acc.find((group) => group.trip_title === tripTitle);
+      const requestId = expense.request_id || "";
+      const userId = expense.user_id || "";
+      const username = expense.user_name || "";
+      const type = expense.type || 3;
+      const startDate = expense.start_date || "N/A";
+      const endDate = expense.end_date || "N/A";
+
+      // Ensure total is a number - convert string to number if needed
+      const expenseTotal =
+        typeof expense.total === "string"
+          ? parseFloat(expense.total) || 0
+          : Number(expense.total) || 0;
+
+      if (existingGroup) {
+        existingGroup.data.push(expense);
+        existingGroup.total_amount =
+          (Number(existingGroup.total_amount) || 0) + expenseTotal;
+      } else {
+        acc.push({
+          request_id: requestId,
+          user_id: userId,
+          user_name: username,
+          start_date: startDate,
+          end_date: endDate,
+          trip_title: tripTitle,
+          data: [expense],
+          total_amount: expenseTotal,
+          type: type,
+        });
+      }
+      return acc;
+    },
+    [],
+  );
+
+  const sortExpensesByDate = (
+    expenses: OutstationExpense[],
+  ): OutstationExpense[] => {
+    return [...expenses].sort((a, b) => {
+      // Handle null/undefined/empty dates
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+
+      // Try to parse dates
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+
+      // Handle invalid dates
+      if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+
+      // Ascending order
+      return dateA.getTime() - dateB.getTime();
+    });
+  };
+
+  groupedExpenses.forEach((group) => {
+    group.data = sortExpensesByDate(group.data);
   });
 
   const handleDelete = async (id: string) => {
@@ -2067,6 +2225,7 @@ export default function ExpensesWebScreen() {
                     <option value="All">All</option>
                     <option value="Mileage">Mileage Expense</option>
                     <option value="General">General Expense</option>
+                    <option value="Outstation">Outstation Expense</option>
                   </select>
                 </View>
 
@@ -2376,6 +2535,14 @@ export default function ExpensesWebScreen() {
       return (
         <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 8 }}>
           {renderGeneralDetailView(selectedGeneralExpense)}
+        </View>
+      );
+    }
+
+    if (selectedOutstationTrip && selectedExpenseType === 3) {
+      return (
+        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 8 }}>
+          {renderOutstationDetailView(selectedOutstationTrip)}
         </View>
       );
     }
@@ -2816,21 +2983,21 @@ export default function ExpensesWebScreen() {
                     <Text style={styles.descriptionText}>
                       {trip.platform === 1 ? "Web" : "Mobile"}
                     </Text>
-                    <Text style={styles.tripRemark}>
+                    <Text style={styles.tripDetail}>
                       <strong>Remark: </strong>
                       {trip.remark}
                     </Text>
-                    {/* <Text style={styles.tripAddress}>
+                    {/* <Text style={styles.tripDetail}>
                       <strong>Time: </strong>
                       {formatFirebaseTime(trip.from_time)} →{" "}
                       {formatFirebaseTime(trip.to_time)}
                     </Text> */}
-                    <Text style={styles.tripAddress}>
+                    <Text style={styles.tripDetail}>
                       <strong>Trip: </strong>
                       {trip.from_address} → {trip.to_address} (
                       {trip.distance?.toFixed(2)} km)
                     </Text>
-                    <Text style={styles.tripAddress}>
+                    <Text style={styles.tripDetail}>
                       <strong>Going Home: </strong>
                       {trip.to_home === true ? "True" : "False"}
                     </Text>
@@ -3202,6 +3369,891 @@ export default function ExpensesWebScreen() {
     );
   };
 
+  const renderOutstationDetailView = (trip: ExpenseGroup) => {
+    //const isEditing = editingId === expense.id;
+    const isEditing = false;
+
+    let expense = trip.data[selectedTripIndex];
+
+    return (
+      <View>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: "#eee",
+            paddingBottom: 12,
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: "600" }}>
+            Expense Details
+          </Text>
+          {/* <View style={{ flexDirection: "row" }}>
+            {!isEditing &&
+              expense.approval_status === 0 &&
+              expense.user_id === userId && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#FF9800",
+                    padding: 8,
+                    borderRadius: 6,
+                    minWidth: 60,
+                    alignItems: "center",
+                  }}
+                  onPress={() => {
+                    test();
+                    //handleEditGeneral(expense)
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+              )}
+            {!isEditing && (
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "#F44336",
+                  padding: 8,
+                  borderRadius: 6,
+                  marginLeft: 8,
+                  minWidth: 60,
+                  alignItems: "center",
+                }}
+                onPress={() => handleDelete(expense.id)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View> */}
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}
+        >
+          <View style={{ flexDirection: "row" }}>
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Date:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {formatDate(expense.date)}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 14, color: "#666", marginRight: 15 }}>
+              {selectedTripIndex + 1} / {groupedExpenses.length}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedTripIndex(selectedTripIndex - 1);
+              }}
+              disabled={selectedTripIndex <= 0}
+              style={{
+                backgroundColor: selectedTripIndex <= 0 ? "#B0BEC5" : "#2196F3",
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 10,
+              }}
+            >
+              <Text
+                style={{ color: "#FFFFFF", fontSize: 20, fontWeight: "bold" }}
+              >
+                ←
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedTripIndex(selectedTripIndex + 1);
+              }}
+              disabled={selectedTripIndex >= groupedExpenses.length - 1}
+              style={{
+                backgroundColor:
+                  selectedTripIndex >= groupedExpenses.length - 1
+                    ? "#B0BEC5"
+                    : "#2196F3",
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{ color: "#FFFFFF", fontSize: 20, fontWeight: "bold" }}
+              >
+                →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", marginBottom: 10 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Airfare:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.airfare || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Airfare Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.airfare_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Parking:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.parking || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Parking Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.parking_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Transport:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.transport || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Transport Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.transport_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Hotel:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.hotel || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Hotel Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.hotel_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", marginBottom: 10 }}>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Own Acc:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.own_acc || "0.00"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Solo/Duo:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.own_acc_sharing || "N/A"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Own Acc Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.own_acc_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Entertainment:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.entertainment || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Entertainment Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.entertainment_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Laundry:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.laundry || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Laundry Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.laundry_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Others:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                RM {expense.others || "0"}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Others Remark:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.others_remark || "N/A"}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", marginBottom: 10 }}>
+          {expense.departure_time && (
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Departure Time:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {formatFirebaseTime(expense.departure_time)}
+              </Text>
+            </View>
+          )}
+
+          {expense.arrival_time && (
+            <View style={{ flexDirection: "column", marginRight: 20 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Arrival Time:
+              </Text>
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {formatFirebaseTime(expense.arrival_time)}
+              </Text>
+            </View>
+          )}
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Breakfast:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.breakfast ? "✓" : "✗"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Lunch:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.lunch ? "✓" : "✗"}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "column", marginRight: 20 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#999",
+                fontWeight: "bold",
+                marginBottom: 4,
+              }}
+            >
+              Dinner:
+            </Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.inlineInput}
+                value={editFormDataGeneral.name}
+                onChangeText={(text) =>
+                  setEditFormDataGeneral({ ...editFormData, name: text })
+                }
+                placeholder="Customer Name"
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: "#444" }}>
+                {expense.dinner ? "✓" : "✗"}
+              </Text>
+            )}
+          </View>
+        </View>
+        <View style={{ marginBottom: 10 }}>
+          {expense.customer?.map((item, index) => (
+            <View style={{ marginBottom: 10, flexDirection: "column" }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Customer #{index + 1}:
+              </Text>
+              <View style={{ flexDirection: "row" }}>
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Name:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {item.name}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Email:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {item.email}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Number:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {item.number}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Time:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {format12Hour(item.time)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ marginBottom: 10 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#999",
+              fontWeight: "bold",
+              marginBottom: 4,
+            }}
+          >
+            Trip Report:
+          </Text>
+          {isEditing ? (
+            <TextInput
+              style={[
+                styles.inlineInput,
+                { minHeight: 200, width: "100%", maxWidth: "100%" },
+              ]}
+              value={editFormDataGeneral.expense_report}
+              multiline
+              onChangeText={(text) =>
+                setEditFormDataGeneral({
+                  ...editFormData,
+                  expense_report: text,
+                })
+              }
+              placeholder="Expense Report"
+            />
+          ) : (
+            <Text style={{ fontSize: 14, color: "#444" }}>
+              {expense.trip_report || "N/A"}
+            </Text>
+          )}
+        </View>
+
+        {isEditing && (
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#4CAF50",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={handleSaveEditGeneral}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#F44336",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={handleCancelEdit}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Admin approve/reject */}
+        {/* {role === 0 && expense.approval_status === 0 && !isEditing && (
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#4CAF50",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => handleStatus(expense.id, 1)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#F44336",
+                padding: 12,
+                borderRadius: 6,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => handleStatus(expense.id, 2)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        )} */}
+      </View>
+    );
+  };
+
   const renderSelectUserModal = () => {
     return (
       <Modal
@@ -3391,12 +4443,26 @@ export default function ExpensesWebScreen() {
     }
   }, [filteredGeneralExpenses, selectedExpenseId, selectedExpenseType]);
 
+  useEffect(() => {
+    if (selectedExpenseType != 3) return;
+    if (
+      selectedRequestId &&
+      !groupedExpenses.some((e) => e.request_id === selectedRequestId)
+    ) {
+      setSelectedRequestId(null);
+    }
+  }, [groupedExpenses, selectedRequestId, selectedExpenseType]);
+
   const selectedExpense = filteredExpenses.find(
     (e) => e.id === selectedExpenseId,
   );
 
   const selectedGeneralExpense = filteredGeneralExpenses.find(
     (e) => e.id === selectedExpenseId,
+  );
+
+  const selectedOutstationTrip = groupedExpenses.find(
+    (e) => e.request_id === selectedRequestId,
   );
 
   return (
@@ -3441,6 +4507,7 @@ export default function ExpensesWebScreen() {
                 onPress={() => {
                   setSelectedExpenseId(item.id);
                   setSelectedExpenseType(item.type);
+                  setSelectedRequestId("");
                 }}
               >
                 <View
@@ -3520,6 +4587,7 @@ export default function ExpensesWebScreen() {
                 onPress={() => {
                   setSelectedExpenseId(item.id);
                   setSelectedExpenseType(item.type);
+                  setSelectedRequestId("");
                   test();
                 }}
               >
@@ -3582,6 +4650,89 @@ export default function ExpensesWebScreen() {
                     {typeof item.amount === "number"
                       ? item.amount.toFixed(2)
                       : item.amount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {groupedExpenses.map((item) => (
+              <TouchableOpacity
+                key={item.request_id}
+                style={{
+                  backgroundColor:
+                    selectedRequestId === item.request_id ? "#e3f2fd" : "#fff",
+                  borderLeftWidth:
+                    selectedRequestId === item.request_id ? 4 : 0,
+                  borderLeftColor: "#2196F3",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 12,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1,
+                }}
+                onPress={() => {
+                  setSelectedRequestId(item.request_id);
+                  setSelectedExpenseId("");
+                  setSelectedExpenseType(item.type);
+                  test();
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                  >
+                    {item.trip_title}
+                  </Text>
+                  <Text
+                    style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                  >
+                    {expenseTypeMap[String(3) as keyof typeof expenseTypeMap]}
+                  </Text>
+                </View>
+                <Text
+                  style={{ fontSize: 14, fontWeight: "600", marginBottom: 2 }}
+                ></Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#666",
+                    marginBottom: 8,
+                    fontWeight: "600",
+                  }}
+                >
+                  {item.user_name}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: "#888" }}>
+                    {formatDate(item.start_date || "")} -{" "}
+                    {formatDate(item.end_date || "")}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      color: "#2196F3",
+                    }}
+                  >
+                    RM{" "}
+                    {typeof item.total_amount === "number"
+                      ? item.total_amount.toFixed(2)
+                      : item.total_amount}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -4134,7 +5285,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 2,
   },
-  tripAddress: {
+  tripDetail: {
     fontSize: 12,
     color: "#000",
     marginTop: 2,

@@ -981,6 +981,7 @@ export default function OutstationExpenseForm() {
         dinner: formDinner,
         trip_report: formTripReport,
         business_card_urls: businessCardUrls,
+        customer: formCustomers,
         type: 3, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,
         created_at: serverTimestamp(),
