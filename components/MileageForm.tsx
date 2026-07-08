@@ -51,7 +51,7 @@ export default function MileageForm() {
   const [formOtherExpense, setFormOtherExpense] = useState<string>("0.00");
   const [formOtherExpenseType, setFormOtherExpenseType] = useState<string>("");
   const [formTripReport, setFormTripReport] = useState<string>("");
-  const [businessCardFile, setBusinessCardFile] = useState<File | null>(null);
+  const [businessCardFiles, setBusinessCardFiles] = useState<File[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("");
@@ -756,10 +756,6 @@ export default function MileageForm() {
         const location = locations[1];
         let address = await getAddressFromCoords(location.lat, location.lng);
 
-        console.log("penang");
-        console.log(location);
-        console.log(address);
-        console.log(locations);
         setFromAddress(address);
         setOriginCoord(location);
       } else if (index === 3) {
@@ -791,23 +787,15 @@ export default function MileageForm() {
         const location = locations[1];
         let address = await getAddressFromCoords(location.lat, location.lng);
 
-        console.log("penang");
-        console.log(location);
-        console.log(address);
-        console.log(locations);
         setToAddress(address);
         setDestCoord(location);
       } else if (index === 3) {
         setFormGoingHome(true);
         setSelectedGoingIndex(index);
-        const location = locations[1];
         let homeAddress = await getAddressFromCoords(
           homeCoords.lat,
           homeCoords.lng,
         );
-        console.log("home address");
-        console.log(homeAddress);
-        console.log(homeCoords);
         setToAddress(homeAddress);
         setDestCoord(homeCoords);
       }
@@ -1010,25 +998,25 @@ export default function MileageForm() {
     }
 
     try {
-      let businessCardUrl = "";
-      if (businessCardFile) {
+      /* let businessCardUrl = "";
+      if (businessCardFiles) {
         const storageRef = ref(
           storage,
-          `business-cards/${Date.now()}_${businessCardFile.name}`,
+          `business-cards/${Date.now()}_${businessCardFiles.name}`,
         );
-        const uploadResult = await uploadBytes(storageRef, businessCardFile);
+        const uploadResult = await uploadBytes(storageRef, businessCardFiles);
         businessCardUrl = await getDownloadURL(uploadResult.ref);
-      }
+      } */
 
-      const receiptUrls: string[] = [];
-      for (const file of receiptFiles) {
+      const businessCardUrls: string[] = [];
+      for (const file of businessCardFiles) {
         const storageRef = ref(
           storage,
-          `receipts/${userId}/${Date.now()}_${file.name}`,
+          `business-cards/${userId}/${Date.now()}_${file.name}`,
         );
         const uploadResult = await uploadBytes(storageRef, file);
         const url = await getDownloadURL(uploadResult.ref);
-        receiptUrls.push(url);
+        businessCardUrls.push(url);
       }
 
       const { fromTime, toTime } = getOverallTimes();
@@ -1047,8 +1035,7 @@ export default function MileageForm() {
         duration: calculateDuration(),
         distance: dist,
         trip_report: formTripReport,
-        business_card_url: businessCardUrl,
-        receipt_urls: receiptUrls,
+        business_card_urls: businessCardUrls,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
         mileage: parseFloat(calculateMileage()),
@@ -1080,7 +1067,7 @@ export default function MileageForm() {
     setFormToll("0.00");
     setFormOtherExpense("0.00");
     setFormOtherExpenseType("");
-    setBusinessCardFile(null);
+    setBusinessCardFiles([]);
     setReceiptFiles([]);
     setFormEmail("");
   };
@@ -1549,6 +1536,10 @@ export default function MileageForm() {
                         {formatTripTime(trip.to_time)}
                       </Text>
                       <Text style={styles.tripRemark}>
+                        {trip.id || "No Remark"} (
+                        {parseFloat(trip.distance || 0).toFixed(2)} km)
+                      </Text>
+                      <Text style={styles.tripRemark}>
                         {trip.remark || "No Remark"} (
                         {parseFloat(trip.distance || 0).toFixed(2)} km)
                       </Text>
@@ -1903,16 +1894,29 @@ export default function MileageForm() {
               />
             </View>
             <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Business Card:</Text>
+              <Text style={styles.fieldLabel}>Business Cards:</Text>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) =>
-                  e.target.files && setBusinessCardFile(e.target.files[0])
-                }
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setBusinessCardFiles(Array.from(e.target.files));
+                  }
+                }}
                 style={htmlInputStyle}
               />
             </View>
+            {businessCardFiles.length > 0 && (
+              <View style={styles.receiptList}>
+                <Text style={styles.receiptLabel}>Selected files:</Text>
+                {businessCardFiles.map((file, idx) => (
+                  <Text key={idx} style={styles.receiptFileName}>
+                    {file.name}
+                  </Text>
+                ))}
+              </View>
+            )}
             {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Receipts:</Text>
               <input

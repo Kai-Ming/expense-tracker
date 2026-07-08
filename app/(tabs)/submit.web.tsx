@@ -1,5 +1,6 @@
 import GeneralExpenseForm from "@/components/GeneralExpenseForm";
 import MileageForm from "@/components/MileageForm";
+import OutstationExpenseForm from "@/components/OutstationForm";
 import { Text, View } from "@/components/Themed";
 import React, { useState } from "react";
 import { StyleSheet, TouchableOpacity } from "react-native";
@@ -50,10 +51,29 @@ export default function SubmitExpenseWebScreen() {
             General Expense
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => changeForm(3)}
+          style={[
+            styles.tabButton,
+            { marginRight: 10 },
+            tabIndex === 3 ? styles.activeTabButton : styles.inactiveTabButton,
+          ]}
+        >
+          <Text
+            style={
+              tabIndex === 3
+                ? styles.activeButtonText
+                : styles.inactiveButtonText
+            }
+          >
+            Outstation Expense
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {tabIndex === 1 && <MileageForm />}
       {tabIndex === 2 && <GeneralExpenseForm />}
+      {tabIndex === 3 && <OutstationExpenseForm />}
     </View>
   );
 }
