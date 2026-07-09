@@ -86,6 +86,7 @@ export default function OutstationExpenseForm() {
     new Date().toISOString().split("T")[0],
   );
   const [formTravelPurposes, setFormTravelPurposes] = useState<string[]>([]);
+  const [otherTravelPurpose, setOtherTravelPurpose] = useState("");
   const [formRequestOthers, setFormRequestOthers] = useState<string>("");
   const [formRequestCountry, setFormRequestCountry] = useState<string>("");
   const [formRequestLocation, setFormRequestLocation] = useState<string>("");
@@ -698,13 +699,50 @@ export default function OutstationExpenseForm() {
   };
 
   const handleSelectPurpose = (purpose: string) => {
+    if (purpose === "Others") {
+      setFormTravelPurposes((prev) => {
+        // Check if "Others" or "Others: something" is already in the array
+        const hasOthers = prev.some((item) => item.startsWith("Others"));
+
+        if (hasOthers) {
+          // If "Others" is already selected, remove it
+          setOtherTravelPurpose("");
+          return prev.filter((item) => !item.startsWith("Others"));
+        } else {
+          // If "Others" is not selected, add it with the text
+          // If otherTravelPurpose has text, use it; otherwise just use "Others"
+          const newEntry = otherTravelPurpose.trim()
+            ? `Others: ${otherTravelPurpose.trim()}`
+            : "Others";
+          return [...prev, newEntry];
+        }
+      });
+    } else {
+      // For other purposes, use the existing toggle logic
+      setFormTravelPurposes((prev) => {
+        if (prev.includes(purpose)) {
+          return prev.filter((item) => item !== purpose);
+        } else {
+          return [...prev, purpose];
+        }
+      });
+    }
+  };
+
+  // Handle text input change - updates the array in real-time
+  const handleOtherTextChange = (text: string) => {
+    setOtherTravelPurpose(text);
+
     setFormTravelPurposes((prev) => {
-      if (prev.includes(purpose)) {
-        // If it's already selected, remove it from the array
-        return prev.filter((item) => item !== purpose);
+      // Remove any existing "Others" entry
+      const withoutOthers = prev.filter((item) => !item.startsWith("Others"));
+
+      if (text.trim()) {
+        // If there's text, add "Others: {text}"
+        return [...withoutOthers, `Others: ${text.trim()}`];
       } else {
-        // If it's not selected, append it to the array
-        return [...prev, purpose];
+        // If text is empty, add just "Others"
+        return [...withoutOthers, "Others"];
       }
     });
   };
@@ -980,8 +1018,8 @@ export default function OutstationExpenseForm() {
         lunch: formLunch,
         dinner: formDinner,
         trip_report: formTripReport,
+        customers: formCustomers,
         business_card_urls: businessCardUrls,
-        customer: formCustomers,
         type: 3, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,
         created_at: serverTimestamp(),
@@ -1218,9 +1256,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Airfare:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Airfare:</Text>
           <TextInput
             value={formAirfare}
             onChangeText={setFormAirfare}
@@ -1228,9 +1264,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formAirfareRemark}
@@ -1241,9 +1275,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Parking:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Parking:</Text>
           <TextInput
             value={formParking}
             onChangeText={setFormParking}
@@ -1251,9 +1283,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formParkingRemark}
@@ -1264,9 +1294,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Transport:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Transport:</Text>
           <TextInput
             value={formTransport}
             onChangeText={setFormTransport}
@@ -1274,9 +1302,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formTransportRemark}
@@ -1287,9 +1313,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Hotel:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Hotel:</Text>
           <TextInput
             value={formHotel}
             onChangeText={(text) => {
@@ -1304,9 +1328,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formHotelRemark}
@@ -1324,9 +1346,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Own Acc (Select One):
-          </Text>
+          <Text style={[styles.fieldLabel]}>Own Acc (Select One):</Text>
           {/* <TextInput
             value={formOwnAccSelect}
             onChangeText={(text) => {
@@ -1398,9 +1418,7 @@ export default function OutstationExpenseForm() {
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formOwnAccRemark}
@@ -1509,9 +1527,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Entertainment:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Entertainment:</Text>
           <TextInput
             value={formEntertainment}
             onChangeText={setFormEntertainment}
@@ -1519,9 +1535,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formEntertainmentRemark}
@@ -1532,9 +1546,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Laundry:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Laundry:</Text>
           <TextInput
             value={formLaundry}
             onChangeText={setFormLaundry}
@@ -1542,9 +1554,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formLaundryRemark}
@@ -1555,9 +1565,7 @@ export default function OutstationExpenseForm() {
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Others:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Others:</Text>
           <TextInput
             value={formOthers}
             onChangeText={setFormOthers}
@@ -1565,9 +1573,7 @@ export default function OutstationExpenseForm() {
             style={styles.webTextInput}
             editable={!isSaving}
           />
-          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-            Remark:
-          </Text>
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
             value={formOthersRemark}
@@ -1822,7 +1828,6 @@ export default function OutstationExpenseForm() {
           </Text>
 
           {travelPurposes.map((purpose) => {
-            // Check if this specific purpose is currently in our array
             const isSelected = formTravelPurposes.includes(purpose);
 
             return (
@@ -1831,20 +1836,47 @@ export default function OutstationExpenseForm() {
                 style={styles.radioContainer}
                 onPress={() => handleSelectPurpose(purpose)}
               >
-                {/* Outer Circle */}
                 <View
                   style={[
                     styles.radioOuter,
                     isSelected && styles.radioOuterSelected,
                   ]}
                 >
-                  {/* Inner Circle (Dot) */}
                   {isSelected && <View style={styles.radioInner} />}
                 </View>
                 <Text style={styles.radioText}>{purpose}</Text>
               </TouchableOpacity>
             );
           })}
+
+          {/* "Others" option */}
+          <TouchableOpacity
+            style={styles.radioContainer}
+            onPress={() => handleSelectPurpose("Others")}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                formTravelPurposes.some((item) => item.startsWith("Others")) &&
+                  styles.radioOuterSelected,
+              ]}
+            >
+              {formTravelPurposes.some((item) => item.startsWith("Others")) && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioText}>Others:</Text>
+          </TouchableOpacity>
+
+          {/* Text input for "Others" */}
+          {formTravelPurposes.some((item) => item.startsWith("Others")) && (
+            <TextInput
+              style={styles.webTextInput}
+              placeholder="Other purpose"
+              value={otherTravelPurpose}
+              onChangeText={handleOtherTextChange}
+            />
+          )}
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -1892,7 +1924,7 @@ export default function OutstationExpenseForm() {
             placeholder="Location"
           />
         </View>
-        <View style={[styles.inputRow, { marginTop: 10 }]}>
+        {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
             Others:
           </Text>
@@ -1904,7 +1936,7 @@ export default function OutstationExpenseForm() {
             editable={!isSaving}
             placeholder="Others"
           />
-        </View>
+        </View> */}
 
         <TouchableOpacity
           onPress={handleRequestSubmit}
@@ -2415,5 +2447,12 @@ const styles = StyleSheet.create({
 
   optionButtonTextSelected: {
     color: "#fff",
+  },
+  otherInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginTop: 8,
+    marginLeft: 30, // Align with the radio options
+    fontSize: 14,
   },
 });
