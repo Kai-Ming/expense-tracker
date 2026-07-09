@@ -798,7 +798,6 @@ export default function OutstationExpenseForm() {
         days: dayCount,
         trip_title: tripTitle,
         travel_purposes: formTravelPurposes,
-        others: formRequestOthers,
         country: formRequestCountry,
         location: formRequestLocation,
         approval_status: 0,
