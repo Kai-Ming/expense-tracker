@@ -10,6 +10,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -89,7 +90,12 @@ export default function OutstationExpenseForm() {
   const [otherTravelPurpose, setOtherTravelPurpose] = useState("");
   const [formRequestOthers, setFormRequestOthers] = useState<string>("");
   const [formRequestCountry, setFormRequestCountry] = useState<string>("");
+  const [formSelectedCountry, setFormSelectedCountry] = useState<string[]>([]);
   const [formRequestLocation, setFormRequestLocation] = useState<string>("");
+  const [formRequestPlaces, setFormRequestPlaces] = useState([
+    { country: "", location: "" },
+  ]);
+  //const [addedPlace, setFormAddedPlace] = useState({})
 
   const [allRequests, setAllRequest] = useState<any[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
@@ -97,6 +103,7 @@ export default function OutstationExpenseForm() {
   const [formTripDate, setFormTripDate] = useState<string>("");
   const [formTripCountry, setFormTripCountry] = useState<string>("");
   const [formTripLocation, setFormTripLocation] = useState<string>("");
+  const [formTripPlaces, setFormTripPlaces] = useState<any[]>([]);
   const [formAirfare, setFormAirfare] = useState<string>("0.00");
   const [formAirfareRemark, setFormAirfareRemark] = useState<string>("");
   const [formParking, setFormParking] = useState<string>("0.00");
@@ -131,12 +138,13 @@ export default function OutstationExpenseForm() {
   const [formTotal, setFormTotal] = useState<string>("0.00");
   const [formTripReport, setFormTripReport] = useState<string>("");
   const [formCustomers, setFormCustomers] = useState([
-    { name: "", email: "", number: "", time: "" },
+    { name: "", company: "", email: "", number: "", time: "" },
   ]);
   const [businessCardFiles, setBusinessCardFiles] = useState<File[]>([]);
   const [allDays, setAllDays] = useState<any[]>([]);
 
   const [showTripModal, setShowTripModal] = useState(false);
+  const [showPlaceModal, setShowPlaceModal] = useState(false);
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -756,6 +764,7 @@ export default function OutstationExpenseForm() {
     }
     const selectedRequest = allRequests.find((r) => r.id === idToAdd);
     setFormTripDate(selectedRequest.start_date);
+    setFormTripPlaces(selectedRequest.places);
     setFormTripCountry(selectedRequest.country);
     setFormTripLocation(selectedRequest.location);
     setFormDepartureDate(selectedRequest.start_date);
@@ -769,18 +778,16 @@ export default function OutstationExpenseForm() {
 
   const handleRequestSubmit = async () => {
     console.log("submitting request");
-    console.log(formStartDate);
-    console.log(formEndDate);
-    console.log(formRequestCountry);
-    console.log(formRequestLocation);
-    console.log(formRequestOthers);
-    console.log(formTravelPurposes);
+    console.log(formRequestPlaces);
+
+    const isPlacesFormValid = formRequestPlaces.every(
+      (place) => place.country.trim() !== "" && place.location.trim() !== "",
+    );
+
     if (
       !formStartDate.trim() ||
       !formEndDate.trim() ||
-      !formRequestOthers.trim() ||
-      !formRequestCountry.trim() ||
-      !formRequestLocation.trim() ||
+      !isPlacesFormValid ||
       formTravelPurposes.length === 0
     ) {
       alert("Please ensure all required fields are filled.");
@@ -789,7 +796,11 @@ export default function OutstationExpenseForm() {
 
     try {
       const dayCount = getDaysDifference(formStartDate, formEndDate);
-      const tripTitle = `${dayCount} day trip to ${formRequestCountry}, ${formRequestLocation}`;
+      const placesString = formRequestPlaces
+        .filter((place) => place.country && place.location) // Both must exist
+        .map((place) => `${place.country} (${place.location})`)
+        .join(", ");
+      const tripTitle = `${dayCount} day trip to ${placesString}`;
       await addDoc(collection(db, "travel_requests"), {
         user_id: userId,
         user_name: username,
@@ -798,8 +809,8 @@ export default function OutstationExpenseForm() {
         days: dayCount,
         trip_title: tripTitle,
         travel_purposes: formTravelPurposes,
-        country: formRequestCountry,
-        location: formRequestLocation,
+        places: formRequestPlaces,
+        locked: false,
         approval_status: 0,
         created_at: serverTimestamp(),
       });
@@ -817,6 +828,13 @@ export default function OutstationExpenseForm() {
       date.setUTCDate(date.getUTCDate() + day);
       return date.toISOString().split("T")[0];
     });
+  };
+
+  const isFirstDay = () => {
+    if (!formTripDate || !formArrivalDate || !selectedRequestId) {
+      return true;
+    }
+    return formTripDate === formDepartureDate;
   };
 
   const isFinalDay = () => {
@@ -884,17 +902,11 @@ export default function OutstationExpenseForm() {
 
   const handleNextDay = async () => {
     console.log("next day");
-    /* if (isFinalDay()) {
-      alert("Past final day of trip");  
-      return;
-    } */
-    console.log(getTotal());
-    console.log(grade);
-    console.log(getMealExpense(formTripCountry, grade));
 
     const isCustomersFormValid = formCustomers.every(
       (customer) =>
         customer.name.trim() !== "" &&
+        customer.company.trim() !== "" &&
         customer.email.trim() !== "" &&
         customer.number.trim() !== "" &&
         customer.time.trim() !== "",
@@ -903,14 +915,6 @@ export default function OutstationExpenseForm() {
     const timeEmpty =
       (formTripDate === formDepartureDate && !formDepartureTime) ||
       (formTripDate === formArrivalDate && !formArrivalTime);
-
-    console.log(formDate);
-    console.log("departure");
-    console.log(formDate === formDepartureDate && !formDepartureTime);
-
-    console.log(formDate === formArrivalDate && !formArrivalTime);
-    console.log(timeEmpty);
-
     if (
       !selectedRequestId.trim() ||
       !formTripReport.trim() ||
@@ -918,6 +922,7 @@ export default function OutstationExpenseForm() {
       timeEmpty
     ) {
       alert("Please ensure all required fields are filled.");
+      console.log("not valid");
       console.log(selectedRequestId);
       console.log(formTripReport);
       console.log(isCustomersFormValid);
@@ -933,13 +938,9 @@ export default function OutstationExpenseForm() {
       ownAccExpense = ownAccExpense / 2;
     }
 
-    setAllDays([
+    const updatedAllDays = [
       ...allDays,
       {
-        user_id: userId,
-        username: username,
-        request_id: selectedRequestId,
-        trip_title: selectedTripTitle,
         date: formTripDate,
         country: formTripCountry,
         location: formTripLocation,
@@ -967,10 +968,22 @@ export default function OutstationExpenseForm() {
         lunch: formLunch,
         dinner: formDinner,
         trip_report: formTripReport,
+        customers: formCustomers,
+        business_card_files: businessCardFiles,
       },
-    ]);
+    ];
 
-    try {
+    setAllDays(updatedAllDays);
+
+    resetNextDay();
+    if (isFinalDay()) {
+      handleTripSubmit(updatedAllDays);
+      resetTripForm();
+    } else {
+      changeDate(1);
+    }
+
+    /* try {
       console.log("submitting");
       const businessCardUrls: string[] = [];
       for (const file of businessCardFiles) {
@@ -1038,10 +1051,68 @@ export default function OutstationExpenseForm() {
     } catch (e) {
       console.error(e);
       alert("Failed to save expense.");
+    } */
+  };
+
+  const handlePreviousDay = () => {
+    const lastDay = removeLastDay();
+    console.log(lastDay);
+    console.log(allDays);
+    resetNextDay();
+    if (isFirstDay()) {
+      return;
+    } else {
+      changeDate(-1);
+    }
+    if (lastDay !== null) {
+      setFormAirfare(lastDay.airfare || "0.00");
+      setFormAirfareRemark(lastDay.airfare_remark || "");
+      setFormParking(lastDay.parking || "0.00");
+      setFormParkingRemark(lastDay.parking_remark || "");
+      setFormTransport(lastDay.transport || "0.00");
+      setFormTransportRemark(lastDay.transport_remark || "");
+      setFormHotel(lastDay.hotel || "0.00");
+      setFormHotelRemark(lastDay.hotel_remark || "");
+      setFormOwnAcc(lastDay.own_acc || "0.00");
+      setFormOwnAccSelect(lastDay.own_acc_sharing || "");
+      setFormOwnAccRemark(lastDay.own_acc_remark || "");
+      setFormDepartureTime(lastDay.departure_time || null);
+      setFormArrivalTime(lastDay.arrival_time || null);
+      setFormBreakfast(lastDay.breakfast || false);
+      setFormLunch(lastDay.lunch || false);
+      setFormDinner(lastDay.dinner || false);
+      setFormEntertainment(lastDay.entertainment || "0.00");
+      setFormEntertainmentRemark(lastDay.entertainment_remark || "");
+      setFormLaundry(lastDay.laundry || "0.00");
+      setFormLaundryRemark(lastDay.laundry_remark || "");
+      setFormOthers(lastDay.others || "0.00");
+      setFormOthersRemark(lastDay.others_remark || "");
+      setFormCustomers(
+        lastDay.customers || [
+          { name: "", company: "", email: "", number: "", time: "" },
+        ],
+      );
+      setBusinessCardFiles(lastDay.business_card_files || []);
+      setFormTripReport(lastDay.trip_report || "");
     }
   };
 
-  const handleTripSubmit = () => {
+  const removeLastDay = () => {
+    if (allDays.length === 0) {
+      console.warn("Array is empty");
+      return null;
+    }
+
+    let poppedValue = null;
+    setAllDays((prev) => {
+      const newDays = [...prev];
+      poppedValue = newDays.pop();
+      return newDays;
+    });
+    return poppedValue;
+  };
+
+  const handleTripSubmit = async (tripDays: any[]) => {
     console.log("submitting trip");
     console.log(formCustomers);
 
@@ -1052,6 +1123,158 @@ export default function OutstationExpenseForm() {
         customer.number.trim() !== "" &&
         customer.time.trim() !== "",
     );
+
+    console.log(tripDays.length);
+
+    let errorEncountered = false;
+
+    // Use for...of instead of forEach
+    for (const day of tripDays) {
+      try {
+        console.log("submitting");
+        const businessCardUrls: string[] = [];
+        for (const file of day.business_card_files) {
+          const storageRef = ref(
+            storage,
+            `business-cards/${userId}/${Date.now()}_${file.name}`,
+          );
+          const uploadResult = await uploadBytes(storageRef, file);
+          const url = await getDownloadURL(uploadResult.ref);
+          businessCardUrls.push(url);
+        }
+
+        const expense = {
+          user_id: userId,
+          username: username,
+          request_id: selectedRequestId,
+          trip_title: selectedTripTitle,
+          start_date: formDepartureDate,
+          end_date: formArrivalDate,
+          date: day.date,
+          country: day.country,
+          location: day.location,
+          airfare: day.airfare,
+          airfare_remark: day.airfare_remark,
+          parking: day.parking,
+          parking_remark: day.parking_remark,
+          transport: day.transport,
+          transport_remark: day.transport_remark,
+          hotel: day.hotel,
+          hotel_remark: day.hotel_remark,
+          own_acc: day.own_acc,
+          own_acc_sharing: day.own_acc_sharing,
+          own_acc_remark: day.own_acc_remark,
+          entertainment: day.entertainment,
+          entertainment_remark: day.entertainment_remark,
+          laundry: day.laundry,
+          laundry_remark: day.laundry_remark,
+          others: day.others,
+          others_remark: day.others_remark,
+          total: day.total,
+          departure_time: day.departure_time,
+          arrival_time: day.arrival_time,
+          breakfast: day.breakfast,
+          lunch: day.lunch,
+          dinner: day.dinner,
+          trip_report: day.trip_report,
+          customers: day.customers,
+          business_card_urls: businessCardUrls,
+          type: 3, // 1 mileage, 2 general, 3 outstation
+          approval_status: 0,
+          created_at: serverTimestamp(),
+        };
+
+        const docRef = await addDoc(collection(db, "expenses"), expense);
+
+        console.log("Document written with ID: ", docRef.id);
+        console.log(expense);
+      } catch (e) {
+        errorEncountered = true;
+        console.error(e);
+        alert("Failed to save expense.");
+        break; // Optional: stop processing more days if one fails
+      }
+    }
+
+    // Now this runs after all days are processed
+    if (!errorEncountered) {
+      console.log("Request ID: ", selectedRequestId);
+      const docRef = doc(db, "travel_requests", selectedRequestId);
+      await updateDoc(docRef, {
+        locked: true,
+      });
+      console.log("Travel request locked successfully!");
+    }
+
+    /* try {
+      console.log("submitting");
+      const businessCardUrls: string[] = [];
+      for (const file of businessCardFiles) {
+        const storageRef = ref(
+          storage,
+          `business-cards/${userId}/${Date.now()}_${file.name}`,
+        );
+        const uploadResult = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(uploadResult.ref);
+        businessCardUrls.push(url);
+      }
+
+      const expense = {
+        user_id: userId,
+        user_name: username,
+        request_id: selectedRequestId,
+        start_date: formDepartureDate,
+        end_date: formArrivalDate,
+        trip_title: selectedTripTitle,
+        date: formTripDate,
+        country: formTripCountry,
+        location: formTripLocation,
+        airfare: formAirfare,
+        airfare_remark: formAirfareRemark,
+        parking: formParking,
+        parking_remark: formParkingRemark,
+        transport: formTransport,
+        transport_remark: formTransportRemark,
+        hotel: formHotel,
+        hotel_remark: formHotelRemark,
+        own_acc: ownAccExpense,
+        own_acc_sharing: formOwnAccSelect,
+        own_acc_remark: formOwnAccRemark,
+        entertainment: formEntertainment,
+        entertainment_remark: formEntertainmentRemark,
+        laundry: formLaundry,
+        laundry_remark: formLaundryRemark,
+        others: formOthers,
+        others_remark: formOthersRemark,
+        total: getTotal(),
+        departure_time: formDepartureTime,
+        arrival_time: formArrivalTime,
+        breakfast: formBrakfast,
+        lunch: formLunch,
+        dinner: formDinner,
+        trip_report: formTripReport,
+        customers: formCustomers,
+        business_card_urls: businessCardUrls,
+        type: 3, // 1 mileage, 2 general, 3 outstation
+        approval_status: 0,
+        created_at: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, "expenses"), expense);
+
+      console.log("Document written with ID: ", docRef.id);
+      console.log(expense);
+
+      resetNextDay();
+      if (isFinalDay()) {
+        resetTripForm();
+      } else {
+        changeDate(1);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save expense.");
+    } */
   };
 
   const resetNextDay = () => {
@@ -1081,7 +1304,9 @@ export default function OutstationExpenseForm() {
     setBusinessCardFiles([]);
     setFormArrivalTime(null);
     setFormDepartureTime(null);
-    setFormCustomers([{ name: "", email: "", number: "", time: "" }]);
+    setFormCustomers([
+      { name: "", company: "", email: "", number: "", time: "" },
+    ]);
   };
 
   const resetRequestForm = () => {
@@ -1091,9 +1316,11 @@ export default function OutstationExpenseForm() {
     setFormRequestOthers("");
     setFormRequestCountry("");
     setFormRequestLocation("");
+    setFormRequestPlaces([{ country: "", location: "" }]);
   };
 
   const resetTripForm = () => {
+    resetNextDay();
     setSelectedRequestId("");
     setSelectedTripTitle("");
 
@@ -1101,28 +1328,57 @@ export default function OutstationExpenseForm() {
     setFormTripCountry("");
     setFormTripLocation("");
     setFormArrivalDate("");
+    setAllDays([]);
+    console.log("resetting all days");
+  };
+
+  const addPlaceRow = () => {
+    setFormRequestPlaces([...formRequestPlaces, { country: "", location: "" }]);
+  };
+
+  // Remove a specific row by index
+  const removePlaceRow = (index: number) => {
+    if (formCustomers.length === 1) {
+      // Keep at least one row, just reset it
+      setFormRequestPlaces([{ country: "", location: "" }]);
+    } else {
+      setFormRequestPlaces(formRequestPlaces.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a specific field for a specific place row
+  const handlePlaceChange = (index: number, field: string, value: string) => {
+    const updatedPlaces = [...formRequestPlaces];
+    updatedPlaces[index][field] = value;
+    setFormRequestPlaces(updatedPlaces);
   };
 
   // Add a new empty customer row
   const addCustomerRow = () => {
     setFormCustomers([
       ...formCustomers,
-      { name: "", email: "", number: "", time: "" },
+      { name: "", company: "", email: "", number: "", time: "" },
     ]);
   };
 
   // Remove a specific row by index
-  const removeCustomerRow = (index) => {
+  const removeCustomerRow = (index: number) => {
     if (formCustomers.length === 1) {
       // Keep at least one row, just reset it
-      setFormCustomers([{ name: "", email: "", number: "", time: "" }]);
+      setFormCustomers([
+        { name: "", company: "", email: "", number: "", time: "" },
+      ]);
     } else {
       setFormCustomers(formCustomers.filter((_, i) => i !== index));
     }
   };
 
   // Update a specific field for a specific customer row
-  const handleCustomerChange = (index, field, value) => {
+  const handleCustomerChange = (
+    index: number,
+    field: string,
+    value: string,
+  ) => {
     const updatedCustomers = [...formCustomers];
     updatedCustomers[index][field] = value;
     setFormCustomers(updatedCustomers);
@@ -1153,7 +1409,7 @@ export default function OutstationExpenseForm() {
                 <Text style={styles.noTripsText}>No trips found</Text>
               )}
               {allRequests.map((trip) => {
-                const isAdded = selectedRequestId == trip.id;
+                const isAdded = selectedRequestId == trip.id || trip.locked;
 
                 return (
                   <TouchableOpacity
@@ -1164,6 +1420,7 @@ export default function OutstationExpenseForm() {
                     ]}
                     onPress={() => {
                       if (isAdded) return;
+                      resetTripForm();
                       setSelectedRequestId(trip.id);
                       setShowTripModal(false);
                       handleSelectRequest(trip.id);
@@ -1219,6 +1476,98 @@ export default function OutstationExpenseForm() {
     return new Date(year, month - 1, day, hours, minutes, 0);
   };
 
+  const handleAddPlace = (country: string, location: string) => {
+    setFormTripCountry(country);
+    setFormTripLocation(location);
+  };
+
+  const renderPlaceModal = () => {
+    console.log(formTripPlaces);
+    return (
+      <Modal
+        visible={showPlaceModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPlaceModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPlaceModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a Place</Text>
+              <TouchableOpacity onPress={() => setShowPlaceModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.tableContainer}>
+              <View style={styles.tableHeader}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Country</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Location</Text>
+                </View>
+              </View>
+
+              <ScrollView style={styles.modalList}>
+                {formTripPlaces.map((place) => {
+                  /* const isAdded =
+                    formTripCountry === place.country &&
+                    formTripLocation === place.location; */
+
+                  const isAdded = false;
+
+                  return (
+                    <TouchableOpacity
+                      key={place.country}
+                      style={[
+                        styles.tableRow,
+                        isAdded && styles.disabledPlaceItem,
+                      ]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        setShowPlaceModal(false);
+                        handleAddPlace(place.country, place.location);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {place.country}
+                        </Text>
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {place.location}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const renderTripForm = () => {
     return (
       <View>
@@ -1247,11 +1596,30 @@ export default function OutstationExpenseForm() {
             {formatDate(formTripDate) || "N/A"}
           </Text>
         </View>
-        <View style={[styles.inputRow, { marginTop: 10 }]}>
+        <View
+          style={[
+            styles.inputRow,
+            {
+              marginTop: 10,
+              flexDirection: "row",
+              justifyContent: "flex-start",
+              gap: 50,
+            },
+          ]}
+        >
           <Text style={styles.fieldLabel}>Country:</Text>
           <Text style={styles.fieldValue}>{formTripCountry || "N/A"}</Text>
           <Text style={styles.fieldLabel}>Location:</Text>
           <Text style={styles.fieldValue}>{formTripLocation || "N/A"}</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => {
+              setShowPlaceModal(true);
+            }}
+          >
+            <Text style={styles.buttonText}>Select Place</Text>
+          </TouchableOpacity>
+          {renderPlaceModal()}
         </View>
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -1610,7 +1978,25 @@ export default function OutstationExpenseForm() {
                   { width: 90 },
                 ]}
               >
-                #{index + 1} Name:
+                Company:
+              </Text>
+              <TextInput
+                placeholder="Company"
+                value={customer.company}
+                onChangeText={(text) =>
+                  handleCustomerChange(index, "company", text)
+                }
+                style={styles.webTextInput}
+                editable={!isSaving}
+              />
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  styles.fieldLabelMandatory,
+                  { width: 90 },
+                ]}
+              >
+                Name:
               </Text>
               <TextInput
                 placeholder="Name"
@@ -1652,7 +2038,7 @@ export default function OutstationExpenseForm() {
                 Number:
               </Text>
               <TextInput
-                placeholder="Phone"
+                placeholder="Number"
                 value={customer.number}
                 onChangeText={(text) =>
                   handleCustomerChange(index, "number", text)
@@ -1741,19 +2127,21 @@ export default function OutstationExpenseForm() {
           />
         </View>
 
-        <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={styles.fieldLabel}>Business Cards:</Text>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              if (e.target.files) {
-                setBusinessCardFiles(Array.from(e.target.files));
-              }
-            }}
-            style={htmlInputStyle}
-          />
+        <View style={{ flexDirection: "column" }}>
+          <View style={[styles.inputRow, { marginTop: 10 }]}>
+            <Text style={styles.fieldLabel}>Business Cards:</Text>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                if (e.target.files) {
+                  Array.from(e.target.files);
+                }
+              }}
+              style={htmlInputStyle}
+            />
+          </View>
           {businessCardFiles.length > 0 && (
             <View style={styles.receiptList}>
               <Text style={styles.receiptLabel}>Selected files:</Text>
@@ -1765,16 +2153,29 @@ export default function OutstationExpenseForm() {
             </View>
           )}
         </View>
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            onPress={handlePreviousDay}
+            style={[
+              styles.button,
+              { marginRight: 10 },
+              { opacity: isFirstDay() ? 0.5 : 1 },
+            ]}
+            disabled={isSaving || isFirstDay()}
+          >
+            <Text style={styles.buttonText}>Previous Day </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleNextDay}
-          style={styles.button}
-          disabled={isSaving}
-        >
-          <Text style={styles.buttonText}>
-            {isFinalDay() ? "Finish" : "Next Day"}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleNextDay}
+            style={[styles.button, { opacity: selectedRequestId ? 1 : 0.5 }]}
+            disabled={isSaving || !selectedRequestId}
+          >
+            <Text style={styles.buttonText}>
+              {isFinalDay() ? "Finish" : "Next Day"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* <TouchableOpacity
           onPress={handleTripSubmit}
@@ -1878,18 +2279,10 @@ export default function OutstationExpenseForm() {
           )}
         </View>
 
-        <View style={[styles.inputRow, { marginTop: 10 }]}>
+        {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
             Country:
           </Text>
-
-          {/* <TextInput
-            value={formRequestCountry}
-            onChangeText={setFormRequestCountry}
-            style={styles.webTextInput}
-            editable={!isSaving}
-            placeholder="Country"
-          /> */}
           <Picker
             selectedValue={formRequestCountry}
             onValueChange={(itemValue) => {
@@ -1897,7 +2290,6 @@ export default function OutstationExpenseForm() {
             }}
             style={styles.select}
           >
-            {/* Default option - shown but can't be selected */}
             <Picker.Item
               key="default"
               label="Select a country..."
@@ -1922,7 +2314,99 @@ export default function OutstationExpenseForm() {
             editable={!isSaving}
             placeholder="Location"
           />
+        </View> */}
+
+        <View
+          style={{
+            marginTop: 15,
+            borderTopWidth: 1,
+            borderTopColor: "#ccc",
+            paddingTop: 10,
+          }}
+        >
+          <Text style={[styles.formLabel, { fontSize: 16 }]}>Places:</Text>
+
+          {formRequestPlaces.map((place, index) => (
+            <View
+              key={index}
+              style={[styles.inputRow, { marginTop: 10, alignItems: "center" }]}
+            >
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  styles.fieldLabelMandatory,
+                  { width: 90 },
+                ]}
+              >
+                #{index + 1} Country:
+              </Text>
+              <Picker
+                selectedValue={place.country}
+                onValueChange={(itemValue) => {
+                  setFormRequestCountry(itemValue);
+                  handlePlaceChange(index, "country", itemValue);
+                }}
+                style={styles.select}
+              >
+                <Picker.Item
+                  key="default"
+                  label="Select a country..."
+                  value=""
+                  enabled={false}
+                />
+
+                {countryList.map((p) => (
+                  <Picker.Item key={p.value} label={p.label} value={p.value} />
+                ))}
+              </Picker>
+
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  styles.fieldLabelMandatory,
+                  { width: 90, marginLeft: 20 },
+                ]}
+              >
+                Location:
+              </Text>
+              <TextInput
+                placeholder="Location"
+                value={place.location}
+                onChangeText={(text) =>
+                  handlePlaceChange(index, "location", text)
+                }
+                style={styles.webTextInput}
+                editable={!isSaving}
+              />
+
+              <TouchableOpacity
+                onPress={() => removePlaceRow(index)}
+                style={{ marginLeft: 10, padding: 5 }}
+                disabled={isSaving}
+              >
+                <Text style={{ color: "red", fontWeight: "bold" }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            onPress={addPlaceRow}
+            style={{
+              marginTop: 10,
+              marginBottom: 20,
+              alignSelf: "flex-start",
+              backgroundColor: "#2196F3",
+              padding: 8,
+              borderRadius: 4,
+            }}
+            disabled={isSaving}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+              + Add Place
+            </Text>
+          </TouchableOpacity>
         </View>
+
         {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
             Others:
@@ -2173,7 +2657,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
-  fieldValue: { fontSize: 14, flex: 1 },
+  fieldValue: { fontSize: 14 },
   button: {
     backgroundColor: "#2196F3",
     padding: 12,
@@ -2182,7 +2666,7 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   buttonText: { color: "white", fontWeight: "bold" },
-  formLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
+  formLabel: { fontSize: 18, fontWeight: "bold" },
   addedTripsContainer: { marginTop: 16 },
   subsectionTitle: {
     fontSize: 14,
@@ -2453,5 +2937,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 30, // Align with the radio options
     fontSize: 14,
+  },
+  tableContainer: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+    paddingRight: 12,
+  },
+  tableRow: {
+    flexDirection: "row",
+    width: "100%",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    alignItems: "center",
+  },
+  headerCell: {
+    fontWeight: "bold",
+    fontSize: 13,
+    color: "#333",
+  },
+  tableCell: {
+    fontSize: 13,
+    color: "#666",
+  },
+  disabledPlaceItem: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
   },
 });
