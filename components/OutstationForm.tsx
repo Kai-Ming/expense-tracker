@@ -95,12 +95,15 @@ export default function OutstationExpenseForm() {
   const [formRequestPlaces, setFormRequestPlaces] = useState([
     { country: "", location: "" },
   ]);
+  const [editRequestId, setEditRequestId] = useState<string>("");
+  const [editingRequest, setEditingRequest] = useState(false);
   //const [addedPlace, setFormAddedPlace] = useState({})
 
   const [allRequests, setAllRequest] = useState<any[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
   const [selectedTripTitle, setSelectedTripTitle] = useState<string>("");
   const [formTripDate, setFormTripDate] = useState<string>("");
+  const [formTripPurposes, setFormTripPurposes] = useState<string[]>([]);
   const [formTripCountry, setFormTripCountry] = useState<string>("");
   const [formTripLocation, setFormTripLocation] = useState<string>("");
   const [formTripPlaces, setFormTripPlaces] = useState<any[]>([]);
@@ -145,6 +148,7 @@ export default function OutstationExpenseForm() {
 
   const [showTripModal, setShowTripModal] = useState(false);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -767,6 +771,7 @@ export default function OutstationExpenseForm() {
     setFormTripPlaces(selectedRequest.places);
     setFormTripCountry(selectedRequest.country);
     setFormTripLocation(selectedRequest.location);
+    setFormTripPurposes(selectedRequest.travel_purposes);
     setFormDepartureDate(selectedRequest.start_date);
     setFormArrivalDate(selectedRequest.end_date);
     setSelectedTripTitle(selectedRequest.trip_title);
@@ -774,6 +779,10 @@ export default function OutstationExpenseForm() {
 
   const handleSubmit = () => {
     console.log("submitting");
+  };
+
+  const handleRequestEdit = async () => {
+    console.log("editing");
   };
 
   const handleRequestSubmit = async () => {
@@ -801,19 +810,36 @@ export default function OutstationExpenseForm() {
         .map((place) => `${place.country} (${place.location})`)
         .join(", ");
       const tripTitle = `${dayCount} day trip to ${placesString}`;
-      await addDoc(collection(db, "travel_requests"), {
-        user_id: userId,
-        user_name: username,
-        start_date: formStartDate,
-        end_date: formEndDate,
-        days: dayCount,
-        trip_title: tripTitle,
-        travel_purposes: formTravelPurposes,
-        places: formRequestPlaces,
-        locked: false,
-        approval_status: 0,
-        created_at: serverTimestamp(),
-      });
+      if (editingRequest) {
+        const docRef = doc(db, "travel_requests", editRequestId);
+
+        await updateDoc(docRef, {
+          user_id: userId,
+          user_name: username,
+          start_date: formStartDate,
+          end_date: formEndDate,
+          days: dayCount,
+          trip_title: tripTitle,
+          travel_purposes: formTravelPurposes,
+          places: formRequestPlaces,
+          locked: false,
+          approval_status: 0,
+        });
+      } else {
+        await addDoc(collection(db, "travel_requests"), {
+          user_id: userId,
+          user_name: username,
+          start_date: formStartDate,
+          end_date: formEndDate,
+          days: dayCount,
+          trip_title: tripTitle,
+          travel_purposes: formTravelPurposes,
+          places: formRequestPlaces,
+          locked: false,
+          approval_status: 0,
+          created_at: serverTimestamp(),
+        });
+      }
       resetRequestForm();
       alert("Trip request submitted successfully!");
     } catch (e) {
@@ -1150,6 +1176,7 @@ export default function OutstationExpenseForm() {
           trip_title: selectedTripTitle,
           start_date: formDepartureDate,
           end_date: formArrivalDate,
+          travel_purposes: formTripPurposes,
           date: day.date,
           country: day.country,
           location: day.location,
@@ -1317,6 +1344,8 @@ export default function OutstationExpenseForm() {
     setFormRequestCountry("");
     setFormRequestLocation("");
     setFormRequestPlaces([{ country: "", location: "" }]);
+    setEditingRequest(false);
+    setEditRequestId("");
   };
 
   const resetTripForm = () => {
@@ -1328,6 +1357,7 @@ export default function OutstationExpenseForm() {
     setFormTripCountry("");
     setFormTripLocation("");
     setFormArrivalDate("");
+    setFormTripPurposes([]);
     setAllDays([]);
     console.log("resetting all days");
   };
@@ -1384,6 +1414,30 @@ export default function OutstationExpenseForm() {
     setFormCustomers(updatedCustomers);
   };
 
+  const setEditTrip = (id: string) => {
+    if (!id) {
+      console.log("No Trip");
+      return;
+    }
+    setEditingRequest(true);
+    setEditRequestId(id);
+    const selectedRequest = allRequests.find((r) => r.id === id);
+    setFormStartDate(selectedRequest.start_date);
+    setFormEndDate(selectedRequest.end_date);
+    setFormTravelPurposes(selectedRequest.travel_purposes || []);
+    setFormRequestPlaces(
+      selectedRequest.places || [{ country: "", location: "" }],
+    );
+    const description = selectedRequest.travel_purposes
+      .find((p) => p.startsWith("Others:"))
+      ?.replace(/^Others:\s*/, "");
+
+    if (description) {
+      setOtherTravelPurpose(description);
+    }
+    setEditingRequest(true);
+  };
+
   const renderRequestsModal = () => {
     return (
       <Modal
@@ -1436,17 +1490,95 @@ export default function OutstationExpenseForm() {
                       {trip?.trip_title}
                     </Text>
                     <Text
+                      style={[
+                        styles.addressText,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      {trip?.travel_purposes?.join(", ") || ""}
+                    </Text>
+                    <Text
                       style={[styles.timeText, isAdded && styles.disabledText]}
                     >
                       {formatDate(trip?.start_date)} -{" "}
                       {formatDate(trip?.end_date)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
+  const renderEditModal = () => {
+    return (
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEditModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a Trip</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {allRequests.length === 0 && (
+                <Text style={styles.noTripsText}>No trips found</Text>
+              )}
+              {allRequests.map((trip) => {
+                const isAdded = trip.locked;
+
+                return (
+                  <TouchableOpacity
+                    key={trip.id}
+                    style={[
+                      styles.modalTripItem,
+                      isAdded && styles.disabledTripItem,
+                    ]}
+                    onPress={() => {
+                      if (isAdded) return;
+                      /* resetTripForm();
+                      setSelectedRequestId(trip.id); */
+                      setShowEditModal(false);
+                      setEditTrip(trip.id);
+                      //handleSelectRequest(trip.id);
+                      //handleAddTrip(trip.id);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.tripRemark,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      {trip?.trip_title}
                     </Text>
                     <Text
                       style={[
                         styles.addressText,
                         isAdded && styles.disabledText,
                       ]}
-                    ></Text>
+                    >
+                      {trip?.travel_purposes?.join(", ") || ""}
+                    </Text>
+                    <Text
+                      style={[styles.timeText, isAdded && styles.disabledText]}
+                    >
+                      {formatDate(trip?.start_date)} -{" "}
+                      {formatDate(trip?.end_date)}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -2195,7 +2327,9 @@ export default function OutstationExpenseForm() {
   const renderRequestForm = () => {
     return (
       <View>
-        <Text style={styles.formLabel}>Submit Travel Request</Text>
+        <Text style={styles.formLabel}>
+          {editingRequest ? "Edit Travel Request" : "Submit Travel Request"}
+        </Text>
         {fieldMessage}
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -2420,6 +2554,31 @@ export default function OutstationExpenseForm() {
             placeholder="Others"
           />
         </View> */}
+        {renderEditModal()}
+
+        <View style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setShowEditModal(true);
+            }}
+            style={styles.button}
+            disabled={isSaving}
+          >
+            <Text style={styles.buttonText}>Edit Request</Text>
+          </TouchableOpacity>
+          {editingRequest && (
+            <TouchableOpacity
+              onPress={() => {
+                setEditingRequest(false);
+                resetRequestForm();
+              }}
+              style={styles.button}
+              disabled={isSaving}
+            >
+              <Text style={styles.buttonText}>Cancel Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <TouchableOpacity
           onPress={handleRequestSubmit}
@@ -2429,7 +2588,9 @@ export default function OutstationExpenseForm() {
           {isSaving ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.buttonText}>Submit Request</Text>
+            <Text style={styles.buttonText}>
+              {editingRequest ? "Submit Edit" : "Submit Request"}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -2666,7 +2827,7 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   buttonText: { color: "white", fontWeight: "bold" },
-  formLabel: { fontSize: 18, fontWeight: "bold" },
+  formLabel: { fontSize: 20, fontWeight: "bold" },
   addedTripsContainer: { marginTop: 16 },
   subsectionTitle: {
     fontSize: 14,
