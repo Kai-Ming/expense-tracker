@@ -1024,7 +1024,7 @@ export default function SubmitExpenseScreen() {
     }
   };
 
-  const submitTrip = async () => {
+  /* const submitTrip = async () => {
     const currentLoc = currentLocationRef.current;
     if (!currentLoc) return;
 
@@ -1053,7 +1053,7 @@ export default function SubmitExpenseScreen() {
       console.error("Submission error:", error);
       Alert.alert("Error", "Failed to save the trip.");
     }
-  };
+  }; */
 
   const submitTripInBackground = async () => {
     const startPoint = pointsRef.current?.[0];

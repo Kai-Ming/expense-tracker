@@ -769,8 +769,6 @@ export default function OutstationExpenseForm() {
     const selectedRequest = allRequests.find((r) => r.id === idToAdd);
     setFormTripDate(selectedRequest.start_date);
     setFormTripPlaces(selectedRequest.places);
-    setFormTripCountry(selectedRequest.country);
-    setFormTripLocation(selectedRequest.location);
     setFormTripPurposes(selectedRequest.travel_purposes);
     setFormDepartureDate(selectedRequest.start_date);
     setFormArrivalDate(selectedRequest.end_date);
@@ -885,7 +883,7 @@ export default function OutstationExpenseForm() {
     return countryRates[grade as Grade];
   };
 
-  const getTotal = () => {
+  const getMealCost = () => {
     let mealExpense = getMealExpense(formTripCountry, grade);
     const totalMeal = getMealExpense(formTripCountry, grade);
 
@@ -898,6 +896,12 @@ export default function OutstationExpenseForm() {
     if (formDinner) {
       mealExpense = mealExpense - totalMeal * 0.5;
     }
+
+    return mealExpense;
+  };
+
+  const getTotal = () => {
+    const mealExpense = getMealCost();
 
     const total =
       parseFloat(formAirfare) +
@@ -944,6 +948,8 @@ export default function OutstationExpenseForm() {
     if (
       !selectedRequestId.trim() ||
       !formTripReport.trim() ||
+      !formTripCountry.trim() ||
+      !formTripLocation.trim() ||
       !isCustomersFormValid ||
       timeEmpty
     ) {
@@ -993,6 +999,7 @@ export default function OutstationExpenseForm() {
         breakfast: formBrakfast,
         lunch: formLunch,
         dinner: formDinner,
+        meal: getMealCost(),
         trip_report: formTripReport,
         customers: formCustomers,
         business_card_files: businessCardFiles,
@@ -1180,29 +1187,30 @@ export default function OutstationExpenseForm() {
           date: day.date,
           country: day.country,
           location: day.location,
-          airfare: day.airfare,
+          airfare: parseFloat(day.airfare) || 0,
           airfare_remark: day.airfare_remark,
-          parking: day.parking,
+          parking: parseFloat(day.parking) || 0,
           parking_remark: day.parking_remark,
-          transport: day.transport,
+          transport: parseFloat(day.transport) || 0,
           transport_remark: day.transport_remark,
-          hotel: day.hotel,
+          hotel: parseFloat(day.hotel) || 0,
           hotel_remark: day.hotel_remark,
-          own_acc: day.own_acc,
+          own_acc: parseFloat(day.own_acc) || 0,
           own_acc_sharing: day.own_acc_sharing,
           own_acc_remark: day.own_acc_remark,
-          entertainment: day.entertainment,
+          entertainment: parseFloat(day.entertainment) || 0,
           entertainment_remark: day.entertainment_remark,
-          laundry: day.laundry,
+          laundry: parseFloat(day.laundry) || 0,
           laundry_remark: day.laundry_remark,
-          others: day.others,
+          others: parseFloat(day.others) || 0,
           others_remark: day.others_remark,
-          total: day.total,
+          total: parseFloat(day.total) || 0,
           departure_time: day.departure_time,
           arrival_time: day.arrival_time,
           breakfast: day.breakfast,
           lunch: day.lunch,
           dinner: day.dinner,
+          meal: day.meal,
           trip_report: day.trip_report,
           customers: day.customers,
           business_card_urls: businessCardUrls,
