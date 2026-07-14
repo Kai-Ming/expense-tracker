@@ -1535,10 +1535,10 @@ export default function MileageForm() {
                         {formatTripTime(trip.from_time)} -{" "}
                         {formatTripTime(trip.to_time)}
                       </Text>
-                      <Text style={styles.tripRemark}>
+                      {/* <Text style={styles.tripRemark}>
                         {trip.id || "No Remark"} (
                         {parseFloat(trip.distance || 0).toFixed(2)} km)
-                      </Text>
+                      </Text> */}
                       <Text style={styles.tripRemark}>
                         {trip.remark || "No Remark"} (
                         {parseFloat(trip.distance || 0).toFixed(2)} km)

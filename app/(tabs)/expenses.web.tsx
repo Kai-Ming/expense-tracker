@@ -136,7 +136,7 @@ interface OutstationExpense {
   dinner: boolean;
   meal: number;
   trip_report: string;
-  customer: any[];
+  customers: any[];
   business_card_urls: string;
   type: number;
   approval_status: number;
@@ -190,6 +190,8 @@ export default function ExpensesWebScreen() {
   const [usernameFilter, setUsenameFilter] = useState<string>("");
   const [expenseType, setExpenseType] = useState<string>("All");
   const [expensePurpose, setExpensePurpose] = useState<string>("");
+  const [requestId, setRequestId] = useState<string>("");
+
   const [appliedStartDate, setAppliedStartDate] = useState<string>("");
   const [appliedEndDate, setAppliedEndDate] = useState<string>("");
   const [appliedUsername, setAppliedUsername] = useState<string>("");
@@ -200,6 +202,8 @@ export default function ExpensesWebScreen() {
   const [appliedExpenseType, setAppliedExpenseType] = useState<string>("All");
   const [appliedExpensePurpose, setAppliedExpensePurpose] =
     useState<string>("");
+  const [appliedRequestId, setAppliedRequestId] = useState<string>("");
+
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
@@ -231,6 +235,8 @@ export default function ExpensesWebScreen() {
     string | null
   >(null);
   const [selectedExpenseType, setSelectedExpenseType] = useState<number>(1);
+
+  const [showTripModal, setShowTripModal] = useState(false);
 
   const purposeList = [
     { label: "Application support", value: "Application support" },
@@ -630,32 +636,58 @@ export default function ExpensesWebScreen() {
   });
 
   const filteredOutstationExpense = oustationExpense.filter((e) => {
-    if (appliedExpenseType == "Mileage" || appliedExpenseType == "General")
-      return false;
-    if (
-      !e.date ||
-      (!appliedStartDate &&
-        !appliedEndDate &&
-        !usernameFilter &&
-        (expenseType != "Oustation" || !appliedExpensePurpose))
-    )
-      return true;
+    // Start with all items
+    let include = true;
 
-    return (
-      !(appliedStartDate && e.date < appliedStartDate) &&
-      !(appliedEndDate && e.date > appliedEndDate) &&
-      !(
-        (appliedUsername && e.user_name != appliedUsername) ||
-        (!appliedUsername && e.username != appliedUsername)
-      )
-    );
+    // Exclude Mileage and General
+    if (appliedExpenseType == "Mileage" || appliedExpenseType == "General") {
+      include = false;
+    }
+
+    // Filter by request_id
+    if (appliedRequestId && e.request_id !== appliedRequestId) {
+      include = false;
+    }
+
+    // Filter by start date
+    if (appliedStartDate && e.date < appliedStartDate) {
+      include = false;
+    }
+
+    // Filter by end date
+    if (appliedEndDate && e.date > appliedEndDate) {
+      include = false;
+    }
+
+    // Filter by username
+    if (
+      appliedUsername &&
+      e.user_name !== appliedUsername &&
+      e.username !== appliedUsername
+    ) {
+      include = false;
+    }
+
+    // If no filters are applied, include all
+    if (
+      !appliedRequestId &&
+      !appliedStartDate &&
+      !appliedEndDate &&
+      !appliedUsername
+    ) {
+      include = true;
+    }
+
+    return include;
   });
 
-  const groupedExpenses = filteredOutstationExpense.reduce<ExpenseGroup[]>(
-    (acc, expense) => {
+  const groupedExpense = (outstationExpense: OutstationExpense[]) => {
+    return outstationExpense.reduce<ExpenseGroup[]>((acc, expense) => {
+      const requestId =
+        expense.request_id || `temp_${Date.now()}_${Math.random()}`;
+      const existingGroup = acc.find((group) => group.request_id === requestId);
+
       const tripTitle = expense.trip_title || "Untitled Trip";
-      const existingGroup = acc.find((group) => group.trip_title === tripTitle);
-      const requestId = expense.request_id || "";
       const userId = expense.user_id || "";
       const username = expense.user_name || expense.username || "";
       const type = expense.type || 3;
@@ -663,7 +695,6 @@ export default function ExpensesWebScreen() {
       const endDate = expense.end_date || "N/A";
       const travelPurposes = expense.travel_purposes || [];
 
-      // Ensure total is a number - convert string to number if needed
       const expenseTotal =
         typeof expense.total === "string"
           ? parseFloat(expense.total) || 0
@@ -688,9 +719,10 @@ export default function ExpensesWebScreen() {
         });
       }
       return acc;
-    },
-    [],
-  );
+    }, []);
+  };
+
+  const groupedExpenses = groupedExpense(filteredOutstationExpense);
 
   const sortExpensesByDate = (
     expenses: OutstationExpense[],
@@ -984,8 +1016,8 @@ export default function ExpensesWebScreen() {
 
           if (trip) {
             const distance = trip.distance?.toFixed(2) || "0.00";
-            const platform = trip.platform === 1 ? "Web" : "Mobile";
-            const goingHome = trip.to_home === true ? "True" : "False";
+            const platform = trip.platform === 2 ? "Web" : "Mobile";
+            const goingHome = trip.to_home === true ? "Yes" : "No";
 
             const fromTime = formatFirebaseTime(trip.from_time);
             const toTime = formatFirebaseTime(trip.to_time);
@@ -1000,7 +1032,7 @@ export default function ExpensesWebScreen() {
               </div>
               
               
-              <strong>Going Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;"><strong>Going Home: </strong>${goingHome}</div>` : ""}
+              <strong>Going Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
               
               
             </div>
@@ -1134,13 +1166,8 @@ export default function ExpensesWebScreen() {
               background-color: transparent;
             }
             td.total-amount {
-              border-left: none;
-              border-right: none;
-              border-bottom: none;
-              border-top: 2px solid #0f172a;
               font-weight: bold;
-              font-size: 13px;
-              padding: 3px;
+              text-align: right;
             }
             .signature-container {
               display: flex;
@@ -1260,8 +1287,8 @@ export default function ExpensesWebScreen() {
               </div>
               <div class="header-title">
                 <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
-                <strong><p class="report-title">MONTHLY LOCAL TRAVELLING CLAIM</p></strong>
-                <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER EXPENSES INCURRED</p>
+                <strong><p class="report-title">LOCAL MILEAGE</p></strong>
+                
               </div>
               <div class="header-empty"></div>
             </div>
@@ -1325,7 +1352,7 @@ export default function ExpensesWebScreen() {
             </table>
             <div class="signature-container">
               <div class="signature-block">
-                <p class="signature-label">Requested By:</p>
+                <p class="signature-label">Claimed By:</p>
                 <div class="signature-line"></div>
                 <p class="signature-date">Name: ${reportUsername}</p>
                 <p class="signature-date">Date: ${getCurrentDate()}</p>
@@ -1660,50 +1687,48 @@ export default function ExpensesWebScreen() {
         .join("");
     };
 
+    const generateCustomerDetails = (customers: any[]) => {
+      return customers.map((customer) => {
+        return `
+          <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 20px; margin-bottom: 1px; padding: 1px 0; font-size: 9px; color: #888;">
+            <div style="font-size: 9px; color: #888;"><strong>Company: </strong>${customer.company || "N/A"}</div>
+            <div style="font-size: 9px; color: #888;"><strong>Customer Name: </strong>${customer.name || "N/A"}</div>
+            <div style="font-size: 9px; color: #888;"><strong>Emali: </strong>${customer.email || "N/A"}</div>
+            <div style="font-size: 9px; color: #888;"><strong>Contact Number: </strong>${customer.number || "N/A"}</div>
+            <div style="font-size: 9px; color: #888;"><strong>Time: </strong>${customer.time || "N/A"}</div>
+          </div>
+        `;
+      });
+    };
+
     const combinedData = [
       ...filteredExpenses.map(normalizeMileage),
       ...filteredGeneralExpenses.map(normalizeGeneral),
     ];
 
-    const totalParking = combinedData.reduce(
-      (sum, item) => sum + item.parking,
-      0,
-    );
-    const totalToll = combinedData.reduce((sum, item) => sum + item.toll, 0);
-    const totalMileage = combinedData.reduce(
-      (sum, item) => sum + item.mileage,
-      0,
-    );
-    const totalExpense = combinedData.reduce(
-      (sum, item) => sum + item.expense,
-      0,
-    );
-    const totalAmount = combinedData.reduce(
-      (sum, item) => sum + item.subTotal,
-      0,
-    );
+    const getMealCost = (item: OutstationExpense): number => {
+      let mealCost = Number(item.meal) || 0;
+      if (!mealCost) {
+        mealCost =
+          Number(item.total) -
+          (Number(item.airfare) +
+            Number(item.parking) +
+            Number(item.transport) +
+            Number(item.hotel) +
+            Number(item.own_acc) +
+            Number(item.entertainment) +
+            Number(item.laundry) +
+            Number(item.others));
+      }
+      return mealCost;
+    };
 
-    const totalAirfare = filteredOutstationExpense.reduce(
-      (sum, item) => sum + item.airfare,
-      0,
-    );
+    const expenses = groupedExpenses.flatMap((group) => group.data);
 
-    const totals = filteredOutstationExpense.reduce(
+    const totals = expenses.reduce(
       (acc, item) => {
         // Calculate meal cost if not provided
-        let mealCost = Number(item.meal) || 0;
-        if (!mealCost) {
-          mealCost =
-            Number(item.total) -
-            (Number(item.airfare) +
-              Number(item.parking) +
-              Number(item.transport) +
-              Number(item.hotel) +
-              Number(item.own_acc) +
-              Number(item.entertainment) +
-              Number(item.laundry) +
-              Number(item.others));
-        }
+        let mealCost = getMealCost(item);
 
         return {
           airfare: acc.airfare + Number(item.airfare) || 0,
@@ -1731,7 +1756,6 @@ export default function ExpensesWebScreen() {
         total: 0,
       },
     );
-
     const formatAmount = (value: number) => {
       return (Number(value) || 0).toFixed(2);
     };
@@ -1817,13 +1841,8 @@ export default function ExpensesWebScreen() {
               background-color: transparent;
             }
             td.total-amount {
-              border-left: none;
-              border-right: none;
-              border-bottom: none;
-              border-top: 2px solid #0f172a;
               font-weight: bold;
-              font-size: 13px;
-              padding: 3px;
+              text-align: right;
             }
             .signature-container {
               display: flex;
@@ -1943,12 +1962,11 @@ export default function ExpensesWebScreen() {
               </div>
               <div class="header-title">
                 <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
-                <strong><p class="report-title">MONTHLY LOCAL TRAVELLING CLAIM</p></strong>
-                <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER EXPENSES INCURRED</p>
+                <strong><p class="report-title">OUTSTATION TRAVELLING CLAIM</p></strong>
               </div>
               <div class="header-empty"></div>
             </div>
-            <h1>Trip Expense Report from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
+            <h1>Expense for ${expenses[0].trip_title}</h1>
             <div class="employee-info-section">
             <div class="employee-info">Name: <u>${reportUsername}</u></div>
             <div class="employee-info">ESS No: <u>${reportEssNo}</u></div>
@@ -1960,7 +1978,9 @@ export default function ExpensesWebScreen() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Trip Title</th>
+                  <th>Country</th>
+                  <th>Location</th>
+                  <th>Meal</th>
                   <th>Airfare</th>
                   <th>Parking</th>
                   <th>Transport</th>
@@ -1973,14 +1993,14 @@ export default function ExpensesWebScreen() {
                 </tr>
               </thead>
               <tbody>
-                ${filteredOutstationExpense
+                ${expenses
                   .map(
                     (item) => `
                       <tr>
                         <td>${formatDateString(item.date)}</td>
-                        <td>${item.trip_title}</td>
                         <td>${item.country}</td>
                         <td>${item.location}</td>
+                        <td class="amount">${formatAmount(getMealCost(item))}</td>
                         <td class="amount">${formatAmount(item.airfare)}</td>
                         <td class="amount">${formatAmount(item.parking)}</td>
                         <td class="amount">${formatAmount(item.transport)}</td>
@@ -1996,23 +2016,24 @@ export default function ExpensesWebScreen() {
                   .join("")}
                   
                 <tr class="total-row">
-                  <td colspan="2" class="total-label">Total:</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.airfare)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.parking)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.transport)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.hotel)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.own_acc)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.entertainment)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.laundry)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.others)}</td>
-                  <td style="font-weight: bold;">${formatCurrency(totals.total)}</td>
+                  <td colspan="3" class="total-label">Total:</td>
+                  <td class="total-amount">${formatCurrency(totals.meal)}</td>
+                  <td class="total-amount">${formatCurrency(totals.airfare)}</td>
+                  <td class="total-amount">${formatCurrency(totals.parking)}</td>
+                  <td class="total-amount">${formatCurrency(totals.transport)}</td>
+                  <td class="total-amount">${formatCurrency(totals.hotel)}</td>
+                  <td class="total-amount">${formatCurrency(totals.own_acc)}</td>
+                  <td class="total-amount">${formatCurrency(totals.entertainment)}</td>
+                  <td class="total-amount">${formatCurrency(totals.laundry)}</td>
+                  <td class="total-amount">${formatCurrency(totals.others)}</td>
+                  <td class="total-amount">${formatCurrency(totals.total)}</td>
                 </tr>
               </tbody>
               
             </table>
             <div class="signature-container">
               <div class="signature-block">
-                <p class="signature-label">Requested By:</p>
+                <p class="signature-label">Claimed By:</p>
                 <div class="signature-line"></div>
                 <p class="signature-date">Name: ${reportUsername}</p>
                 <p class="signature-date">Date: ${getCurrentDate()}</p>
@@ -2026,76 +2047,93 @@ export default function ExpensesWebScreen() {
               </div>
             </div>
             <div>
-              <h1>Detailed Reports from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
-              ${filteredExpenses
+              <h1>Detailed Reports for ${expenses[0].trip_title} </h1>
+              ${expenses
                 .map(
                   (item) => `
                   <div class="details-container">
                     <div class="details-row">
                       <div class="details">
                         <div class="details-label">Username: </div>
-                        <div class="details-value">${item.user_name}</div>
+                        <div class="details-value">${item.user_name || item.username}</div>
                       </div>
                       <div class="details">
                         <div class="details-label">Date: </div>
                         <div class="details-value">${item.date}</div>
                       </div>
                       <div class="details">
+                        <div class="details-label">Travel Purposes: </div>
+                        <div class="details-value">${(item.travel_purposes || []).join(", ")}</div>
+                      </div>
+                      <div class="details">
                         <div class="details-label">Type: </div>
-                        <div class="details-value">Mileage Expense</div>
+                        <div class="details-value">Outstation Expense</div>
                       </div>
                     </div>
                     <div class="details-row" style="margin-top: 10px;">
                       <div class="details">
-                        <div class="details-label">Customer Name: </div>
-                        <div class="details-value">${item.name}</div>
+                        <div class="details-label">Airfare: </div>
+                        <div class="details-value">RM ${formatCurrency(item.airfare)}, ${item.airfare_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Company: </div>
-                        <div class="details-value">${item.company}</div>
+                        <div class="details-label">Parking: </div>
+                        <div class="details-value">RM ${formatCurrency(item.parking)}, ${item.parking_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Contact Number: </div>
-                        <div class="details-value">${item.contact_number}</div>
+                        <div class="details-label">Transport: </div>
+                        <div class="details-value">RM ${formatCurrency(item.transport)}, ${item.transport_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Email: </div>
-                        <div class="details-value">${item.email}</div>
+                        <div class="details-label">Hotel: </div>
+                        <div class="details-value">RM ${formatCurrency(item.hotel)}, ${item.hotel_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Purpose: </div>
-                        <div class="details-value">${item.purpose}</div>
+                        <div class="details-label">Own Acc: </div>
+                        <div class="details-value">RM ${formatCurrency(item.own_acc)}, ${item.own_acc_sharing || "N/A"}, ${item.own_acc_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Distance: </div>
-                        <div class="details-value">${item.distance} km</div>
+                        <div class="details-label">Entertainment: </div>
+                        <div class="details-value">RM ${formatCurrency(item.entertainment)}, ${item.entertainment_remark || "N/A"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Time: </div>
-                        <div class="details-value">${item.from_time} - ${item.to_time} (${item.duration})</div>
+                        <div class="details-label">Laundry: </div>
+                        <div class="details-value">RM ${formatCurrency(item.laundry)}, ${item.laundry_remark || "N/A"}</div>
+                      </div>
+                      <div class="details">
+                        <div class="details-label">Others: </div>
+                        <div class="details-value">RM ${formatCurrency(item.others)}, ${item.others_remark || "N/A"}</div>
                       </div>
                     </div>
 
                     <div class="details-row" style="margin-top: 10px;">
                       <div class="details">
-                        <div class="details-label">Parking: </div>
-                        <div class="details-value">RM ${item.parking}</div>
+                        <div class="details-label">Breakfast: </div>
+                        <div class="details-value">${item.breakfast ? "No" : "Yes"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Toll: </div>
-                        <div class="details-value">RM ${item.toll}</div>
+                        <div class="details-label">Lunch: </div>
+                        <div class="details-value">${item.lunch ? "No" : "Yes"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Mileage: </div>
-                        <div class="details-value">RM ${item.mileage}</div>
+                        <div class="details-label">Dinner: </div>
+                        <div class="details-value">${item.dinner ? "No" : "Yes"}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Expense: </div>
-                        <div class="details-value">RM ${item.expense}</div>
+                        <div class="details-label">Meal Cost: </div>
+                        <div class="details-value">RM ${formatCurrency(getMealCost(item))}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Expense Purpose: </div>
-                        <div class="details-value">${item.expense_purpose || "N/A"}</div>
+                        <div class="details-label">Total: </div>
+                        <div class="details-value">RM ${formatCurrency(item.total)}</div>
+                      </div>
+                    </div>
+                    
+                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
+                      <div class="details" style="flex: 1; width: 100%;">
+                        <div class="details-label">Customers: </div>
+                        <div class="details-value trip-details-container">
+                          ${generateCustomerDetails(item.customers || [])}
+                        </div>
                       </div>
                     </div>
 
@@ -2103,72 +2141,6 @@ export default function ExpensesWebScreen() {
                       <div class="details">
                         <div class="details-label">Trip Report: </div>
                         <div class="details-value">${item.trip_report}</div>
-                      </div>
-                    </div>
-                    
-                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
-                      <div class="details" style="flex: 1; width: 100%;">
-                        <div class="details-label">Trip Details: </div>
-                        <div class="details-value trip-details-container">
-                          ${generateTripDetails(item.trip_ids || [])}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                `,
-                )
-                .join("")}
-
-              ${filteredGeneralExpenses
-                .map(
-                  (item) => `
-                  <div class="details-container">
-                    <div class="details-row">
-                      <div class="details">
-                        <div class="details-label">Username: </div>
-                        <div class="details-value">${item.user_name}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Date: </div>
-                        <div class="details-value">${item.date}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Type: </div>
-                        <div class="details-value">General Expense</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Customer Name: </div>
-                        <div class="details-value">${item.name || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Company: </div>
-                        <div class="details-value">${item.company || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Contact Number: </div>
-                        <div class="details-value">${item.contact_number || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Email: </div>
-                        <div class="details-value">${item.email || "N/A"}</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Purpose: </div>
-                        <div class="details-value">${item.expense_type}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Expense Amount: </div>
-                        <div class="details-value">RM ${item.amount}</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.expense_report}</div>
                       </div>
                     </div>
                   </div>
@@ -2265,6 +2237,131 @@ export default function ExpensesWebScreen() {
     const hoursStr = hours12.toString().padStart(2, "0");
     const minutesStr = minutes.toString().padStart(2, "0");
     return `${hoursStr}:${minutesStr} ${period}`;
+  };
+
+  const renderTripModal = () => {
+    return (
+      <Modal
+        visible={showTripModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTripModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTripModal(false)}
+        >
+          <View style={styles.userModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTripTitle}>Select a Trip</Text>
+              <TouchableOpacity onPress={() => setShowTripModal(false)}>
+                <Text style={styles.closeModal}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.tableContainer}>
+              <View style={styles.tableHeader}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Trip Title</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>User</Text>
+                </View>
+              </View>
+
+              <ScrollView style={styles.modalList}>
+                {groupedExpense(oustationExpense).map((trip) => {
+                  /* const isAdded =
+                                formTripCountry === place.country &&
+                                formTripLocation === place.location; */
+
+                  const isAdded = false;
+
+                  return (
+                    <TouchableOpacity
+                      key={trip.request_id}
+                      style={[
+                        styles.tableRow,
+                        isAdded && styles.disabledPlaceItem,
+                      ]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        setRequestId(trip.request_id);
+                        setShowTripModal(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {trip?.trip_title}
+                        </Text>
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {trip?.user_name || "N/A"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* <ScrollView style={styles.modalList}>
+              {groupedExpenses.length === 0 && (
+                <Text style={styles.noTripsText}>No trips found</Text>
+              )}
+              {groupedExpenses.map((trip) => {
+                //const isAdded = selectedRequestId == trip.id || trip.locked;
+                const isAdded = false;
+
+                return (
+                  <TouchableOpacity
+                    key={trip.trip_title}
+                    style={[
+                      styles.modalTripItem,
+                      isAdded && styles.disabledTripItem,
+                    ]}
+                    onPress={() => {
+                      if (isAdded) return;
+                      setShowTripModal(false);
+                      //handleAddTrip(trip.id);
+                    }}
+                  >
+                    <Text
+                      style={[styles.tripTitle, isAdded && styles.disabledText]}
+                    >
+                      {trip?.trip_title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tripPurpose,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      {trip?.user_name || "N/A"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView> */}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   const renderHeader = () => (
@@ -2402,14 +2499,16 @@ export default function ExpensesWebScreen() {
                     onChange={(e) => setExpenseType(e.target.value)}
                     style={inputBase}
                   >
-                    <option value="All">All</option>
+                    <option value="All" disabled>
+                      All
+                    </option>
                     <option value="Mileage">Mileage Expense</option>
                     <option value="General">General Expense</option>
                     <option value="Outstation">Outstation Expense</option>
                   </select>
                 </View>
 
-                {expenseType !== "Outstationa" && (
+                {expenseType !== "Outstation" ? (
                   <View
                     style={{
                       flex: 1,
@@ -2452,7 +2551,71 @@ export default function ExpensesWebScreen() {
                           ))}
                     </select>
                   </View>
+                ) : (
+                  <View
+                    style={{
+                      flex: 1,
+                      marginRight: 12,
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 11,
+                        marginBottom: 4,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Trip
+                    </Text>
+                    <View
+                      style={{
+                        borderRadius: 6,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={styles.tripButton}
+                        onPress={() => {
+                          setShowTripModal(true);
+                          console.log();
+                        }}
+                      >
+                        <Text ellipsizeMode="tail">
+                          {requestId === ""
+                            ? "Select a Trip"
+                            : groupedExpenses.find(
+                                (group) => group.request_id === requestId,
+                              )?.trip_title || "N/A"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {/* <select
+                      value={expensePurpose}
+                      onChange={(e) => setExpensePurpose(e.target.value)}
+                      style={inputBase}
+                    >
+                      <option value="" disabled>
+                        Select a purpose...
+                      </option>
+
+                      {filteredOutstationExpense.length > 0 ? (
+                        filteredOutstationExpense.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {`${e.trip_title}\n${e.user_name || e.username || "N/A"}`}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          No trips available
+                        </option>
+                      )}
+                    </select> */}
+                  </View>
                 )}
+
+                {renderTripModal()}
 
                 {role == 0 && (
                   <View
@@ -2518,6 +2681,11 @@ export default function ExpensesWebScreen() {
                     setAppliedExpenseType(expenseType);
                     setAppliedExpensePurpose(expensePurpose);
                     updateUserFilter(usernameFilter);
+                    setAppliedRequestId(requestId);
+                    console.log(requestId);
+                    console.log(appliedRequestId);
+                    console.log(groupedExpenses);
+                    console.log(filteredOutstationExpense);
                   }}
                 >
                   <Text
@@ -2547,6 +2715,8 @@ export default function ExpensesWebScreen() {
                     setAppliedEssNo("");
                     setAppliedDepartment("");
                     setAppliedGrade("");
+                    setRequestId("");
+                    setAppliedRequestId("");
                   }}
                 >
                   <Text
@@ -2566,13 +2736,13 @@ export default function ExpensesWebScreen() {
                 }}
               ></View>
 
-              {/* {appliedExpenseType === "Outstation" ? (
+              {appliedExpenseType === "Outstation" ? (
                 <TouchableOpacity
                   style={[styles.exportButton]}
                   onPress={exportOutstationToPdf}
                 >
                   <Text style={styles.exportButtonText}>
-                    Generate PDF Report
+                    Generate PDF Report (Outstation)
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -2584,13 +2754,7 @@ export default function ExpensesWebScreen() {
                     Generate PDF Report
                   </Text>
                 </TouchableOpacity>
-              )} */}
-              <TouchableOpacity
-                style={styles.exportButton}
-                onPress={exportToPdf}
-              >
-                <Text style={styles.exportButtonText}>Generate PDF Report</Text>
-              </TouchableOpacity>
+              )}
 
               {renderSelectUserModal()}
             </View>
@@ -3185,7 +3349,7 @@ export default function ExpensesWebScreen() {
                 return trip ? (
                   <View key={tripId} style={styles.tripItem}>
                     <Text style={styles.descriptionText}>
-                      {trip.platform === 1 ? "Web" : "Mobile"}
+                      {trip.platform === 2 ? "Web" : "Mobile"}
                     </Text>
                     <Text style={styles.tripDetail}>
                       <strong>Remark: </strong>
@@ -3203,7 +3367,7 @@ export default function ExpensesWebScreen() {
                     </Text>
                     <Text style={styles.tripDetail}>
                       <strong>Going Home: </strong>
-                      {trip.to_home === true ? "True" : "False"}
+                      {trip.to_home === true ? "Yes" : "No"}
                     </Text>
                   </View>
                 ) : (
@@ -3707,7 +3871,7 @@ export default function ExpensesWebScreen() {
               disabled={selectedTripIndex >= trip.data.length - 1}
               style={{
                 backgroundColor:
-                  selectedTripIndex >= groupedExpenses.length - 1
+                  selectedTripIndex >= trip.data.length - 1
                     ? "#B0BEC5"
                     : "#2196F3",
                 width: 40,
@@ -4239,7 +4403,7 @@ export default function ExpensesWebScreen() {
               />
             ) : (
               <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.breakfast ? "✓" : "✗"}
+                {expense.breakfast ? "No" : "Yes"}
               </Text>
             )}
           </View>
@@ -4266,7 +4430,7 @@ export default function ExpensesWebScreen() {
               />
             ) : (
               <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.lunch ? "✓" : "✗"}
+                {expense.lunch ? "No" : "Yes"}
               </Text>
             )}
           </View>
@@ -4293,7 +4457,7 @@ export default function ExpensesWebScreen() {
               />
             ) : (
               <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.dinner ? "✓" : "✗"}
+                {expense.dinner ? "No" : "Yes"}
               </Text>
             )}
           </View>
@@ -4923,7 +5087,8 @@ export default function ExpensesWebScreen() {
                   setSelectedRequestId(item.request_id);
                   setSelectedExpenseId("");
                   setSelectedExpenseType(item.type);
-                  test();
+                  console.log(item.travel_purposes);
+                  console.log(item);
                 }}
               >
                 <View
@@ -5054,18 +5219,6 @@ export default function ExpensesWebScreen() {
     </View>
   );
 }
-
-const htmlSelectStyle = {
-  padding: "8px 12px",
-  border: "1px solid #ccc",
-  borderRadius: "4px",
-  backgroundColor: "#f9f9f9",
-  fontSize: "14px",
-  width: "100%",
-  maxWidth: 400,
-  marginBottom: 10,
-  height: "auto",
-};
 
 const filterInputStyle = {
   backgroundColor: "rgba(255,255,255,0.1)",
@@ -5607,4 +5760,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
   },
+  tripButton: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flex: 1,
+    borderWidth: 0,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    fontFamily: "System",
+  },
+
+  addressText: { fontSize: 13, color: "#444", marginTop: 2 },
+
+  disabledTripItem: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.6,
+  },
+  modalTripTitle: { fontSize: 18, fontWeight: "bold" },
+  closeModal: { fontSize: 20, fontWeight: "bold", color: "#999" },
+  tripTitle: { fontWeight: "bold", fontSize: 14 },
+  tripPurpose: { fontSize: 12, color: "#666" },
+  modalTripItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
 });

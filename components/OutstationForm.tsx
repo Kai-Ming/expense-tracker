@@ -2091,6 +2091,7 @@ export default function OutstationExpenseForm() {
         </View>
         <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={styles.fieldLabel}>Total:</Text>
+          <Text style={styles.fieldValue}>RM {getMealCost()}</Text>
           <Text style={styles.fieldValue}>RM {getTotal()}</Text>
         </View>
         {/* --- Dynamic Customer Section --- */}
