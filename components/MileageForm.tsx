@@ -1329,297 +1329,304 @@ export default function MileageForm() {
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.formContainer}>
-            <Text style={styles.formLabel}>Submit Travel Expense</Text>
-            {fieldMessage}
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Date:</Text>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                style={htmlInputStyle}
-              />
-              {/* <Text style={styles.fieldLabel}>Select Trips:</Text> */}
-              <View style={styles.dropdownInput}>
-                <TouchableOpacity
-                  style={styles.dropdownButton}
-                  onPress={() => {
-                    setIsDropdownOpen(true);
+          <View style={styles.wrapper}>
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={true}
+              style={styles.horizontalScrollView}
+              contentContainerStyle={styles.horizontalContent}
+            >
+              <View style={styles.formContainer}>
+                <Text style={styles.formLabel}>Submit Travel Expense</Text>
+                {fieldMessage}
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Date:</Text>
+                  <input
+                    type="date"
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    style={htmlInputStyle}
+                  />
+                  {/* <Text style={styles.fieldLabel}>Select Trips:</Text> */}
+                  <View style={styles.dropdownInput}>
+                    <TouchableOpacity
+                      style={styles.dropdownButton}
+                      onPress={() => {
+                        setIsDropdownOpen(true);
 
-                    console.log(addedTrips);
-                  }}
-                >
-                  <Text style={styles.buttonText}>
-                    {selectedTripId
-                      ? (() => {
-                          const selected = tripsForSelectedDate.find(
-                            (t) => t.id === selectedTripId,
-                          );
-                          return selected
-                            ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
-                            : "Select Trips";
-                        })()
-                      : tripsForSelectedDate.length > 0
-                        ? "Select Trips"
-                        : "No Trips"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {renderTripModal()}
-
-              <TouchableOpacity
-                onPress={() => setShowTripModal(true)}
-                style={[styles.dropdownInput, { marginLeft: 10 }]}
-              >
-                <Text style={styles.buttonText}>Add Trip</Text>
-              </TouchableOpacity>
-              <Modal
-                animationType="fade"
-                transparent={true}
-                visible={showTripModal}
-                statusBarTranslucent={true}
-                onRequestClose={() => !isSaving && setShowTripModal(false)}
-              >
-                <View style={styles.screenOverlay}>
-                  <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    style={styles.keyboardContainer}
-                  >
-                    <ScrollView
-                      style={styles.modalScrollWrapper}
-                      contentContainerStyle={styles.modalScrollContent}
-                      keyboardShouldPersistTaps="handled"
-                      showsVerticalScrollIndicator={false}
+                        console.log(addedTrips);
+                      }}
                     >
-                      <View style={styles.modalView}>
-                        <Text style={styles.modalTitle}>Add Trip</Text>
+                      <Text style={styles.buttonText}>
+                        {selectedTripId
+                          ? (() => {
+                              const selected = tripsForSelectedDate.find(
+                                (t) => t.id === selectedTripId,
+                              );
+                              return selected
+                                ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
+                                : "Select Trips";
+                            })()
+                          : tripsForSelectedDate.length > 0
+                            ? "Select Trips"
+                            : "No Trips"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {renderTripModal()}
 
-                        <View style={styles.formGroup}>
-                          <Text
-                            style={[
-                              styles.modalSubtitle,
-                              styles.fieldLabelMandatory,
-                            ]}
-                          >
-                            From (Starting location):
-                          </Text>
-                          <PlacesInput
-                            value={fromAddress}
-                            placeholder="Search starting location"
-                            onPlaceSelected={(address, location) => {
-                              setFromAddress(address);
-                              setOriginCoord(location);
-                            }}
-                            disabled={selectedFromIndex !== 0}
-                          />
-                          <View
-                            style={[{ flexDirection: "row", marginTop: 5 }]}
-                          >
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedFromIndex === 1
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 0 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(1, 0);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedFromIndex === 1
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                HQ
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedFromIndex === 2
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 15 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(2, 0);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedFromIndex === 2
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                Penang
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedFromIndex === 3
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 15 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(3, 0);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedFromIndex === 3
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                Home
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                          <Text
-                            style={[
-                              styles.modalSubtitle,
-                              styles.fieldLabelMandatory,
-                              { marginTop: 10 },
-                            ]}
-                          >
-                            To (Destination):
-                          </Text>
-                          <PlacesInput
-                            value={toAddress}
-                            placeholder="Search destination…"
-                            onPlaceSelected={(address, location) => {
-                              setToAddress(address);
-                              setDestCoord(location);
-                            }}
-                            disabled={selectedGoingIndex !== 0}
-                          />
-                          <View
-                            style={[{ flexDirection: "row", marginTop: 5 }]}
-                          >
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedGoingIndex === 1
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 0 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(1, 1);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedGoingIndex === 1
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                HQ
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedGoingIndex === 2
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 15 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(2, 1);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedGoingIndex === 2
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                Penang
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.dialogButton,
-                                selectedGoingIndex === 3
-                                  ? styles.submitButtonActive
-                                  : styles.submitButton,
-                                { marginLeft: 15 },
-                              ]}
-                              onPress={() => {
-                                selectDefault(3, 1);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  selectedGoingIndex === 3
-                                    ? styles.textStyleActive
-                                    : styles.textStyle,
-                                  { fontWeight: "normal" },
-                                ]}
-                              >
-                                Home
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
+                  <TouchableOpacity
+                    onPress={() => setShowTripModal(true)}
+                    style={[styles.dropdownInput, { marginLeft: 10 }]}
+                  >
+                    <Text style={styles.buttonText}>Add Trip</Text>
+                  </TouchableOpacity>
+                  <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={showTripModal}
+                    statusBarTranslucent={true}
+                    onRequestClose={() => !isSaving && setShowTripModal(false)}
+                  >
+                    <View style={styles.screenOverlay}>
+                      <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        style={styles.keyboardContainer}
+                      >
+                        <ScrollView
+                          style={styles.modalScrollWrapper}
+                          contentContainerStyle={styles.modalScrollContent}
+                          keyboardShouldPersistTaps="handled"
+                          showsVerticalScrollIndicator={false}
+                        >
+                          <View style={styles.modalView}>
+                            <Text style={styles.modalTitle}>Add Trip</Text>
 
-                          <Text
-                            style={[
-                              styles.modalSubtitle,
-                              styles.fieldLabelMandatory,
-                              { marginTop: 10 },
-                            ]}
-                          >
-                            Departure Time:
-                          </Text>
-                          <input
-                            type="time"
-                            value={dateToTimeString(formTripFromTime)}
-                            onChange={(e) =>
-                              setFormTripFromTime(
-                                timeStringToDate(e.target.value),
-                              )
-                            }
-                            style={styles.timeInput}
-                            disabled={isSaving}
-                          />
+                            <View style={styles.formGroup}>
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                ]}
+                              >
+                                From (Starting location):
+                              </Text>
+                              <PlacesInput
+                                value={fromAddress}
+                                placeholder="Search starting location"
+                                onPlaceSelected={(address, location) => {
+                                  setFromAddress(address);
+                                  setOriginCoord(location);
+                                }}
+                                disabled={selectedFromIndex !== 0}
+                              />
+                              <View
+                                style={[{ flexDirection: "row", marginTop: 5 }]}
+                              >
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedFromIndex === 1
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 0 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(1, 0);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedFromIndex === 1
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    HQ
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedFromIndex === 2
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(2, 0);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedFromIndex === 2
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    Penang
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedFromIndex === 3
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(3, 0);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedFromIndex === 3
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    Home
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                  { marginTop: 10 },
+                                ]}
+                              >
+                                To (Destination):
+                              </Text>
+                              <PlacesInput
+                                value={toAddress}
+                                placeholder="Search destination…"
+                                onPlaceSelected={(address, location) => {
+                                  setToAddress(address);
+                                  setDestCoord(location);
+                                }}
+                                disabled={selectedGoingIndex !== 0}
+                              />
+                              <View
+                                style={[{ flexDirection: "row", marginTop: 5 }]}
+                              >
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedGoingIndex === 1
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 0 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(1, 1);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedGoingIndex === 1
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    HQ
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedGoingIndex === 2
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(2, 1);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedGoingIndex === 2
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    Penang
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    selectedGoingIndex === 3
+                                      ? styles.submitButtonActive
+                                      : styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    selectDefault(3, 1);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      selectedGoingIndex === 3
+                                        ? styles.textStyleActive
+                                        : styles.textStyle,
+                                      { fontWeight: "normal" },
+                                    ]}
+                                  >
+                                    Home
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
 
-                          <Text
-                            style={[
-                              styles.modalSubtitle,
-                              styles.fieldLabelMandatory,
-                            ]}
-                          >
-                            Arrival Time:
-                          </Text>
-                          <input
-                            type="time"
-                            value={dateToTimeString(formTripToTime)}
-                            onChange={(e) =>
-                              setFormTripToTime(
-                                timeStringToDate(e.target.value),
-                              )
-                            }
-                            style={styles.timeInput}
-                            disabled={isSaving}
-                          />
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                  { marginTop: 10 },
+                                ]}
+                              >
+                                Departure Time:
+                              </Text>
+                              <input
+                                type="time"
+                                value={dateToTimeString(formTripFromTime)}
+                                onChange={(e) =>
+                                  setFormTripFromTime(
+                                    timeStringToDate(e.target.value),
+                                  )
+                                }
+                                style={styles.timeInput}
+                                disabled={isSaving}
+                              />
 
-                          {/* <Text style={styles.modalSubtitle}>Going Home:</Text>
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                ]}
+                              >
+                                Arrival Time:
+                              </Text>
+                              <input
+                                type="time"
+                                value={dateToTimeString(formTripToTime)}
+                                onChange={(e) =>
+                                  setFormTripToTime(
+                                    timeStringToDate(e.target.value),
+                                  )
+                                }
+                                style={styles.timeInput}
+                                disabled={isSaving}
+                              />
+
+                              {/* <Text style={styles.modalSubtitle}>Going Home:</Text>
                           <Switch
                             trackColor={{ false: "#767577", true: "#81b0ff" }}
                             thumbColor="#2196F3"
@@ -1629,105 +1636,111 @@ export default function MileageForm() {
                               handleUpdateHome(newValue)
                             }
                           /> */}
-                          <Text
-                            style={[
-                              styles.modalSubtitle,
-                              styles.fieldLabelMandatory,
-                            ]}
-                          >
-                            Remark:
-                          </Text>
-                          <TextInput
-                            style={[
-                              styles.input,
-                              { minHeight: 80, textAlignVertical: "top" },
-                            ]}
-                            placeholder="Trip Remark..."
-                            placeholderTextColor="#999999"
-                            value={formRemark}
-                            onChangeText={setFormRemark}
-                            editable={!isSaving}
-                            keyboardType="default"
-                            multiline
-                            numberOfLines={3}
-                          />
-                        </View>
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                ]}
+                              >
+                                Remark:
+                              </Text>
+                              <TextInput
+                                style={[
+                                  styles.input,
+                                  { minHeight: 80, textAlignVertical: "top" },
+                                ]}
+                                placeholder="Trip Remark..."
+                                placeholderTextColor="#999999"
+                                value={formRemark}
+                                onChangeText={setFormRemark}
+                                editable={!isSaving}
+                                keyboardType="default"
+                                multiline
+                                numberOfLines={3}
+                              />
+                            </View>
 
-                        <View style={styles.buttonRow}>
-                          <TouchableOpacity
-                            style={[styles.dialogButton, styles.cancelButton]}
-                            onPress={() => {
-                              setShowTripModal(false);
-                              resetTripForm();
-                            }}
-                            disabled={isSaving}
-                          >
-                            <Text style={styles.textStyle}>Cancel</Text>
-                          </TouchableOpacity>
+                            <View style={styles.buttonRow}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.dialogButton,
+                                  styles.cancelButton,
+                                ]}
+                                onPress={() => {
+                                  setShowTripModal(false);
+                                  resetTripForm();
+                                }}
+                                disabled={isSaving}
+                              >
+                                <Text style={styles.textStyle}>Cancel</Text>
+                              </TouchableOpacity>
 
-                          <TouchableOpacity
-                            style={[
-                              styles.dialogButton,
-                              styles.submitButton,
-                              isSaving && { opacity: 0.7 },
-                            ]}
-                            onPress={saveTrip}
-                            disabled={isSaving}
-                          >
-                            {isSaving ? (
-                              <ActivityIndicator color="#fff" size="small" />
-                            ) : (
-                              <Text style={styles.textStyle}>Submit</Text>
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </ScrollView>
-                  </KeyboardAvoidingView>
+                              <TouchableOpacity
+                                style={[
+                                  styles.dialogButton,
+                                  styles.submitButton,
+                                  isSaving && { opacity: 0.7 },
+                                ]}
+                                onPress={saveTrip}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? (
+                                  <ActivityIndicator
+                                    color="#fff"
+                                    size="small"
+                                  />
+                                ) : (
+                                  <Text style={styles.textStyle}>Submit</Text>
+                                )}
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </ScrollView>
+                      </KeyboardAvoidingView>
+                    </View>
+                  </Modal>
                 </View>
-              </Modal>
-            </View>
-            {addedTrips.length > 0 && (
-              <View style={styles.addedTripsContainer}>
-                <Text style={styles.subsectionTitle}>Selected Trips:</Text>
-                {addedTrips.map((trip) => (
-                  <View key={trip.id} style={styles.addedTripItem}>
-                    <View style={styles.addedTripDetails}>
-                      <Text style={styles.timeText}>
-                        {formatTripTime(trip.from_time)} -{" "}
-                        {formatTripTime(trip.to_time)}
-                      </Text>
-                      {/* <Text style={styles.tripRemark}>
+                {addedTrips.length > 0 && (
+                  <View style={styles.addedTripsContainer}>
+                    <Text style={styles.subsectionTitle}>Selected Trips:</Text>
+                    {addedTrips.map((trip) => (
+                      <View key={trip.id} style={styles.addedTripItem}>
+                        <View style={styles.addedTripDetails}>
+                          <Text style={styles.timeText}>
+                            {formatTripTime(trip.from_time)} -{" "}
+                            {formatTripTime(trip.to_time)}
+                          </Text>
+                          {/* <Text style={styles.tripRemark}>
                         {trip.id || "No Remark"} (
                         {parseFloat(trip.distance || 0).toFixed(2)} km)
                       </Text> */}
-                      <Text style={styles.tripRemark}>
-                        {trip.remark || "No Remark"} (
-                        {parseFloat(trip.distance || 0).toFixed(2)} km)
+                          <Text style={styles.tripRemark}>
+                            {trip.remark || "No Remark"} (
+                            {parseFloat(trip.distance || 0).toFixed(2)} km)
+                          </Text>
+                          <Text style={styles.tripAddress} numberOfLines={1}>
+                            {trip.from_address} → {trip.to_address}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveTrip(trip.id)}
+                          style={styles.removeButton}
+                        >
+                          <Text style={styles.removeButtonText}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    <View style={styles.totalSummary}>
+                      <Text style={styles.summaryText}>
+                        Total Distance: {getDistanceValue().toFixed(2)} km
                       </Text>
-                      <Text style={styles.tripAddress} numberOfLines={1}>
-                        {trip.from_address} → {trip.to_address}
+                      <Text style={styles.summaryText}>
+                        Total Mileage: RM {calculateMileage()}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveTrip(trip.id)}
-                      style={styles.removeButton}
-                    >
-                      <Text style={styles.removeButtonText}>Remove</Text>
-                    </TouchableOpacity>
                   </View>
-                ))}
-                <View style={styles.totalSummary}>
-                  <Text style={styles.summaryText}>
-                    Total Distance: {getDistanceValue().toFixed(2)} km
-                  </Text>
-                  <Text style={styles.summaryText}>
-                    Total Mileage: RM {calculateMileage()}
-                  </Text>
-                </View>
-              </View>
-            )}
-            {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
+                )}
+                {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <TouchableOpacity
                 onPress={() => setShowTravelModal(true)}
                 style={[styles.dropdownInput, { marginLeft: 10 }]}
@@ -1900,46 +1913,50 @@ export default function MileageForm() {
                 </View>
               </Modal>
             </View> */}
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Distance:</Text>
-              <Text style={styles.fieldValue}>{distance} km</Text>
-            </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Purpose:
-              </Text>
-              <select
-                value={formPurpose}
-                onChange={(e) => setFormPurpose(e.target.value)}
-                style={htmlSelectStyle}
-              >
-                <option value="">Select a purpose...</option>
-                <option value="Application support">Application support</option>
-                <option value="Attending seminar/training">
-                  Attending seminar/training
-                </option>
-                <option value="Breakfast/Lunch/Dinner meeting">
-                  Breakfast/Lunch/Dinner meeting
-                </option>
-                <option value="Documents submission">
-                  Documents submission
-                </option>
-                <option value="Door knocking">Door knocking</option>
-                <option value="Meeting and follow-up">
-                  Meeting and follow-up
-                </option>
-                <option value="Presentation">Presentation</option>
-                <option value="Service and support">Service and support</option>
-                <option value="Site inspection">Site inspection</option>
-                <option value="Site visitation">Site visitation</option>
-              </select>
-            </View>
-            {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Distance:</Text>
+                  <Text style={styles.fieldValue}>{distance} km</Text>
+                </View>
+                <View
+                  style={[
+                    styles.inputRow,
+                    { marginTop: 10, alignItems: "flex-start" },
+                  ]}
+                >
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Purpose:
+                  </Text>
+                  <select
+                    value={formPurpose}
+                    onChange={(e) => setFormPurpose(e.target.value)}
+                    style={htmlSelectStyle}
+                  >
+                    <option value="">Select a purpose...</option>
+                    <option value="Application support">
+                      Application support
+                    </option>
+                    <option value="Attending seminar/training">
+                      Attending seminar/training
+                    </option>
+                    <option value="Breakfast/Lunch/Dinner meeting">
+                      Breakfast/Lunch/Dinner meeting
+                    </option>
+                    <option value="Documents submission">
+                      Documents submission
+                    </option>
+                    <option value="Door knocking">Door knocking</option>
+                    <option value="Meeting and follow-up">
+                      Meeting and follow-up
+                    </option>
+                    <option value="Presentation">Presentation</option>
+                    <option value="Service and support">
+                      Service and support
+                    </option>
+                    <option value="Site inspection">Site inspection</option>
+                    <option value="Site visitation">Site visitation</option>
+                  </select>
+                </View>
+                {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                 Company/Site:
               </Text>
@@ -1980,301 +1997,314 @@ export default function MileageForm() {
                 keyboardType="email-address"
               />
             </View> */}
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Start Trip Time:</Text>
-              <Text style={styles.fieldValue}>
-                {to12HourTime(formFromTime) || "N/A"}
-              </Text>
-              <Text style={styles.fieldLabel}>End Trip Time:</Text>
-              <Text style={styles.fieldValue}>
-                {to12HourTime(formToTime) || "N/A"}
-              </Text>
-              <Text style={styles.fieldLabel}>Duration:</Text>
-              <Text style={styles.fieldValue}>{calculateDuration()}</Text>
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Mileage (RM):</Text>
-              <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
-              <Text style={styles.fieldLabel}>Toll (RM):</Text>
-              {/* <Text style={styles.fieldValue}>RM {calculateToll()}</Text> */}
-              <TextInput
-                value={formToll}
-                onChangeText={setFormToll}
-                keyboardType="numeric"
-                style={styles.webTextInput}
-              />
-              <Text style={styles.fieldLabel}>Parking (RM):</Text>
-              <TextInput
-                value={formParking}
-                onChangeText={setFormParking}
-                keyboardType="numeric"
-                style={styles.webTextInput}
-              />
-              <Text style={styles.fieldLabel}>Cost:</Text>
-              <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Other Expenses (RM):</Text>
-              <TextInput
-                value={formOtherExpense}
-                onChangeText={setFormOtherExpense}
-                keyboardType="numeric"
-                style={styles.webTextInput}
-              />
-
-              <select
-                value={formOtherExpenseType}
-                onChange={(e) => setFormOtherExpenseType(e.target.value)}
-                style={htmlSelectStyle}
-              >
-                <option value="">Select a purpose...</option>
-                <option value="Meal with customer">Meal with customer</option>
-                <option value="Meal with supplier">Meal with supplier</option>
-                <option value="Purchase of goods">Purchase of goods</option>
-                <option value="Staff benefits">Staff benefits</option>
-                <option value="Others">Others</option>
-              </select>
-
-              <Text style={[styles.fieldLabel]}>Vendor:</Text>
-              <TextInput
-                value={formVendor}
-                onChangeText={setFormVendor}
-                style={styles.webTextInput}
-                placeholder="Vendor"
-              />
-            </View>
-            <View style={[{ marginTop: 10 }]}>
-              <Text style={[styles.formLabel, { fontSize: 16 }]}>
-                Customer Details:
-              </Text>
-
-              {formCustomers.map((customer, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.inputRow,
-                    { marginBottom: 10, alignItems: "center" },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.fieldLabel,
-                      styles.fieldLabelMandatory,
-                      { width: 70 },
-                    ]}
-                  >
-                    Company:
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Start Trip Time:</Text>
+                  <Text style={styles.fieldValue}>
+                    {to12HourTime(formFromTime) || "N/A"}
                   </Text>
+                  <Text style={styles.fieldLabel}>End Trip Time:</Text>
+                  <Text style={styles.fieldValue}>
+                    {to12HourTime(formToTime) || "N/A"}
+                  </Text>
+                  <Text style={styles.fieldLabel}>Duration:</Text>
+                  <Text style={styles.fieldValue}>{calculateDuration()}</Text>
+                </View>
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Mileage (RM):</Text>
+                  <Text style={styles.fieldValue}>RM {calculateMileage()}</Text>
+                  <Text style={styles.fieldLabel}>Toll (RM):</Text>
+                  {/* <Text style={styles.fieldValue}>RM {calculateToll()}</Text> */}
                   <TextInput
-                    placeholder="Company"
-                    value={customer.company}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "company", text)
-                    }
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={!isSaving}
+                    value={formToll}
+                    onChangeText={setFormToll}
+                    keyboardType="numeric"
+                    style={styles.webTextInput}
                   />
-                  <Text
-                    style={[
-                      styles.fieldLabel,
-                      styles.fieldLabelMandatory,
-                      { width: 70 },
-                    ]}
-                  >
-                    Name:
-                  </Text>
+                  <Text style={styles.fieldLabel}>Parking (RM):</Text>
                   <TextInput
-                    placeholder="Name"
-                    value={customer.name}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "name", text)
-                    }
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={!isSaving}
+                    value={formParking}
+                    onChangeText={setFormParking}
+                    keyboardType="numeric"
+                    style={styles.webTextInput}
+                  />
+                  <Text style={styles.fieldLabel}>Cost:</Text>
+                  <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
+                </View>
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Other Expenses (RM):</Text>
+                  <TextInput
+                    value={formOtherExpense}
+                    onChangeText={setFormOtherExpense}
+                    keyboardType="numeric"
+                    style={styles.webTextInput}
                   />
 
-                  <Text
-                    style={[
-                      styles.fieldLabel,
-                      styles.fieldLabelMandatory,
-                      { width: 70 },
-                    ]}
+                  <select
+                    value={formOtherExpenseType}
+                    onChange={(e) => setFormOtherExpenseType(e.target.value)}
+                    style={htmlSelectStyle}
                   >
-                    Email:
-                  </Text>
-                  <TextInput
-                    placeholder="Email"
-                    value={customer.email}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "email", text)
-                    }
-                    keyboardType="email-address"
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={!isSaving}
-                  />
+                    <option value="">Select a purpose...</option>
+                    <option value="Meal with customer">
+                      Meal with customer
+                    </option>
+                    <option value="Meal with supplier">
+                      Meal with supplier
+                    </option>
+                    <option value="Purchase of goods">Purchase of goods</option>
+                    <option value="Staff benefits">Staff benefits</option>
+                    <option value="Others">Others</option>
+                  </select>
 
-                  <Text
-                    style={[
-                      styles.fieldLabel,
-                      styles.fieldLabelMandatory,
-                      { width: 70 },
-                    ]}
-                  >
-                    Number:
-                  </Text>
+                  <Text style={[styles.fieldLabel]}>Vendor:</Text>
                   <TextInput
-                    placeholder="Number"
-                    value={customer.number}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "number", text)
-                    }
-                    keyboardType="phone-pad"
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={!isSaving}
+                    value={formVendor}
+                    onChangeText={setFormVendor}
+                    style={styles.webTextInput}
+                    placeholder="Vendor"
                   />
+                </View>
+                <View style={[{ marginTop: 10 }]}>
+                  <Text style={[styles.formLabel, { fontSize: 16 }]}>
+                    Customer Details:
+                  </Text>
 
-                  <View
-                    style={[{ alignItems: "center", flexDirection: "row" }]}
-                  >
-                    <Text
+                  {formCustomers.map((customer, index) => (
+                    <View
+                      key={index}
                       style={[
-                        styles.fieldLabel,
-                        styles.fieldLabelMandatory,
-                        { width: 70 },
+                        styles.inputRow,
+                        { marginBottom: 10, alignItems: "center" },
                       ]}
                     >
-                      Time:
-                    </Text>
-                    <input
-                      type="time"
-                      value={customer.time}
-                      onChange={(e) =>
-                        handleCustomerChange(index, "time", e.target.value)
-                      }
-                      style={{
-                        maxWidth: 150,
-                        backgroundColor: "#f9f9f9",
-                        border: "1px solid #eee",
-                        borderRadius: "8px",
-                        padding: "8px 12px",
-                        fontSize: "16px",
-                        color: "#333",
-                        boxSizing: "border-box",
-                        height: "40px",
-                        margin: 0,
-                      }}
-                      disabled={isSaving}
-                    />
-                  </View>
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          styles.fieldLabelMandatory,
+                          { width: 70 },
+                        ]}
+                      >
+                        Company:
+                      </Text>
+                      <TextInput
+                        placeholder="Company"
+                        value={customer.company}
+                        onChangeText={(text) =>
+                          handleCustomerChange(index, "company", text)
+                        }
+                        style={[styles.webTextInput, { maxWidth: 150 }]}
+                        editable={!isSaving}
+                      />
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          styles.fieldLabelMandatory,
+                          { width: 70 },
+                        ]}
+                      >
+                        Name:
+                      </Text>
+                      <TextInput
+                        placeholder="Name"
+                        value={customer.name}
+                        onChangeText={(text) =>
+                          handleCustomerChange(index, "name", text)
+                        }
+                        style={[styles.webTextInput, { maxWidth: 150 }]}
+                        editable={!isSaving}
+                      />
 
-                  <Text
-                    style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
-                  >
-                    Address:
-                  </Text>
-                  <TextInput
-                    placeholder="Address"
-                    value={customer.address}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "address", text)
-                    }
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={false}
-                  />
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          styles.fieldLabelMandatory,
+                          { width: 70 },
+                        ]}
+                      >
+                        Email:
+                      </Text>
+                      <TextInput
+                        placeholder="Email"
+                        value={customer.email}
+                        onChangeText={(text) =>
+                          handleCustomerChange(index, "email", text)
+                        }
+                        keyboardType="email-address"
+                        style={[styles.webTextInput, { maxWidth: 150 }]}
+                        editable={!isSaving}
+                      />
 
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          styles.fieldLabelMandatory,
+                          { width: 70 },
+                        ]}
+                      >
+                        Number:
+                      </Text>
+                      <TextInput
+                        placeholder="Number"
+                        value={customer.number}
+                        onChangeText={(text) =>
+                          handleCustomerChange(index, "number", text)
+                        }
+                        keyboardType="phone-pad"
+                        style={[styles.webTextInput, { maxWidth: 150 }]}
+                        editable={!isSaving}
+                      />
+
+                      <View
+                        style={[{ alignItems: "center", flexDirection: "row" }]}
+                      >
+                        <Text
+                          style={[
+                            styles.fieldLabel,
+                            styles.fieldLabelMandatory,
+                            { width: 70 },
+                          ]}
+                        >
+                          Time:
+                        </Text>
+                        <input
+                          type="time"
+                          value={customer.time}
+                          onChange={(e) =>
+                            handleCustomerChange(index, "time", e.target.value)
+                          }
+                          style={{
+                            maxWidth: 150,
+                            backgroundColor: "#f9f9f9",
+                            border: "1px solid #eee",
+                            borderRadius: "8px",
+                            padding: "8px 12px",
+                            fontSize: "16px",
+                            color: "#333",
+                            boxSizing: "border-box",
+                            height: "40px",
+                            margin: 0,
+                          }}
+                          disabled={isSaving}
+                        />
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          { width: 70, marginLeft: 10 },
+                        ]}
+                      >
+                        Address:
+                      </Text>
+                      <TextInput
+                        placeholder="Address"
+                        value={customer.address}
+                        onChangeText={(text) =>
+                          handleCustomerChange(index, "address", text)
+                        }
+                        style={[styles.webTextInput, { maxWidth: 150 }]}
+                        editable={false}
+                      />
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowAddressModal(true);
+                          setCustomerIndex(index);
+                          console.log(index);
+                        }}
+                        style={[
+                          styles.dropdownInput,
+                          {
+                            marginLeft: 10,
+                            paddingVertical: 10,
+                            maxWidth: 130,
+                          },
+                        ]}
+                        disabled={isSaving}
+                      >
+                        <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                          Select Address
+                        </Text>
+                      </TouchableOpacity>
+
+                      {renderTripAddressModal()}
+
+                      {/* Remove Button for this row */}
+                      <TouchableOpacity
+                        onPress={() => removeCustomerRow(index)}
+                        style={{ marginLeft: 10, padding: 5 }}
+                        disabled={isSaving}
+                      >
+                        <Text style={{ color: "red", fontWeight: "bold" }}>
+                          ✕
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                  {/* Button to add another customer row */}
                   <TouchableOpacity
-                    onPress={() => {
-                      setShowAddressModal(true);
-                      setCustomerIndex(index);
-                      console.log(index);
+                    onPress={addCustomerRow}
+                    style={{
+                      marginTop: 10,
+                      alignSelf: "flex-start",
+                      backgroundColor: "#2196F3",
+                      padding: 8,
+                      borderRadius: 4,
+                      marginBottom: 10,
                     }}
-                    style={[
-                      styles.dropdownInput,
-                      { marginLeft: 10, paddingVertical: 10, maxWidth: 130 },
-                    ]}
                     disabled={isSaving}
                   >
                     <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                      Select Address
+                      + Add Customer
                     </Text>
                   </TouchableOpacity>
-
-                  {renderTripAddressModal()}
-
-                  {/* Remove Button for this row */}
-                  <TouchableOpacity
-                    onPress={() => removeCustomerRow(index)}
-                    style={{ marginLeft: 10, padding: 5 }}
-                    disabled={isSaving}
-                  >
-                    <Text style={{ color: "red", fontWeight: "bold" }}>✕</Text>
-                  </TouchableOpacity>
                 </View>
-              ))}
-
-              {/* Button to add another customer row */}
-              <TouchableOpacity
-                onPress={addCustomerRow}
-                style={{
-                  marginTop: 10,
-                  alignSelf: "flex-start",
-                  backgroundColor: "#2196F3",
-                  padding: 8,
-                  borderRadius: 4,
-                  marginBottom: 10,
-                }}
-                disabled={isSaving}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  + Add Customer
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Trip Report:
-              </Text>
-              <TextInput
-                value={formTripReport}
-                onChangeText={setFormTripReport}
-                multiline
-                style={[
-                  styles.webTextInput,
-                  { minHeight: 200, width: "100%", maxWidth: "100%" },
-                ]}
-                placeholder="Trip Report"
-              />
-            </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Business Cards:</Text>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setBusinessCardFiles(Array.from(e.target.files));
-                  }
-                }}
-                style={htmlInputStyle}
-              />
-            </View>
-            {businessCardFiles.length > 0 && (
-              <View style={styles.receiptList}>
-                <Text style={styles.receiptLabel}>Selected files:</Text>
-                {businessCardFiles.map((file, idx) => (
-                  <Text key={idx} style={styles.receiptFileName}>
-                    {file.name}
+                <View
+                  style={[
+                    styles.inputRow,
+                    { marginTop: 10, alignItems: "flex-start" },
+                  ]}
+                >
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Trip Report:
                   </Text>
-                ))}
-              </View>
-            )}
-            {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <TextInput
+                    value={formTripReport}
+                    onChangeText={setFormTripReport}
+                    multiline
+                    style={[
+                      styles.webTextInput,
+                      { minHeight: 200, width: "100%", maxWidth: "100%" },
+                    ]}
+                    placeholder="Trip Report"
+                  />
+                </View>
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Business Cards:</Text>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setBusinessCardFiles(Array.from(e.target.files));
+                      }
+                    }}
+                    style={htmlInputStyle}
+                  />
+                </View>
+                {businessCardFiles.length > 0 && (
+                  <View style={styles.receiptList}>
+                    <Text style={styles.receiptLabel}>Selected files:</Text>
+                    {businessCardFiles.map((file, idx) => (
+                      <Text key={idx} style={styles.receiptFileName}>
+                        {file.name}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+                {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Receipts:</Text>
               <input
                 type="file"
@@ -2297,17 +2327,19 @@ export default function MileageForm() {
                 ))}
               </View>
             )} */}
-            <TouchableOpacity
-              onPress={handleSubmit}
-              style={styles.button}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.buttonText}>Submit Expense</Text>
-              )}
-            </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  style={[styles.button, { marginBottom: 20 }]}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.buttonText}>Submit Expense</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </ScrollView>
       </View>
@@ -2552,5 +2584,16 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: "#9e9e9e",
+  },
+  wrapper: {
+    flex: 1,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -184,59 +184,66 @@ export default function GeneralExpenseForm() {
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.formContainer}>
-            <Text style={styles.formLabel}>Submit General Expense</Text>
-            {fieldMessage}
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Date:</Text>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                style={htmlInputStyle}
-              />
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Expense Purpose:
-              </Text>
-              <select
-                value={formExpenseType}
-                onChange={(e) => setFormExpenseType(e.target.value)}
-                style={htmlSelectStyle}
-              >
-                <option value="">Select a purpose...</option>
-                <option value="1">{expenseType["1"]}</option>
-                <option value="2">{expenseType["2"]}</option>
-                <option value="3">{expenseType["3"]}</option>
-                <option value="4">{expenseType["4"]}</option>
-                <option value="5">{expenseType["5"]}</option>
-                <option value="6">{expenseType["6"]}</option>
-              </select>
-              <Text style={styles.fieldLabel}></Text>
+          <View style={styles.wrapper}>
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={true}
+              style={styles.horizontalScrollView}
+              contentContainerStyle={styles.horizontalContent}
+            >
+              <View style={styles.formContainer}>
+                <Text style={styles.formLabel}>Submit General Expense</Text>
+                {fieldMessage}
+                <View style={[styles.inputRow, { marginTop: 10 }]}>
+                  <Text style={styles.fieldLabel}>Date:</Text>
+                  <input
+                    type="date"
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    style={htmlInputStyle}
+                  />
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Expense Purpose:
+                  </Text>
+                  <select
+                    value={formExpenseType}
+                    onChange={(e) => setFormExpenseType(e.target.value)}
+                    style={htmlSelectStyle}
+                  >
+                    <option value="">Select a purpose...</option>
+                    <option value="1">{expenseType["1"]}</option>
+                    <option value="2">{expenseType["2"]}</option>
+                    <option value="3">{expenseType["3"]}</option>
+                    <option value="4">{expenseType["4"]}</option>
+                    <option value="5">{expenseType["5"]}</option>
+                    <option value="6">{expenseType["6"]}</option>
+                  </select>
+                  <Text style={styles.fieldLabel}></Text>
 
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Amount (RM):
-              </Text>
-              <TextInput
-                value={formAmount}
-                onChangeText={setFormAmount}
-                keyboardType="decimal-pad"
-                style={styles.webTextInput}
-                editable={!isSaving}
-              />
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Amount (RM):
+                  </Text>
+                  <TextInput
+                    value={formAmount}
+                    onChangeText={setFormAmount}
+                    keyboardType="decimal-pad"
+                    style={styles.webTextInput}
+                    editable={!isSaving}
+                  />
 
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Vendor:
-              </Text>
-              <TextInput
-                value={formVendor}
-                onChangeText={setFormVendor}
-                placeholder="Vendor"
-                style={styles.webTextInput}
-                editable={!isSaving}
-              />
-            </View>
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Vendor:
+                  </Text>
+                  <TextInput
+                    value={formVendor}
+                    onChangeText={setFormVendor}
+                    placeholder="Vendor"
+                    style={styles.webTextInput}
+                    editable={!isSaving}
+                  />
+                </View>
 
-            {/* {(formExpenseType === "1" || formExpenseType === "2") && (
+                {/* {(formExpenseType === "1" || formExpenseType === "2") && (
               <View style={[styles.inputRow, { marginTop: 10 }]}>
                 <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Company/Site:
@@ -283,194 +290,202 @@ export default function GeneralExpenseForm() {
               </View>
             )} */}
 
-            {(formExpenseType === "1" || formExpenseType === "2") && (
-              <View style={[{ marginTop: 10 }]}>
-                <Text style={[styles.formLabel, { fontSize: 16 }]}>
-                  Customer Details:
-                </Text>
-
-                {formCustomers.map((customer, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.inputRow,
-                      { marginTop: 10, alignItems: "center" },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        styles.fieldLabelMandatory,
-                        { width: 90 },
-                      ]}
-                    >
-                      Company:
+                {(formExpenseType === "1" || formExpenseType === "2") && (
+                  <View style={[{ marginTop: 10 }]}>
+                    <Text style={[styles.formLabel, { fontSize: 16 }]}>
+                      Customer Details:
                     </Text>
-                    <TextInput
-                      placeholder="Company"
-                      value={customer.company}
-                      onChangeText={(text) =>
-                        handleCustomerChange(index, "company", text)
-                      }
-                      style={styles.webTextInput}
-                      editable={!isSaving}
-                    />
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        styles.fieldLabelMandatory,
-                        { width: 90 },
-                      ]}
-                    >
-                      Name:
-                    </Text>
-                    <TextInput
-                      placeholder="Name"
-                      value={customer.name}
-                      onChangeText={(text) =>
-                        handleCustomerChange(index, "name", text)
-                      }
-                      style={styles.webTextInput}
-                      editable={!isSaving}
-                    />
 
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        styles.fieldLabelMandatory,
-                        { width: 90 },
-                      ]}
-                    >
-                      Email:
-                    </Text>
-                    <TextInput
-                      placeholder="Email"
-                      value={customer.email}
-                      onChangeText={(text) =>
-                        handleCustomerChange(index, "email", text)
-                      }
-                      keyboardType="email-address"
-                      style={styles.webTextInput}
-                      editable={!isSaving}
-                    />
-
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        styles.fieldLabelMandatory,
-                        { width: 90 },
-                      ]}
-                    >
-                      Number:
-                    </Text>
-                    <TextInput
-                      placeholder="Number"
-                      value={customer.number}
-                      onChangeText={(text) =>
-                        handleCustomerChange(index, "number", text)
-                      }
-                      keyboardType="phone-pad"
-                      style={styles.webTextInput}
-                      editable={!isSaving}
-                    />
-
-                    <View
-                      style={[{ alignItems: "center", flexDirection: "row" }]}
-                    >
-                      <Text
+                    {formCustomers.map((customer, index) => (
+                      <View
+                        key={index}
                         style={[
-                          styles.fieldLabel,
-                          styles.fieldLabelMandatory,
-                          { width: 90 },
+                          styles.inputRow,
+                          { marginTop: 10, alignItems: "center" },
                         ]}
                       >
-                        Time:
-                      </Text>
-                      <input
-                        type="time"
-                        value={customer.time}
-                        onChange={(e) =>
-                          handleCustomerChange(index, "time", e.target.value)
-                        }
-                        style={{
-                          maxWidth: 150,
-                          backgroundColor: "#f9f9f9",
-                          border: "1px solid #eee",
-                          borderRadius: "8px",
-                          padding: "8px 12px",
-                          fontSize: "16px",
-                          color: "#333",
-                          boxSizing: "border-box",
-                          height: "40px",
-                          margin: 0,
-                        }}
-                        disabled={isSaving}
-                      />
-                    </View>
+                        <Text
+                          style={[
+                            styles.fieldLabel,
+                            styles.fieldLabelMandatory,
+                            { width: 90 },
+                          ]}
+                        >
+                          Company:
+                        </Text>
+                        <TextInput
+                          placeholder="Company"
+                          value={customer.company}
+                          onChangeText={(text) =>
+                            handleCustomerChange(index, "company", text)
+                          }
+                          style={styles.webTextInput}
+                          editable={!isSaving}
+                        />
+                        <Text
+                          style={[
+                            styles.fieldLabel,
+                            styles.fieldLabelMandatory,
+                            { width: 90 },
+                          ]}
+                        >
+                          Name:
+                        </Text>
+                        <TextInput
+                          placeholder="Name"
+                          value={customer.name}
+                          onChangeText={(text) =>
+                            handleCustomerChange(index, "name", text)
+                          }
+                          style={styles.webTextInput}
+                          editable={!isSaving}
+                        />
 
-                    {/* Remove Button for this row */}
+                        <Text
+                          style={[
+                            styles.fieldLabel,
+                            styles.fieldLabelMandatory,
+                            { width: 90 },
+                          ]}
+                        >
+                          Email:
+                        </Text>
+                        <TextInput
+                          placeholder="Email"
+                          value={customer.email}
+                          onChangeText={(text) =>
+                            handleCustomerChange(index, "email", text)
+                          }
+                          keyboardType="email-address"
+                          style={styles.webTextInput}
+                          editable={!isSaving}
+                        />
+
+                        <Text
+                          style={[
+                            styles.fieldLabel,
+                            styles.fieldLabelMandatory,
+                            { width: 90 },
+                          ]}
+                        >
+                          Number:
+                        </Text>
+                        <TextInput
+                          placeholder="Number"
+                          value={customer.number}
+                          onChangeText={(text) =>
+                            handleCustomerChange(index, "number", text)
+                          }
+                          keyboardType="phone-pad"
+                          style={styles.webTextInput}
+                          editable={!isSaving}
+                        />
+
+                        <View
+                          style={[
+                            { alignItems: "center", flexDirection: "row" },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.fieldLabel,
+                              styles.fieldLabelMandatory,
+                              { width: 90 },
+                            ]}
+                          >
+                            Time:
+                          </Text>
+                          <input
+                            type="time"
+                            value={customer.time}
+                            onChange={(e) =>
+                              handleCustomerChange(
+                                index,
+                                "time",
+                                e.target.value,
+                              )
+                            }
+                            style={{
+                              maxWidth: 150,
+                              backgroundColor: "#f9f9f9",
+                              border: "1px solid #eee",
+                              borderRadius: "8px",
+                              padding: "8px 12px",
+                              fontSize: "16px",
+                              color: "#333",
+                              boxSizing: "border-box",
+                              height: "40px",
+                              margin: 0,
+                            }}
+                            disabled={isSaving}
+                          />
+                        </View>
+
+                        {/* Remove Button for this row */}
+                        <TouchableOpacity
+                          onPress={() => removeCustomerRow(index)}
+                          style={{ marginLeft: 10, padding: 5 }}
+                          disabled={isSaving}
+                        >
+                          <Text style={{ color: "red", fontWeight: "bold" }}>
+                            ✕
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {/* Button to add another customer row */}
                     <TouchableOpacity
-                      onPress={() => removeCustomerRow(index)}
-                      style={{ marginLeft: 10, padding: 5 }}
+                      onPress={addCustomerRow}
+                      style={{
+                        marginTop: 10,
+                        alignSelf: "flex-start",
+                        backgroundColor: "#2196F3",
+                        padding: 8,
+                        borderRadius: 4,
+                      }}
                       disabled={isSaving}
                     >
-                      <Text style={{ color: "red", fontWeight: "bold" }}>
-                        ✕
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                        + Add Customer
                       </Text>
                     </TouchableOpacity>
                   </View>
-                ))}
+                )}
 
-                {/* Button to add another customer row */}
+                <View
+                  style={[
+                    styles.inputRow,
+                    { marginTop: 10, alignItems: "flex-start" },
+                  ]}
+                >
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                    Expense Report:
+                  </Text>
+                  <TextInput
+                    value={formExpenseReport}
+                    onChangeText={setFormExpenseReport}
+                    multiline
+                    style={[
+                      styles.webTextInput,
+                      { minHeight: 200, width: "100%", maxWidth: "100%" },
+                    ]}
+                    placeholder="Expense Report"
+                  />
+                </View>
                 <TouchableOpacity
-                  onPress={addCustomerRow}
-                  style={{
-                    marginTop: 10,
-                    alignSelf: "flex-start",
-                    backgroundColor: "#2196F3",
-                    padding: 8,
-                    borderRadius: 4,
-                  }}
+                  onPress={handleSubmit}
+                  style={[styles.button, { marginBottom: 20 }]}
                   disabled={isSaving}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                    + Add Customer
-                  </Text>
+                  {isSaving ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.buttonText}>Submit Expense</Text>
+                  )}
                 </TouchableOpacity>
               </View>
-            )}
-
-            <View
-              style={[
-                styles.inputRow,
-                { marginTop: 10, alignItems: "flex-start" },
-              ]}
-            >
-              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
-                Expense Report:
-              </Text>
-              <TextInput
-                value={formExpenseReport}
-                onChangeText={setFormExpenseReport}
-                multiline
-                style={[
-                  styles.webTextInput,
-                  { minHeight: 200, width: "100%", maxWidth: "100%" },
-                ]}
-                placeholder="Expense Report"
-              />
-            </View>
-            <TouchableOpacity
-              onPress={handleSubmit}
-              style={styles.button}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.buttonText}>Submit Expense</Text>
-              )}
-            </TouchableOpacity>
+            </ScrollView>
           </View>
         </ScrollView>
       </View>
@@ -708,4 +723,15 @@ const styles = StyleSheet.create({
     color: "#9e9e9e",
   },
   fieldLabelMandatory: { color: "#2196F3" },
+  wrapper: {
+    flex: 1,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

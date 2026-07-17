@@ -215,7 +215,7 @@ export default function OutstationExpenseForm() {
   useEffect(() => {
     setAddedTrips([]);
     setDistance("0.00");
-  }, [formDate]);
+  }, [formTripDate]);
 
   useEffect(() => {
     const totalDist = addedTrips.reduce(
@@ -826,7 +826,7 @@ export default function OutstationExpenseForm() {
   }, []);
 
   useEffect(() => {
-    const selectedDateStr = formDate;
+    const selectedDateStr = formTripDate;
     const filtered = allUserTrips.filter((trip) => {
       if (!trip.created_at) return false;
       const tripDate = trip.created_at.toDate
@@ -838,7 +838,7 @@ export default function OutstationExpenseForm() {
     setTripsForSelectedDate(filtered);
     setSelectedTripId("");
     // Do NOT reset addedTrips here
-  }, [allUserTrips, formDate]);
+  }, [allUserTrips, formTripDate]);
 
   const fieldMessage = (
     <Text
@@ -1511,6 +1511,10 @@ export default function OutstationExpenseForm() {
   };
 
   const saveTrip = async () => {
+    if (!selectedRequestId.trim()) {
+      alert("Please select a trip request.");
+      return;
+    }
     if (!fromAddress.trim() || !toAddress.trim()) {
       alert("Please fill in both 'From' and 'To' addresses.");
       return;
@@ -1661,7 +1665,7 @@ export default function OutstationExpenseForm() {
         from_home: formFromHome,
         to_home: formGoingHome,
         route_image_url: routeImageUrl,
-        date: formDate,
+        date: formTripDate,
         platform: 2,
         created_at: serverTimestamp(),
       };
@@ -1685,7 +1689,7 @@ export default function OutstationExpenseForm() {
 
       // Reset the trip form and close modal
       resetTripForm();
-      setShowTripModal(false);
+      setShowAddTripModal(false);
     } catch (error) {
       console.error("Save error:", error);
       console.log(error);
@@ -2086,7 +2090,7 @@ export default function OutstationExpenseForm() {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Select a Trip from {formatDate(formDate)}
+              Select a Trip from {formatDate(formTripDate)}
             </Text>
             <TouchableOpacity onPress={() => setShowAddressModal(false)}>
               <Text style={styles.closeButton}>✕</Text>
@@ -2171,7 +2175,7 @@ export default function OutstationExpenseForm() {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Select a Trip from {formatDate(formDate)}
+              Select a Trip from {formatDate(formTripDate)}
             </Text>
             <TouchableOpacity onPress={() => setShowMileageModal(false)}>
               <Text style={styles.closeButton}>✕</Text>
@@ -2180,7 +2184,7 @@ export default function OutstationExpenseForm() {
           <ScrollView style={styles.modalList}>
             {tripsForSelectedDate.length === 0 && (
               <Text style={styles.noTripsText}>
-                No trips found for {formDate.split("-").reverse().join("-")}
+                No trips found for {formTripDate.split("-").reverse().join("-")}
               </Text>
             )}
             {tripsForSelectedDate.map((trip) => {
@@ -2741,8 +2745,8 @@ export default function OutstationExpenseForm() {
   };
 
   const timeStringToDate = (timeString: string): Date | null => {
-    if (!formDate || !timeString) return null;
-    const [year, month, day] = formDate.split("-").map(Number);
+    if (!formTripDate || !timeString) return null;
+    const [year, month, day] = formTripDate.split("-").map(Number);
     const [hours, minutes] = timeString.split(":").map(Number);
     return new Date(year, month - 1, day, hours, minutes, 0);
   };
@@ -2900,12 +2904,13 @@ export default function OutstationExpenseForm() {
 
           <View style={[styles.dropdownInput, { marginLeft: 20 }]}>
             <TouchableOpacity
-              style={styles.dropdownButton}
+              style={{ opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5 }}
               onPress={() => {
                 setShowMileageModal(true);
 
                 console.log(addedTrips);
               }}
+              disabled={!(tripsForSelectedDate.length > 0)}
             >
               <Text style={styles.buttonText}>
                 {selectedTripId
@@ -3573,6 +3578,7 @@ export default function OutstationExpenseForm() {
               styles.button,
               { marginRight: 10 },
               { opacity: isFirstDay() ? 0.5 : 1 },
+              { marginBottom: 20 },
             ]}
             disabled={isSaving || isFirstDay()}
           >
@@ -3581,7 +3587,10 @@ export default function OutstationExpenseForm() {
 
           <TouchableOpacity
             onPress={handleNextDay}
-            style={[styles.button, { opacity: selectedRequestId ? 1 : 0.5 }]}
+            style={[
+              styles.button,
+              { opacity: selectedRequestId ? 1 : 0.5, marginBottom: 20 },
+            ]}
             disabled={isSaving || !selectedRequestId}
           >
             <Text style={styles.buttonText}>
@@ -3863,7 +3872,7 @@ export default function OutstationExpenseForm() {
 
         <TouchableOpacity
           onPress={handleRequestSubmit}
-          style={styles.button}
+          style={[styles.button, { marginBottom: 20 }]}
           disabled={isSaving}
         >
           {isSaving ? (
@@ -3882,64 +3891,73 @@ export default function OutstationExpenseForm() {
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.formContainer}>
-            <View style={styles.tabRow}>
-              <TouchableOpacity
-                onPress={() => changeForm(1)}
-                style={[
-                  styles.tabButton,
-                  { marginRight: 10 },
-                  tabIndex === 1
-                    ? styles.activeTabButton
-                    : styles.inactiveTabButton,
-                ]}
-              >
-                <Text
-                  style={
-                    tabIndex === 1
-                      ? styles.activeButtonText
-                      : styles.inactiveButtonText
-                  }
-                >
-                  Travel Request
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => changeForm(2)}
-                style={[
-                  styles.tabButton,
-                  { marginRight: 10 },
-                  tabIndex === 2
-                    ? styles.activeTabButton
-                    : styles.inactiveTabButton,
-                ]}
-              >
-                <Text
-                  style={
-                    tabIndex === 2
-                      ? styles.activeButtonText
-                      : styles.inactiveButtonText
-                  }
-                >
-                  Outstation Trip
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {tabIndex === 1 && renderRequestForm()}
-            {tabIndex === 2 && renderTripForm()}
-
-            {/* <TouchableOpacity
-              onPress={handleSubmit}
-              style={styles.button}
-              disabled={isSaving}
+          <View style={styles.wrapper}>
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={true}
+              style={styles.horizontalScrollView}
+              contentContainerStyle={styles.horizontalContent}
             >
-              {isSaving ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.buttonText}>Submit Expense</Text>
-              )}
-            </TouchableOpacity> */}
+              <View style={styles.formContainer}>
+                <View style={styles.tabRow}>
+                  <TouchableOpacity
+                    onPress={() => changeForm(1)}
+                    style={[
+                      styles.tabButton,
+                      { marginRight: 10 },
+                      tabIndex === 1
+                        ? styles.activeTabButton
+                        : styles.inactiveTabButton,
+                    ]}
+                  >
+                    <Text
+                      style={
+                        tabIndex === 1
+                          ? styles.activeButtonText
+                          : styles.inactiveButtonText
+                      }
+                    >
+                      Travel Request
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => changeForm(2)}
+                    style={[
+                      styles.tabButton,
+                      { marginRight: 10 },
+                      tabIndex === 2
+                        ? styles.activeTabButton
+                        : styles.inactiveTabButton,
+                    ]}
+                  >
+                    <Text
+                      style={
+                        tabIndex === 2
+                          ? styles.activeButtonText
+                          : styles.inactiveButtonText
+                      }
+                    >
+                      Outstation Trip
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {tabIndex === 1 && renderRequestForm()}
+                {tabIndex === 2 && renderTripForm()}
+
+                {/* <TouchableOpacity
+                  onPress={handleSubmit}
+                  style={styles.button}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.buttonText}>Submit Expense</Text>
+                  )}
+                </TouchableOpacity> */}
+              </View>
+            </ScrollView>
           </View>
         </ScrollView>
       </View>
@@ -4423,5 +4441,16 @@ const styles = StyleSheet.create({
   },
   textStyleActive: {
     color: "#2196F3",
+  },
+  wrapper: {
+    flex: 1,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

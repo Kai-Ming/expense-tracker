@@ -2012,7 +2012,7 @@ export default function ExpensesWebScreen() {
                     (item) => `
                       <tr>
                         <td>${formatDateString(item.date)}</td>
-                        <td>${item.company || item.customers[0].name}</td>
+                        <td>${item.company || item.customers[0].company}</td>
                         <td>${item.purpose}</td>
                         <td>${item.expensePurpose || "-"}</td>
                         <td>${item.vendor || "-"}
@@ -3195,7 +3195,7 @@ export default function ExpensesWebScreen() {
                         <div class="details-value">RM ${formatCurrency(item.mileage || 0)}</div>
                       </div>
                       <div class="details">
-                        <div class="details-label">Parking: </div>
+                        <div class="details-label">Toll: </div>
                         <div class="details-value">RM ${formatCurrency(item.toll || 0)}, ${item.toll_remark || "N/A"}</div>
                       </div>
                       <div class="details">
@@ -6670,29 +6670,16 @@ export default function ExpensesWebScreen() {
 
         {/* RIGHT PANEL: 70% width, detail view */}
         <ScrollView style={{ width: "70%", padding: 24 }}>
-          {/* {selectedExpense ? (
-            <View
-              style={{
-                backgroundColor: "#fff",
-                borderRadius: 12,
-                padding: 8,
-              }}
+          <View style={styles.wrapper}>
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={true}
+              style={styles.horizontalScrollView}
+              contentContainerStyle={styles.horizontalContent}
             >
-              {renderDetailView(selectedExpense)}
-            </View>
-          ) : (
-            <Text
-              style={{
-                textAlign: "center",
-                marginTop: 50,
-                color: "#999",
-                fontSize: 16,
-              }}
-            >
-              Select an expense from the left to view details
-            </Text>
-          )} */}
-          {renderExpenseDetail()}
+              {renderExpenseDetail()}
+            </ScrollView>
+          </View>
         </ScrollView>
       </View>
 
@@ -7290,4 +7277,15 @@ const styles = StyleSheet.create({
   tripTitle: { fontWeight: "bold", fontSize: 14 },
   tripPurpose: { fontSize: 12, color: "#666" },
   modalTripItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
+  wrapper: {
+    flex: 1,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
 });
