@@ -50,6 +50,10 @@ interface User {
   role: number;
   office: number;
   active: boolean;
+  home_coordinates: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export default function settings() {
@@ -623,6 +627,15 @@ export default function settings() {
         formEmail.trim(),
         formPassword,
       ); */
+      const coordinates = await getCoordinatesFromAddress(homeAddress);
+      if (!coordinates) {
+        Alert.alert(
+          "Error",
+          "Could not find coordinates for the home address. Please check the address and try again.",
+        );
+        setIsSaving(false);
+        return;
+      }
 
       const newUid = await createNewUser(formEmail.trim(), formPassword);
 
@@ -639,6 +652,7 @@ export default function settings() {
         grade: formGrade.trim(),
         cost_center: formCostCenter.trim(),
         office: parseInt(formOffice),
+        home_coordinates: new GeoPoint(coordinates.lat, coordinates.lng),
         active: true,
         permission: 0,
         subordinates: [],
@@ -681,7 +695,7 @@ export default function settings() {
     setHomeAddress("");
   };
 
-  const handleSelectUser = (userId: string) => {
+  const handleSelectUser = async (userId: string) => {
     console.log(userId);
     const idToAdd = userId || selectedUserId;
     if (!idToAdd) {
@@ -699,11 +713,69 @@ export default function settings() {
       setFormRole(userToAdd.role.toString() || "");
       setFormDepartment(userToAdd.department || "");
       setFormOffice(userToAdd.office?.toString() || "");
+      const homeCoord = userToAdd.home_coordinates;
+
+      if (homeCoord) {
+        try {
+          const address = await getAddressFromCoords(
+            homeCoord.latitude,
+            homeCoord.longitude,
+          );
+          setHomeAddress(address || "");
+        } catch (error) {
+          console.log("Error fetching home address");
+          console.log(error);
+        }
+      }
+    }
+  };
+
+  const getCoordinatesFromAddress = async (
+    address: string,
+  ): Promise<{ lat: number; lng: number } | null> => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error("Google Maps API Key is missing");
+      return null;
+    }
+
+    if (!address || address.trim() === "") {
+      console.error("Address is empty");
+      return null;
+    }
+
+    try {
+      // Encode the address string to make it URL-safe
+      const encodedAddress = encodeURIComponent(address);
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+
+      // Call the Google Geocoding API
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+
+      // Check if Google successfully found the address
+      if (data.status !== "OK" || !data.results.length) {
+        console.error(`Geocoding failed: ${data.status}`);
+        return null;
+      }
+
+      // Extract and return latitude and longitude
+      const { lat, lng } = data.results[0].geometry.location;
+      return { lat, lng };
+    } catch (error) {
+      console.error("Error fetching coordinates:", error);
+      return null;
     }
   };
 
   const editUser = async () => {
-    if (!formUsername.trim() || !formEmail.trim() || !formEssNo.trim()) {
+    if (
+      !formUsername.trim() ||
+      !formEmail.trim() ||
+      !formEssNo.trim() ||
+      !homeAddress.trim()
+    ) {
       Alert.alert("Error", "Field cannot be empty");
       return;
     }
@@ -711,6 +783,16 @@ export default function settings() {
     setIsSaving(true);
 
     try {
+      const coordinates = await getCoordinatesFromAddress(homeAddress);
+      if (!coordinates) {
+        Alert.alert(
+          "Error",
+          "Could not find coordinates for the home address. Please check the address and try again.",
+        );
+        setIsSaving(false);
+        return;
+      }
+
       const userDocRef = doc(db, "users", selectedUserId);
 
       await updateDoc(userDocRef, {
@@ -723,6 +805,7 @@ export default function settings() {
         role: parseInt(formRole.trim()),
         office: parseInt(formOffice.trim()),
         active: formActive,
+        home_coordinates: new GeoPoint(coordinates.lat, coordinates.lng),
       });
 
       Alert.alert("Success", "User updated successfully!");
@@ -1903,6 +1986,25 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
+
+                      <Text style={styles.modalSubtitle}>Home Address:</Text>
+                      <View
+                        style={{
+                          width: "100%",
+                          position: "relative",
+                          zIndex: 100,
+                          elevation: 10,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <PlacesInput
+                          value={homeAddress}
+                          placeholder="Search home..."
+                          onPlaceSelected={(address, location) => {
+                            setHomeAddress(address);
+                          }}
+                        />
+                      </View>
                       {/* <View style={styles.modalRow}>
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Role:</Text>
@@ -1926,7 +2028,10 @@ export default function settings() {
                     <View style={styles.buttonRow}>
                       <TouchableOpacity
                         style={[styles.dialogButton, styles.cancelButton]}
-                        onPress={() => setUserModalVisible(false)}
+                        onPress={() => {
+                          clearUserForm();
+                          setUserModalVisible(false);
+                        }}
                         disabled={isSaving}
                       >
                         <Text style={styles.textStyle}>Cancel</Text>
@@ -2138,17 +2243,6 @@ export default function settings() {
                         </View>
                       </View>
 
-                      <Text style={styles.modalSubtitle}>Home Address:</Text>
-                      <View style={{ width: "100%" }}>
-                        <PlacesInput
-                          value={homeAddress}
-                          placeholder="Search home..."
-                          onPlaceSelected={(address, location) => {
-                            setHomeAddress(address);
-                          }}
-                        />
-                      </View>
-
                       <Text style={styles.modalSubtitle}>Active:</Text>
                       <Switch
                         trackColor={{ false: "#767577", true: "#81b0ff" }}
@@ -2156,6 +2250,25 @@ export default function settings() {
                         ios_backgroundColor="#3e3e3e"
                         value={formActive}
                         onValueChange={(newValue) => setFormActive(newValue)}
+                      />
+                    </View>
+
+                    <Text style={styles.modalSubtitle}>Home Address:</Text>
+                    <View
+                      style={{
+                        width: "100%",
+                        position: "relative",
+                        zIndex: 100,
+                        elevation: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <PlacesInput
+                        value={homeAddress}
+                        placeholder="Search home..."
+                        onPlaceSelected={(address, location) => {
+                          setHomeAddress(address);
+                        }}
                       />
                     </View>
 
