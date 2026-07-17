@@ -31,6 +31,10 @@ export default function GeneralExpenseForm() {
   const [formContactNumber, setFormContactNumber] = useState<string>("");
   const [formEmail, setFormEmail] = useState<string>("");
   const [formExpenseReport, setFormExpenseReport] = useState<string>("");
+  const [formVendor, setFormVendor] = useState<string>("");
+  const [formCustomers, setFormCustomers] = useState([
+    { name: "", company: "", email: "", number: "", time: "" },
+  ]);
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -72,20 +76,34 @@ export default function GeneralExpenseForm() {
   }, []);
 
   const handleSubmit = async () => {
+    const isCustomersFormValid = formCustomers.every(
+      (customer) =>
+        customer.name.trim() !== "" &&
+        customer.company.trim() !== "" &&
+        customer.email.trim() !== "" &&
+        customer.number.trim() !== "" &&
+        customer.time.trim() !== "",
+    );
+
     const expensePurposeValidation =
       (formExpenseType === "1" || formExpenseType === "2") &&
-      (!formCompany || !formContactNumber || !formEmail || !formName);
+      !isCustomersFormValid;
 
     console.log(expensePurposeValidation);
+
     if (
       !formExpenseType ||
       !formDate ||
       parseFloat(formAmount) === 0 ||
+      !formExpenseReport ||
+      !formVendor ||
       expensePurposeValidation
     ) {
+      console.log("not valid");
       alert("Please ensure all required fields are filled.");
       return;
     }
+    console.log("valid");
     try {
       await addDoc(collection(db, "expenses"), {
         user_id: userId,
@@ -93,10 +111,8 @@ export default function GeneralExpenseForm() {
         date: formDate,
         expense_type: expenseType[formExpenseType as keyof typeof expenseType],
         amount: parseFloat(formAmount),
-        company: formCompany,
-        name: formName,
-        contact_number: formContactNumber,
-        email: formEmail,
+        customers: formCustomers,
+        vendor: formVendor,
         expense_report: formExpenseReport,
         type: 2, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,
@@ -110,6 +126,37 @@ export default function GeneralExpenseForm() {
     }
   };
 
+  // Add a new empty customer row
+  const addCustomerRow = () => {
+    setFormCustomers([
+      ...formCustomers,
+      { name: "", company: "", email: "", number: "", time: "" },
+    ]);
+  };
+
+  // Remove a specific row by index
+  const removeCustomerRow = (index: number) => {
+    if (formCustomers.length === 1) {
+      // Keep at least one row, just reset it
+      setFormCustomers([
+        { name: "", company: "", email: "", number: "", time: "" },
+      ]);
+    } else {
+      setFormCustomers(formCustomers.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a specific field for a specific customer row
+  const handleCustomerChange = (
+    index: number,
+    field: string,
+    value: string,
+  ) => {
+    const updatedCustomers = [...formCustomers];
+    updatedCustomers[index][field] = value;
+    setFormCustomers(updatedCustomers);
+  };
+
   const resetForm = () => {
     setFormExpenseType("");
     setFormPurpose("");
@@ -118,7 +165,11 @@ export default function GeneralExpenseForm() {
     setFormName("");
     setFormContactNumber("");
     setFormEmail("");
+    setFormVendor("");
     setFormExpenseReport("");
+    setFormCustomers([
+      { name: "", company: "", email: "", number: "", time: "" },
+    ]);
   };
 
   const fieldMessage = (
@@ -172,9 +223,20 @@ export default function GeneralExpenseForm() {
                 style={styles.webTextInput}
                 editable={!isSaving}
               />
+
+              <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+                Vendor:
+              </Text>
+              <TextInput
+                value={formVendor}
+                onChangeText={setFormVendor}
+                placeholder="Vendor"
+                style={styles.webTextInput}
+                editable={!isSaving}
+              />
             </View>
 
-            {(formExpenseType === "1" || formExpenseType === "2") && (
+            {/* {(formExpenseType === "1" || formExpenseType === "2") && (
               <View style={[styles.inputRow, { marginTop: 10 }]}>
                 <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Company/Site:
@@ -218,6 +280,163 @@ export default function GeneralExpenseForm() {
                   placeholderTextColor="#999999"
                   editable={!isSaving}
                 />
+              </View>
+            )} */}
+
+            {(formExpenseType === "1" || formExpenseType === "2") && (
+              <View style={[{ marginTop: 10 }]}>
+                <Text style={[styles.formLabel, { fontSize: 16 }]}>
+                  Customer Details:
+                </Text>
+
+                {formCustomers.map((customer, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.inputRow,
+                      { marginTop: 10, alignItems: "center" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        styles.fieldLabelMandatory,
+                        { width: 90 },
+                      ]}
+                    >
+                      Company:
+                    </Text>
+                    <TextInput
+                      placeholder="Company"
+                      value={customer.company}
+                      onChangeText={(text) =>
+                        handleCustomerChange(index, "company", text)
+                      }
+                      style={styles.webTextInput}
+                      editable={!isSaving}
+                    />
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        styles.fieldLabelMandatory,
+                        { width: 90 },
+                      ]}
+                    >
+                      Name:
+                    </Text>
+                    <TextInput
+                      placeholder="Name"
+                      value={customer.name}
+                      onChangeText={(text) =>
+                        handleCustomerChange(index, "name", text)
+                      }
+                      style={styles.webTextInput}
+                      editable={!isSaving}
+                    />
+
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        styles.fieldLabelMandatory,
+                        { width: 90 },
+                      ]}
+                    >
+                      Email:
+                    </Text>
+                    <TextInput
+                      placeholder="Email"
+                      value={customer.email}
+                      onChangeText={(text) =>
+                        handleCustomerChange(index, "email", text)
+                      }
+                      keyboardType="email-address"
+                      style={styles.webTextInput}
+                      editable={!isSaving}
+                    />
+
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        styles.fieldLabelMandatory,
+                        { width: 90 },
+                      ]}
+                    >
+                      Number:
+                    </Text>
+                    <TextInput
+                      placeholder="Number"
+                      value={customer.number}
+                      onChangeText={(text) =>
+                        handleCustomerChange(index, "number", text)
+                      }
+                      keyboardType="phone-pad"
+                      style={styles.webTextInput}
+                      editable={!isSaving}
+                    />
+
+                    <View
+                      style={[{ alignItems: "center", flexDirection: "row" }]}
+                    >
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          styles.fieldLabelMandatory,
+                          { width: 90 },
+                        ]}
+                      >
+                        Time:
+                      </Text>
+                      <input
+                        type="time"
+                        value={customer.time}
+                        onChange={(e) =>
+                          handleCustomerChange(index, "time", e.target.value)
+                        }
+                        style={{
+                          maxWidth: 150,
+                          backgroundColor: "#f9f9f9",
+                          border: "1px solid #eee",
+                          borderRadius: "8px",
+                          padding: "8px 12px",
+                          fontSize: "16px",
+                          color: "#333",
+                          boxSizing: "border-box",
+                          height: "40px",
+                          margin: 0,
+                        }}
+                        disabled={isSaving}
+                      />
+                    </View>
+
+                    {/* Remove Button for this row */}
+                    <TouchableOpacity
+                      onPress={() => removeCustomerRow(index)}
+                      style={{ marginLeft: 10, padding: 5 }}
+                      disabled={isSaving}
+                    >
+                      <Text style={{ color: "red", fontWeight: "bold" }}>
+                        ✕
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {/* Button to add another customer row */}
+                <TouchableOpacity
+                  onPress={addCustomerRow}
+                  style={{
+                    marginTop: 10,
+                    alignSelf: "flex-start",
+                    backgroundColor: "#2196F3",
+                    padding: 8,
+                    borderRadius: 4,
+                  }}
+                  disabled={isSaving}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    + Add Customer
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 

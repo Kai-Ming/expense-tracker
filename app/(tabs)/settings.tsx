@@ -678,6 +678,7 @@ export default function settings() {
     setFormRole("");
     setFormActive(true);
     setFormOffice("");
+    setHomeAddress("");
   };
 
   const handleSelectUser = (userId: string) => {
@@ -1264,12 +1265,12 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         onPress={() => setHomeModalVisible(true)}
         style={styles.button}
       >
         <Text style={styles.buttonText}>Set Home Address</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -2135,6 +2136,17 @@ export default function settings() {
                             <option value="1">Penang</option>
                           </select>
                         </View>
+                      </View>
+
+                      <Text style={styles.modalSubtitle}>Home Address:</Text>
+                      <View style={{ width: "100%" }}>
+                        <PlacesInput
+                          value={homeAddress}
+                          placeholder="Search home..."
+                          onPlaceSelected={(address, location) => {
+                            setHomeAddress(address);
+                          }}
+                        />
                       </View>
 
                       <Text style={styles.modalSubtitle}>Active:</Text>

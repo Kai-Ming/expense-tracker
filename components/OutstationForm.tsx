@@ -13,11 +13,13 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -25,6 +27,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { db, storage } from "../firebaseConfig";
+import { useGoogleMapsDistance } from "./DistanceCalculator";
+import PlacesInput from "./PlacesInput";
 
 type Grade =
   | "S4"
@@ -35,6 +39,7 @@ type Grade =
   | "B3"
   | "B2"
   | "B1"
+  | "A4"
   | "A3"
   | "A2"
   | "A1"
@@ -109,6 +114,8 @@ export default function OutstationExpenseForm() {
   const [formTripPlaces, setFormTripPlaces] = useState<any[]>([]);
   const [formAirfare, setFormAirfare] = useState<string>("0.00");
   const [formAirfareRemark, setFormAirfareRemark] = useState<string>("");
+  const [formToll, setFormToll] = useState<string>("0.00");
+  const [formTollRemark, setFormTollRemark] = useState<string>("");
   const [formParking, setFormParking] = useState<string>("0.00");
   const [formParkingRemark, setFormParkingRemark] = useState<string>("");
   const [formTransport, setFormTransport] = useState<string>("0.00");
@@ -141,11 +148,54 @@ export default function OutstationExpenseForm() {
   const [formTotal, setFormTotal] = useState<string>("0.00");
   const [formTripReport, setFormTripReport] = useState<string>("");
   const [formCustomers, setFormCustomers] = useState([
-    { name: "", company: "", email: "", number: "", time: "" },
+    { name: "", company: "", email: "", number: "", time: "", address: "" },
   ]);
   const [businessCardFiles, setBusinessCardFiles] = useState<File[]>([]);
   const [allDays, setAllDays] = useState<any[]>([]);
 
+  const { calculateDistance, getRouteImageUrl, sdkLoaded } =
+    useGoogleMapsDistance();
+  const [officeCoords, setOfficeCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [homeCoords, setHomeCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [mileageRate, setMileageRate] = useState<number>(0.8);
+  const [mileageRateOutstation, setMileageRateOutstation] =
+    useState<number>(0.7);
+  const [outStationDistance, setOutstationDistance] = useState<number>(50);
+
+  const [allUserTrips, setAllUserTrips] = useState<any[]>([]);
+  const [addedTrips, setAddedTrips] = useState<any[]>([]);
+  const [tripsForSelectedDate, setTripsForSelectedDate] = useState<any[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string>("");
+  const [selectedFromIndex, setSelectedFromIndex] = useState<number>(0);
+  const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
+  const [fromAddress, setFromAddress] = useState<string>("");
+  const [toAddress, setToAddress] = useState<string>("");
+  const [formFromHome, setFormFromHome] = useState<boolean>(false);
+  const [formGoingHome, setFormGoingHome] = useState<boolean>(false);
+  const [formTripFromTime, setFormTripFromTime] = useState<Date | null>(null);
+  const [formTripToTime, setFormTripToTime] = useState<Date | null>(null);
+  const [formRemark, setFormRemark] = useState<string>("");
+  const [originCoord, setOriginCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [destCoord, setDestCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [distance, setDistance] = useState<string>("0.00");
+
+  const [customerIndex, setCustomerIndex] = useState<number>(0);
+
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showMileageModal, setShowMileageModal] = useState(false);
+  const [showAddTripModal, setShowAddTripModal] = useState(false);
   const [showTripModal, setShowTripModal] = useState(false);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -153,6 +203,27 @@ export default function OutstationExpenseForm() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [tabIndex, setTabIndex] = useState<number>(1);
+
+  const locations = [
+    { lat: 3.0409332, lng: 101.5453218 },
+    {
+      lat: 5.333704064834522,
+      lng: 100.29405526266623,
+    },
+  ];
+
+  useEffect(() => {
+    setAddedTrips([]);
+    setDistance("0.00");
+  }, [formDate]);
+
+  useEffect(() => {
+    const totalDist = addedTrips.reduce(
+      (sum, trip) => sum + (parseFloat(trip.distance) || 0),
+      0,
+    );
+    setDistance(totalDist.toFixed(2));
+  }, [addedTrips]);
 
   const expenseType = {
     "1": "Meal with customer",
@@ -219,6 +290,7 @@ export default function OutstationExpenseForm() {
       B3: 55,
       B2: 55,
       B1: 60,
+      A4: 70,
       A3: 70,
       A2: 75,
       A1: 80,
@@ -234,6 +306,7 @@ export default function OutstationExpenseForm() {
       B3: 66,
       B2: 66,
       B1: 72,
+      A4: 84,
       A3: 84,
       A2: 90,
       A1: 96,
@@ -249,6 +322,7 @@ export default function OutstationExpenseForm() {
       B3: 187,
       B2: 187,
       B1: 204,
+      A4: 238,
       A3: 238,
       A2: 255,
       A1: 272,
@@ -264,6 +338,7 @@ export default function OutstationExpenseForm() {
       B3: 165,
       B2: 165,
       B1: 180,
+      A4: 210,
       A3: 210,
       A2: 225,
       A1: 240,
@@ -279,6 +354,7 @@ export default function OutstationExpenseForm() {
       B3: 143,
       B2: 143,
       B1: 156,
+      A4: 182,
       A3: 182,
       A2: 195,
       A1: 208,
@@ -294,6 +370,7 @@ export default function OutstationExpenseForm() {
       B3: 132,
       B2: 132,
       B1: 144,
+      A4: 168,
       A3: 168,
       A2: 180,
       A1: 192,
@@ -309,6 +386,7 @@ export default function OutstationExpenseForm() {
       B3: 132,
       B2: 132,
       B1: 144,
+      A4: 168,
       A3: 168,
       A2: 180,
       A1: 192,
@@ -324,6 +402,7 @@ export default function OutstationExpenseForm() {
       B3: 132,
       B2: 132,
       B1: 144,
+      A4: 168,
       A3: 168,
       A2: 180,
       A1: 192,
@@ -339,6 +418,7 @@ export default function OutstationExpenseForm() {
       B3: 110,
       B2: 110,
       B1: 120,
+      A4: 140,
       A3: 140,
       A2: 150,
       A1: 160,
@@ -354,6 +434,7 @@ export default function OutstationExpenseForm() {
       B3: 110,
       B2: 110,
       B1: 120,
+      A4: 140,
       A3: 140,
       A2: 150,
       A1: 160,
@@ -369,6 +450,7 @@ export default function OutstationExpenseForm() {
       B3: 308,
       B2: 308,
       B1: 336,
+      A4: 392,
       A3: 392,
       A2: 420,
       A1: 448,
@@ -384,6 +466,7 @@ export default function OutstationExpenseForm() {
       B3: 242,
       B2: 242,
       B1: 264,
+      A4: 308,
       A3: 308,
       A2: 330,
       A1: 352,
@@ -399,6 +482,7 @@ export default function OutstationExpenseForm() {
       B3: 275,
       B2: 275,
       B1: 300,
+      A4: 350,
       A3: 350,
       A2: 375,
       A1: 400,
@@ -414,6 +498,7 @@ export default function OutstationExpenseForm() {
       B3: 275,
       B2: 275,
       B1: 300,
+      A4: 350,
       A3: 350,
       A2: 375,
       A1: 400,
@@ -429,6 +514,7 @@ export default function OutstationExpenseForm() {
       B3: 220,
       B2: 220,
       B1: 240,
+      A4: 280,
       A3: 280,
       A2: 300,
       A1: 320,
@@ -444,6 +530,7 @@ export default function OutstationExpenseForm() {
       B3: 165,
       B2: 165,
       B1: 180,
+      A4: 210,
       A3: 210,
       A2: 225,
       A1: 240,
@@ -459,6 +546,7 @@ export default function OutstationExpenseForm() {
       B3: 165,
       B2: 165,
       B1: 180,
+      A4: 210,
       A3: 210,
       A2: 225,
       A1: 240,
@@ -474,6 +562,7 @@ export default function OutstationExpenseForm() {
       B3: 385,
       B2: 385,
       B1: 420,
+      A4: 490,
       A3: 490,
       A2: 525,
       A1: 560,
@@ -489,6 +578,7 @@ export default function OutstationExpenseForm() {
       B3: 297,
       B2: 297,
       B1: 324,
+      A4: 378,
       A3: 378,
       A2: 405,
       A1: 432,
@@ -504,6 +594,7 @@ export default function OutstationExpenseForm() {
       B3: 396,
       B2: 396,
       B1: 432,
+      A4: 504,
       A3: 504,
       A2: 540,
       A1: 576,
@@ -519,6 +610,7 @@ export default function OutstationExpenseForm() {
       B3: 385,
       B2: 385,
       B1: 420,
+      A4: 490,
       A3: 490,
       A2: 525,
       A1: 560,
@@ -534,6 +626,7 @@ export default function OutstationExpenseForm() {
       B3: 275,
       B2: 275,
       B1: 300,
+      A4: 350,
       A3: 350,
       A2: 375,
       A1: 400,
@@ -549,6 +642,7 @@ export default function OutstationExpenseForm() {
       B3: 242,
       B2: 242,
       B1: 264,
+      A4: 308,
       A3: 308,
       A2: 330,
       A1: 352,
@@ -564,6 +658,7 @@ export default function OutstationExpenseForm() {
       B3: 220,
       B2: 220,
       B1: 240,
+      A4: 280,
       A3: 280,
       A2: 300,
       A1: 320,
@@ -579,6 +674,7 @@ export default function OutstationExpenseForm() {
       B3: 220,
       B2: 220,
       B1: 240,
+      A4: 280,
       A3: 280,
       A2: 300,
       A1: 320,
@@ -586,7 +682,6 @@ export default function OutstationExpenseForm() {
       M2: 400,
     },
   };
-
   const ownAccCost = 100;
 
   useEffect(() => {
@@ -605,6 +700,22 @@ export default function OutstationExpenseForm() {
 
             const grade = userData.grade;
             setGrade(grade || "S4");
+            const homeCoord = userData.home_coordinates;
+
+            if (homeCoord) {
+              setHomeCoords({
+                lat: homeCoord.latitude,
+                lng: homeCoord.longitude,
+              });
+            }
+
+            const officeLocation = userData.office;
+
+            if (officeLocation === 0) {
+              setOfficeCoords(locations[0]);
+            } else {
+              setOfficeCoords(locations[1]);
+            }
           } else {
             setUsername(user.displayName || "User");
           }
@@ -680,6 +791,54 @@ export default function OutstationExpenseForm() {
       setLockDinner(formArrivalTime < eightPM);
     }
   }, [formArrivalTime]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const q = query(
+      collection(db, "trips"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const trips = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAllUserTrips(trips);
+    });
+    return () => unsubscribe();
+  }, [userId]);
+
+  useEffect(() => {
+    const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
+    if (!configId) return;
+    const unsubscribe = onSnapshot(doc(db, "config", configId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.mileage_rate) setMileageRate(data.mileage_rate);
+        if (data.mileage_rate_outstation)
+          setMileageRateOutstation(data.mileage_rate_oustation);
+        if (data.outstation_disance)
+          setOutstationDistance(data.outstation_distance);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const selectedDateStr = formDate;
+    const filtered = allUserTrips.filter((trip) => {
+      if (!trip.created_at) return false;
+      const tripDate = trip.created_at.toDate
+        ? trip.created_at.toDate()
+        : new Date(trip.created_at);
+      const tripDateStr = tripDate.toISOString().split("T")[0];
+      return tripDateStr === selectedDateStr;
+    });
+    setTripsForSelectedDate(filtered);
+    setSelectedTripId("");
+    // Do NOT reset addedTrips here
+  }, [allUserTrips, formDate]);
 
   const fieldMessage = (
     <Text
@@ -905,6 +1064,7 @@ export default function OutstationExpenseForm() {
 
     const total =
       parseFloat(formAirfare) +
+      parseFloat(formToll) +
       parseFloat(formParking) +
       parseFloat(formTransport) +
       parseFloat(formHotel) +
@@ -913,6 +1073,7 @@ export default function OutstationExpenseForm() {
       parseFloat(formLaundry) +
       parseFloat(formOthers) +
       getOwnAccExpense() +
+      getTotalMileage() +
       mealExpense;
 
     return total.toFixed(2);
@@ -933,14 +1094,19 @@ export default function OutstationExpenseForm() {
   const handleNextDay = async () => {
     console.log("next day");
 
-    const isCustomersFormValid = formCustomers.every(
-      (customer) =>
-        customer.name.trim() !== "" &&
-        customer.company.trim() !== "" &&
-        customer.email.trim() !== "" &&
-        customer.number.trim() !== "" &&
-        customer.time.trim() !== "",
-    );
+    const isCustomersFormValid =
+      formCustomers.every(
+        (customer) =>
+          customer.name.trim() !== "" &&
+          customer.company.trim() !== "" &&
+          customer.email.trim() !== "" &&
+          customer.number.trim() !== "" &&
+          customer.time.trim() !== "",
+      ) &&
+      (addedTrips.length === 0 ||
+        formCustomers.some(
+          (customer) => customer.address && customer.address.trim() !== "",
+        ));
 
     const timeEmpty =
       (formTripDate === formDepartureDate && !formDepartureTime) ||
@@ -978,6 +1144,10 @@ export default function OutstationExpenseForm() {
         location: formTripLocation,
         airfare: formAirfare,
         airfare_remark: formAirfareRemark,
+        mileage: getTotalMileage().toFixed(2),
+        trip_ids: addedTrips.map((trip) => trip.id),
+        toll: formToll,
+        toll_remark: formTollRemark,
         parking: formParking,
         parking_remark: formParkingRemark,
         transport: formTransport,
@@ -1087,6 +1257,15 @@ export default function OutstationExpenseForm() {
     } */
   };
 
+  const addTripsByIds = (tripIds: string[]) => {
+    const tripsToAdd = allUserTrips.filter(
+      (trip) =>
+        tripIds.includes(trip.id) &&
+        !addedTrips.some((added) => added.id === trip.id),
+    );
+    setAddedTrips((prev) => [...prev, ...tripsToAdd]);
+  };
+
   const handlePreviousDay = () => {
     const lastDay = removeLastDay();
     console.log(lastDay);
@@ -1100,6 +1279,9 @@ export default function OutstationExpenseForm() {
     if (lastDay !== null) {
       setFormAirfare(lastDay.airfare || "0.00");
       setFormAirfareRemark(lastDay.airfare_remark || "");
+      addTripsByIds(lastDay.trip_ids || []);
+      setFormToll(lastDay.toll || "0.00");
+      setFormTollRemark(lastDay.toll_remark || "");
       setFormParking(lastDay.parking || "0.00");
       setFormParkingRemark(lastDay.parking_remark || "");
       setFormTransport(lastDay.transport || "0.00");
@@ -1122,7 +1304,14 @@ export default function OutstationExpenseForm() {
       setFormOthersRemark(lastDay.others_remark || "");
       setFormCustomers(
         lastDay.customers || [
-          { name: "", company: "", email: "", number: "", time: "" },
+          {
+            name: "",
+            company: "",
+            email: "",
+            number: "",
+            time: "",
+            address: "",
+          },
         ],
       );
       setBusinessCardFiles(lastDay.business_card_files || []);
@@ -1144,6 +1333,927 @@ export default function OutstationExpenseForm() {
     });
     return poppedValue;
   };
+
+  const handleRemoveTrip = (tripId: string) => {
+    setAddedTrips((prev) => prev.filter((t) => t.id !== tripId));
+  };
+
+  const getDistanceValue = () =>
+    parseFloat(distance.replace(/[^0-9.]/g, "")) || 0;
+
+  const calculateMileage = () => getTotalMileage().toFixed(2);
+
+  const formatTripTime = (timestamp: any): string => {
+    if (!timestamp) return "--:--";
+
+    let date: Date;
+
+    // 1. Check if it's a Firestore-style Timestamp object (your 2nd case)
+    if (typeof timestamp.toDate === "function") {
+      date = timestamp.toDate();
+    }
+    // 2. Check if it's an object with seconds/nanoseconds (raw Firestore data)
+    else if (typeof timestamp.seconds === "number") {
+      date = new Date(timestamp.seconds * 1000);
+    }
+    // 3. Handle Date objects or Date strings (your 1st case, e.g., "Mon Jun 22 2026...")
+    else {
+      date = new Date(timestamp);
+    }
+
+    // Fallback if the date turns out to be invalid
+    if (isNaN(date.getTime())) {
+      return "--:--";
+    }
+
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const handleAddTrip = (tripId?: string) => {
+    const idToAdd = tripId || selectedTripId;
+    if (!idToAdd) {
+      return;
+    }
+    const tripToAdd = tripsForSelectedDate.find((t) => t.id === idToAdd);
+    if (tripToAdd && !addedTrips.some((t) => t.id === tripToAdd.id)) {
+      setAddedTrips((prev) => [...prev, tripToAdd]);
+      setSelectedTripId("");
+    } else if (tripToAdd) {
+      alert("This trip has already been added.");
+    }
+  };
+
+  const saveRouteImageToFirebase = async (origin, destination) => {
+    try {
+      // 1. Get the Google Static Map URL with the polyline
+      const googleMapUrl = await getRouteImageUrl(origin, destination);
+
+      // 2. Fetch the actual image data as a Blob (binary data)
+      // NOTE: Ensure your Google Cloud Console allows your domain to fetch Static Map blobs
+      const response = await fetch(googleMapUrl);
+      const blob = (await response.json)
+        ? await response.blob()
+        : await response.blob();
+
+      // 3. Initialize Firebase Storage and create a unique file path
+      const storage = getStorage();
+      const fileName = `route-images/trip_${Date.now()}.png`;
+      const storageRef = ref(storage, fileName);
+
+      // 4. Upload the raw blob to Firebase Storage
+      const uploadResult = await uploadBytes(storageRef, blob, {
+        contentType: "image/png",
+      });
+
+      // 5. Grab the secure Firebase download URL (No Google API keys inside this!)
+      const firebaseDownloadUrl = await getDownloadURL(uploadResult.ref);
+
+      return firebaseDownloadUrl;
+    } catch (error) {
+      console.error(
+        "Failed to process and save route image to Firebase:",
+        error,
+      );
+      throw error;
+    }
+  };
+
+  const fetchTollCost = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ) => {
+    return 0;
+  };
+
+  const getDrivingDistance = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ) => {
+    try {
+      const data = await calculateDistance(origin, destination);
+      console.log(":Type of data");
+      console.log(typeof data);
+      return data || 0;
+    } catch (error) {
+      console.log(error);
+      alert("Error calculating distance");
+      return 0;
+    }
+  };
+
+  const getAddressFromCoords = async (
+    lat: number,
+    lng: number,
+  ): Promise<string> => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is undefined");
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+      return "Address not found";
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === "OK" && data.results.length > 0) {
+        return data.results[0].formatted_address
+          .replace(/\b\d{5}\b,?\s*/g, "")
+          .trim();
+      }
+
+      // ── Fallback to native if Google fails ────────────────────────
+      console.warn(
+        "Google geocoding failed, falling back to native:",
+        data.status,
+      );
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+      if (geo.length > 0) {
+        const g = geo[0];
+        return [g.name, g.street, g.city].filter(Boolean).join(", ");
+      }
+
+      return "Address not found";
+    } catch (error) {
+      console.error("Geocoding fetch error:", error);
+      // ── Fallback to native on network error ───────────────────────
+      try {
+        const geo = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        if (geo.length > 0) {
+          const g = geo[0];
+          return [g.name, g.street, g.city].filter(Boolean).join(", ");
+        }
+      } catch (nativeError) {
+        console.error("Native geocoding also failed:", nativeError);
+      }
+      return "Address not found";
+    }
+  };
+
+  const saveTrip = async () => {
+    if (!fromAddress.trim() || !toAddress.trim()) {
+      alert("Please fill in both 'From' and 'To' addresses.");
+      return;
+    }
+    if (!originCoord || !destCoord) {
+      alert("Please select valid locations from the suggestions.");
+      return;
+    }
+    if (!formRemark.trim()) {
+      alert("Please fill in a remark.");
+      return;
+    }
+    if (!formTripFromTime || !formTripToTime) {
+      alert("Please fill in both 'Departure' and 'Arrival' times.");
+      return;
+    }
+    if (!userId) {
+      alert("You must be logged in.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      let subToAddress = toAddress;
+      const distanceResult = await getDrivingDistance(originCoord, destCoord);
+      let subDistance = 0;
+      if (distanceResult) {
+        subDistance = parseFloat(distanceResult.toFixed(2));
+      }
+      let subToll = await fetchTollCost(originCoord, destCoord);
+      if (formGoingHome) {
+        const distToCurrent = await getDrivingDistance(originCoord, destCoord);
+        const distToOffice = await getDrivingDistance(
+          originCoord,
+          officeCoords || { lat: 0, lng: 0 },
+        );
+        console.log(distToOffice);
+        console.log(distToCurrent);
+
+        if (distToOffice > distToCurrent) {
+          console.log(`Route Comparison: Using Current.`);
+        } else {
+          console.log(`Route Comparison: Using Office.`);
+          const distanceValue = await distToOffice;
+          if (distanceValue !== undefined) {
+            console.log("updating subdistance");
+            console.log(distanceValue);
+            console.log(distanceValue.toFixed(2));
+            subDistance = parseFloat(distanceValue.toFixed(2));
+            console.log("subdistance");
+            console.log(subDistance);
+          }
+          subToll = await fetchTollCost(
+            originCoord,
+            officeCoords || { lat: 0, lng: 0 },
+          );
+          if (officeCoords) {
+            subToAddress = await getAddressFromCoords(
+              officeCoords.lat,
+              officeCoords.lng,
+            );
+            /* if (currentLocation) {
+                finalToll = await fetchTollCost(currentLocation, officeCoords);
+              } */
+          }
+
+          console.log(subToAddress);
+        }
+      } else if (formFromHome) {
+        const distToCurrent = await getDrivingDistance(originCoord, destCoord);
+        const distToOffice = await getDrivingDistance(
+          officeCoords || { lat: 0, lng: 0 },
+          destCoord,
+        );
+        console.log(distToOffice);
+        console.log(distToCurrent);
+
+        if (distToOffice > distToCurrent) {
+          console.log(`Route Comparison: Using Current.`);
+        } else {
+          console.log(`Route Comparison: Using Office.`);
+          const distanceValue = await distToOffice;
+          if (distanceValue !== undefined) {
+            console.log("updating subdistance");
+            console.log(distanceValue);
+            console.log(distanceValue.toFixed(2));
+            subDistance = parseFloat(distanceValue.toFixed(2));
+            console.log("subdistance");
+            console.log(subDistance);
+          }
+          subToll = await fetchTollCost(
+            originCoord,
+            officeCoords || { lat: 0, lng: 0 },
+          );
+          if (officeCoords) {
+            subToAddress = await getAddressFromCoords(
+              officeCoords.lat,
+              officeCoords.lng,
+            );
+            /* if (currentLocation) {
+                finalToll = await fetchTollCost(currentLocation, officeCoords);
+              } */
+          }
+
+          console.log(subToAddress);
+        }
+      }
+      //const distanceData = getDrivingDistance(originCoord, destCoord);
+      if (!subDistance) {
+        console.log("from", originCoord, "to", destCoord);
+        console.log("from", fromAddress, "to", toAddress);
+        alert("Could not calculate driving distance. Please try again.");
+        return;
+      }
+
+      let routeImageUrl = "";
+      try {
+        routeImageUrl = await saveRouteImageToFirebase(originCoord, destCoord);
+      } catch (imageError) {
+        console.error("Error generating route image:", imageError);
+      }
+
+      let mileageRateTemp = mileageRate;
+
+      if (subDistance > outStationDistance) {
+        mileageRateTemp = mileageRateOutstation;
+      }
+
+      let mileage = (subDistance ?? 0) * mileageRateTemp;
+
+      console.log("distance");
+      console.log(subDistance);
+      console.log(subToAddress);
+      console.log(mileage);
+
+      const tripToSave = {
+        user_id: userId,
+        from_address: fromAddress,
+        to_address: subToAddress,
+        distance: parseFloat(subDistance.toFixed(2)),
+        mileage: parseFloat(mileage.toFixed(2)),
+        toll: parseFloat(subToll.toFixed(2)),
+        total: (mileage + subToll).toFixed(2),
+        remark: formRemark.trim() || "",
+        from_time: formTripFromTime,
+        to_time: formTripToTime,
+        from_home: formFromHome,
+        to_home: formGoingHome,
+        route_image_url: routeImageUrl,
+        date: formDate,
+        platform: 2,
+        created_at: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, "trips"), tripToSave);
+      console.log("Trip saved with ID:", docRef.id);
+      console.log(tripToSave);
+
+      // --- Create a local trip object for immediate addition ---
+      const newTrip = {
+        id: docRef.id,
+        ...tripToSave,
+        created_at: new Date(), // local timestamp for display; Firestore will have serverTimestamp
+      };
+
+      console.log("new trip");
+      console.log(newTrip);
+
+      // Add to addedTrips directly
+      setAddedTrips((prev) => [...prev, newTrip]);
+
+      // Reset the trip form and close modal
+      resetTripForm();
+      setShowTripModal(false);
+    } catch (error) {
+      console.error("Save error:", error);
+      console.log(error);
+      alert("Failed to save trip.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const selectDefault = async (index: number, direction: number) => {
+    if (index === 0) {
+      return;
+    }
+
+    /* if (officeLocation === 0) {
+      setOfficeCoords({ lat: 3.0409332, lng: 101.5453218 });
+    } else {
+      setOfficeCoords({
+        lat: 5.4144228421944005,
+        lng: 100.31619126878057,
+      });
+    } */
+
+    if (direction === 0) {
+      setFormFromHome(false);
+      if (selectedFromIndex === index) {
+        setSelectedFromIndex(0);
+        clearAddress(0);
+      } else if (index === 1) {
+        setSelectedFromIndex(index);
+        const location = locations[0];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+        setFromAddress(address);
+        setOriginCoord(location);
+      } else if (index === 2) {
+        setSelectedFromIndex(index);
+        const location = locations[1];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+
+        setFromAddress(address);
+        setOriginCoord(location);
+      } else if (index === 3) {
+        setFormFromHome(true);
+        setSelectedFromIndex(index);
+        const location = locations[1];
+        let homeAddress = await getAddressFromCoords(
+          homeCoords.lat,
+          homeCoords.lng,
+        );
+        console.log("home address");
+        console.log(homeAddress);
+        console.log(homeCoords);
+        setFromAddress(homeAddress);
+        setOriginCoord(homeCoords);
+      }
+    } else if (direction === 1) {
+      setFormGoingHome(false);
+      if (selectedGoingIndex === index) {
+        setSelectedGoingIndex(0);
+        clearAddress(0);
+      } else if (index === 1) {
+        setSelectedGoingIndex(index);
+        const location = locations[0];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+        setToAddress(address);
+        setDestCoord(location);
+      } else if (index === 2) {
+        setSelectedGoingIndex(index);
+        const location = locations[1];
+        let address = await getAddressFromCoords(location.lat, location.lng);
+
+        setToAddress(address);
+        setDestCoord(location);
+      } else if (index === 3) {
+        setFormGoingHome(true);
+        setSelectedGoingIndex(index);
+        let homeAddress = await getAddressFromCoords(
+          homeCoords.lat,
+          homeCoords.lng,
+        );
+        setToAddress(homeAddress);
+        setDestCoord(homeCoords);
+      }
+    }
+  };
+
+  const clearAddress = (direction: number) => {
+    if (direction === 0) {
+      setFromAddress("");
+      setOriginCoord(null);
+    } else if (direction === 1) {
+      setToAddress("");
+      setDestCoord(null);
+    }
+  };
+
+  const renderAddTripModal = () => {
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showAddTripModal}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isSaving && setShowAddTripModal(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Add Trip</Text>
+
+                <View style={styles.formGroup}>
+                  <Text
+                    style={[styles.modalSubtitle, styles.fieldLabelMandatory]}
+                  >
+                    From (Starting location):
+                  </Text>
+                  <PlacesInput
+                    value={fromAddress}
+                    placeholder="Search starting location"
+                    onPlaceSelected={(address, location) => {
+                      setFromAddress(address);
+                      setOriginCoord(location);
+                    }}
+                    disabled={selectedFromIndex !== 0}
+                  />
+                  <View style={[{ flexDirection: "row", marginTop: 5 }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedFromIndex === 1
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 0 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(1, 0);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedFromIndex === 1
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        HQ
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedFromIndex === 2
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(2, 0);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedFromIndex === 2
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        Penang
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedFromIndex === 3
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(3, 0);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedFromIndex === 3
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        Home
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text
+                    style={[
+                      styles.modalSubtitle,
+                      styles.fieldLabelMandatory,
+                      { marginTop: 10 },
+                    ]}
+                  >
+                    To (Destination):
+                  </Text>
+                  <PlacesInput
+                    value={toAddress}
+                    placeholder="Search destination…"
+                    onPlaceSelected={(address, location) => {
+                      setToAddress(address);
+                      setDestCoord(location);
+                    }}
+                    disabled={selectedGoingIndex !== 0}
+                  />
+                  <View style={[{ flexDirection: "row", marginTop: 5 }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedGoingIndex === 1
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 0 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(1, 1);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedGoingIndex === 1
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        HQ
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedGoingIndex === 2
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(2, 1);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedGoingIndex === 2
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        Penang
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        selectedGoingIndex === 3
+                          ? styles.submitButtonActive
+                          : styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        selectDefault(3, 1);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          selectedGoingIndex === 3
+                            ? styles.textStyleActive
+                            : styles.textStyle,
+                          { fontWeight: "normal" },
+                        ]}
+                      >
+                        Home
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.modalSubtitle,
+                      styles.fieldLabelMandatory,
+                      { marginTop: 10 },
+                    ]}
+                  >
+                    Departure Time:
+                  </Text>
+                  <input
+                    type="time"
+                    value={dateToTimeString(formTripFromTime)}
+                    onChange={(e) =>
+                      setFormTripFromTime(timeStringToDate(e.target.value))
+                    }
+                    style={styles.timeInput}
+                    disabled={isSaving}
+                  />
+
+                  <Text
+                    style={[styles.modalSubtitle, styles.fieldLabelMandatory]}
+                  >
+                    Arrival Time:
+                  </Text>
+                  <input
+                    type="time"
+                    value={dateToTimeString(formTripToTime)}
+                    onChange={(e) =>
+                      setFormTripToTime(timeStringToDate(e.target.value))
+                    }
+                    style={styles.timeInput}
+                    disabled={isSaving}
+                  />
+                  <Text
+                    style={[styles.modalSubtitle, styles.fieldLabelMandatory]}
+                  >
+                    Remark:
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { minHeight: 80, textAlignVertical: "top" },
+                    ]}
+                    placeholder="Trip Remark..."
+                    placeholderTextColor="#999999"
+                    value={formRemark}
+                    onChangeText={setFormRemark}
+                    editable={!isSaving}
+                    keyboardType="default"
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowAddTripModal(false);
+                      resetMileageTripForm();
+                    }}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
+                    onPress={saveTrip}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Submit</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderTripAddressModal = () => (
+    <Modal
+      visible={showAddressModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowAddressModal(false)}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowAddressModal(false)}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              Select a Trip from {formatDate(formDate)}
+            </Text>
+            <TouchableOpacity onPress={() => setShowAddressModal(false)}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList}>
+            {tripsForSelectedDate.length === 0 && (
+              <Text style={styles.noTripsText}>No trips added</Text>
+            )}
+            {addedTrips.map((trip) => {
+              //const isAdded = addedTrips.some(  (added) => added.id === trip.id);
+              const isAdded = false;
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[
+                    styles.modalTripItem,
+                    isAdded && styles.disabledTripItem,
+                  ]}
+                  onPress={() => {
+                    if (isAdded) return;
+                    setShowAddressModal(false);
+                    console.log(trip.to_address);
+                    handleCustomerChange(
+                      customerIndex,
+                      "address",
+                      trip.to_address,
+                    );
+                  }}
+                >
+                  <Text
+                    style={[styles.timeText, isAdded && styles.disabledText]}
+                  >
+                    {formatTripTime(trip.from_time)} -{" "}
+                    {formatTripTime(trip.to_time)}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Platform: </Text>
+                    {trip?.platform === 2 ? "Web" : "Mobile"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Remark: </Text>
+                    {trip.remark || "No Remark"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>From: </Text>
+                    {trip.from_address}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>To: </Text>
+                    {trip.to_address}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  const renderMileageModal = () => (
+    <Modal
+      visible={showMileageModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowMileageModal(false)}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowMileageModal(false)}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              Select a Trip from {formatDate(formDate)}
+            </Text>
+            <TouchableOpacity onPress={() => setShowMileageModal(false)}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList}>
+            {tripsForSelectedDate.length === 0 && (
+              <Text style={styles.noTripsText}>
+                No trips found for {formDate.split("-").reverse().join("-")}
+              </Text>
+            )}
+            {tripsForSelectedDate.map((trip) => {
+              const isAdded = addedTrips.some((added) => added.id === trip.id);
+
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[
+                    styles.modalTripItem,
+                    isAdded && styles.disabledTripItem,
+                  ]}
+                  onPress={() => {
+                    if (isAdded) return;
+                    setSelectedTripId(trip.id);
+                    setShowMileageModal(false);
+                    handleAddTrip(trip.id);
+                  }}
+                >
+                  <Text
+                    style={[styles.timeText, isAdded && styles.disabledText]}
+                  >
+                    {formatTripTime(trip.from_time)} -{" "}
+                    {formatTripTime(trip.to_time)}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Platform: </Text>
+                    {trip?.platform === 2 ? "Web" : "Mobile"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Remark: </Text>
+                    {trip.remark || "No Remark"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>From: </Text>
+                    {trip.from_address}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>To: </Text>
+                    {trip.to_address}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  const getTotalMileage = () => {
+    return addedTrips.reduce(
+      (sum, trip) => sum + (parseFloat(trip.mileage) || 0),
+      0,
+    );
+  };
+
+  /* const calculateCost = () => {
+    const travelCost = getTotalMileage();
+    const parking = parseFloat(formParking) || 0;
+    //const toll = getTotalToll();
+    const toll = parseFloat(formToll);
+    const expense = parseFloat(formOtherExpense) || 0;
+    return (travelCost + parking + toll + expense).toFixed(2);
+  }; */
 
   const handleTripSubmit = async (tripDays: any[]) => {
     console.log("submitting trip");
@@ -1187,6 +2297,10 @@ export default function OutstationExpenseForm() {
           date: day.date,
           country: day.country,
           location: day.location,
+          mileage: parseFloat(day.mileage) || 0,
+          trip_ids: day.trip_ids || [],
+          toll: parseFloat(day.toll) || 0,
+          toll_remark: day.toll_remark,
           airfare: parseFloat(day.airfare) || 0,
           airfare_remark: day.airfare_remark,
           parking: parseFloat(day.parking) || 0,
@@ -1315,6 +2429,9 @@ export default function OutstationExpenseForm() {
   const resetNextDay = () => {
     setFormAirfare("0.00");
     setFormAirfareRemark("");
+    setAddedTrips([]);
+    setFormToll("0.00");
+    setFormTollRemark("");
     setFormParking("0.00");
     setFormParkingRemark("");
     setFormTransport("0.00");
@@ -1340,7 +2457,7 @@ export default function OutstationExpenseForm() {
     setFormArrivalTime(null);
     setFormDepartureTime(null);
     setFormCustomers([
-      { name: "", company: "", email: "", number: "", time: "" },
+      { name: "", company: "", email: "", number: "", time: "", address: "" },
     ]);
   };
 
@@ -1370,6 +2487,20 @@ export default function OutstationExpenseForm() {
     console.log("resetting all days");
   };
 
+  const resetMileageTripForm = () => {
+    setFromAddress("");
+    setToAddress("");
+    setFormRemark("");
+    setFormTripFromTime(null);
+    setFormTripToTime(null);
+    setFormFromHome(false);
+    setFormGoingHome(false);
+    setOriginCoord(null);
+    setDestCoord(null);
+    setSelectedFromIndex(0);
+    setSelectedGoingIndex(0);
+  };
+
   const addPlaceRow = () => {
     setFormRequestPlaces([...formRequestPlaces, { country: "", location: "" }]);
   };
@@ -1395,7 +2526,7 @@ export default function OutstationExpenseForm() {
   const addCustomerRow = () => {
     setFormCustomers([
       ...formCustomers,
-      { name: "", company: "", email: "", number: "", time: "" },
+      { name: "", company: "", email: "", number: "", time: "", address: "" },
     ]);
   };
 
@@ -1404,7 +2535,7 @@ export default function OutstationExpenseForm() {
     if (formCustomers.length === 1) {
       // Keep at least one row, just reset it
       setFormCustomers([
-        { name: "", company: "", email: "", number: "", time: "" },
+        { name: "", company: "", email: "", number: "", time: "", address: "" },
       ]);
     } else {
       setFormCustomers(formCustomers.filter((_, i) => i !== index));
@@ -1722,7 +2853,7 @@ export default function OutstationExpenseForm() {
               setShowTripModal(true);
             }}
           >
-            <Text style={styles.buttonText}>Select Trip</Text>
+            <Text style={styles.buttonText}>Select Outstation Trip</Text>
           </TouchableOpacity>
         </View>
         {renderRequestsModal()}
@@ -1761,12 +2892,95 @@ export default function OutstationExpenseForm() {
           </TouchableOpacity>
           {renderPlaceModal()}
         </View>
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <Text style={[styles.fieldLabel]}>Mileage:</Text>
+          <Text style={styles.fieldValue}>
+            RM {getTotalMileage().toFixed(2)}
+          </Text>
+
+          <View style={[styles.dropdownInput, { marginLeft: 20 }]}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowMileageModal(true);
+
+                console.log(addedTrips);
+              }}
+            >
+              <Text style={styles.buttonText}>
+                {selectedTripId
+                  ? (() => {
+                      const selected = tripsForSelectedDate.find(
+                        (t) => t.id === selectedTripId,
+                      );
+                      return selected
+                        ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
+                        : "Select Trips";
+                    })()
+                  : tripsForSelectedDate.length > 0
+                    ? "Select Trips"
+                    : "No Trips"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {renderMileageModal()}
+
+          <TouchableOpacity
+            onPress={() => setShowAddTripModal(true)}
+            style={[styles.dropdownInput, { marginLeft: 10 }]}
+          >
+            <Text style={styles.buttonText}>Add Trip</Text>
+          </TouchableOpacity>
+          {renderAddTripModal()}
+        </View>
+
+        {addedTrips.length > 0 && (
+          <View style={styles.addedTripsContainer}>
+            <Text style={styles.subsectionTitle}>Selected Trips:</Text>
+            {addedTrips.map((trip) => (
+              <View key={trip.id} style={styles.addedTripItem}>
+                <View style={styles.addedTripDetails}>
+                  <Text style={styles.timeText}>
+                    {formatTripTime(trip.from_time)} -{" "}
+                    {formatTripTime(trip.to_time)}
+                  </Text>
+                  {/* <Text style={styles.tripRemark}>
+                                {trip.id || "No Remark"} (
+                                {parseFloat(trip.distance || 0).toFixed(2)} km)
+                              </Text> */}
+                  <Text style={styles.tripRemark}>
+                    {trip.remark || "No Remark"} (
+                    {parseFloat(trip.distance || 0).toFixed(2)} km)
+                  </Text>
+                  <Text style={styles.tripAddress} numberOfLines={1}>
+                    {trip.from_address} → {trip.to_address}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleRemoveTrip(trip.id)}
+                  style={styles.removeButton}
+                >
+                  <Text style={styles.removeButtonText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <View style={styles.totalSummary}>
+              <Text style={styles.summaryText}>
+                Total Distance: {getDistanceValue().toFixed(2)} km
+              </Text>
+              <Text style={styles.summaryText}>
+                Total Mileage: RM {calculateMileage()}
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
-          <Text style={[styles.fieldLabel]}>Airfare:</Text>
+          <Text style={[styles.fieldLabel]}>Toll:</Text>
           <TextInput
-            value={formAirfare}
-            onChangeText={setFormAirfare}
+            value={formToll}
+            onChangeText={setFormToll}
             keyboardType="decimal-pad"
             style={styles.webTextInput}
             editable={!isSaving}
@@ -1774,8 +2988,8 @@ export default function OutstationExpenseForm() {
           <Text style={[styles.fieldLabel]}>Remark:</Text>
           <TextInput
             placeholder="Remark"
-            value={formAirfareRemark}
-            onChangeText={setFormAirfareRemark}
+            value={formTollRemark}
+            onChangeText={setFormTollRemark}
             style={styles.webTextInput}
             editable={!isSaving}
           />
@@ -1795,6 +3009,25 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formParkingRemark}
             onChangeText={setFormParkingRemark}
+            style={styles.webTextInput}
+            editable={!isSaving}
+          />
+        </View>
+
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <Text style={[styles.fieldLabel]}>Airfare:</Text>
+          <TextInput
+            value={formAirfare}
+            onChangeText={setFormAirfare}
+            keyboardType="decimal-pad"
+            style={styles.webTextInput}
+            editable={!isSaving}
+          />
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
+          <TextInput
+            placeholder="Remark"
+            value={formAirfareRemark}
+            onChangeText={setFormAirfareRemark}
             style={styles.webTextInput}
             editable={!isSaving}
           />
@@ -2091,7 +3324,6 @@ export default function OutstationExpenseForm() {
         </View>
         <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={styles.fieldLabel}>Total:</Text>
-          <Text style={styles.fieldValue}>RM {getMealCost()}</Text>
           <Text style={styles.fieldValue}>RM {getTotal()}</Text>
         </View>
         {/* --- Dynamic Customer Section --- */}
@@ -2110,13 +3342,16 @@ export default function OutstationExpenseForm() {
           {formCustomers.map((customer, index) => (
             <View
               key={index}
-              style={[styles.inputRow, { marginTop: 10, alignItems: "center" }]}
+              style={[
+                styles.inputRow,
+                { marginBottom: 10, alignItems: "center" },
+              ]}
             >
               <Text
                 style={[
                   styles.fieldLabel,
                   styles.fieldLabelMandatory,
-                  { width: 90 },
+                  { width: 70 },
                 ]}
               >
                 Company:
@@ -2127,14 +3362,14 @@ export default function OutstationExpenseForm() {
                 onChangeText={(text) =>
                   handleCustomerChange(index, "company", text)
                 }
-                style={styles.webTextInput}
+                style={[styles.webTextInput, { maxWidth: 150 }]}
                 editable={!isSaving}
               />
               <Text
                 style={[
                   styles.fieldLabel,
                   styles.fieldLabelMandatory,
-                  { width: 90 },
+                  { width: 70 },
                 ]}
               >
                 Name:
@@ -2145,7 +3380,7 @@ export default function OutstationExpenseForm() {
                 onChangeText={(text) =>
                   handleCustomerChange(index, "name", text)
                 }
-                style={styles.webTextInput}
+                style={[styles.webTextInput, { maxWidth: 150 }]}
                 editable={!isSaving}
               />
 
@@ -2153,7 +3388,7 @@ export default function OutstationExpenseForm() {
                 style={[
                   styles.fieldLabel,
                   styles.fieldLabelMandatory,
-                  { width: 90 },
+                  { width: 70 },
                 ]}
               >
                 Email:
@@ -2165,7 +3400,7 @@ export default function OutstationExpenseForm() {
                   handleCustomerChange(index, "email", text)
                 }
                 keyboardType="email-address"
-                style={styles.webTextInput}
+                style={[styles.webTextInput, { maxWidth: 150 }]}
                 editable={!isSaving}
               />
 
@@ -2173,7 +3408,7 @@ export default function OutstationExpenseForm() {
                 style={[
                   styles.fieldLabel,
                   styles.fieldLabelMandatory,
-                  { width: 90 },
+                  { width: 70 },
                 ]}
               >
                 Number:
@@ -2185,7 +3420,7 @@ export default function OutstationExpenseForm() {
                   handleCustomerChange(index, "number", text)
                 }
                 keyboardType="phone-pad"
-                style={styles.webTextInput}
+                style={[styles.webTextInput, { maxWidth: 150 }]}
                 editable={!isSaving}
               />
 
@@ -2194,7 +3429,7 @@ export default function OutstationExpenseForm() {
                   style={[
                     styles.fieldLabel,
                     styles.fieldLabelMandatory,
-                    { width: 90 },
+                    { width: 70 },
                   ]}
                 >
                   Time:
@@ -2220,6 +3455,43 @@ export default function OutstationExpenseForm() {
                   disabled={isSaving}
                 />
               </View>
+
+              {addedTrips.length !== 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
+                  >
+                    Address:
+                  </Text>
+                  <TextInput
+                    placeholder="Address"
+                    value={customer.address}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "address", text)
+                    }
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={false}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowAddressModal(true);
+                      setCustomerIndex(index);
+                      console.log(index);
+                    }}
+                    style={[
+                      styles.dropdownInput,
+                      { marginLeft: 10, paddingVertical: 10, maxWidth: 130 },
+                    ]}
+                    disabled={isSaving}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Select Address
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {renderTripAddressModal()}
 
               {/* Remove Button for this row */}
               <TouchableOpacity
@@ -3143,5 +4415,13 @@ const styles = StyleSheet.create({
   disabledPlaceItem: {
     backgroundColor: "#e0e0e0",
     opacity: 0.6,
+  },
+  submitButtonActive: {
+    backgroundColor: "transparent",
+    borderColor: "#2196F3",
+    borderWidth: 1,
+  },
+  textStyleActive: {
+    color: "#2196F3",
   },
 });

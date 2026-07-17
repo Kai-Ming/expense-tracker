@@ -27,7 +27,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db, storage } from "../firebaseConfig";
+import { db } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
 
 export default function MileageForm() {
@@ -50,7 +50,13 @@ export default function MileageForm() {
   const [formToll, setFormToll] = useState<string>("0.00");
   const [formOtherExpense, setFormOtherExpense] = useState<string>("0.00");
   const [formOtherExpenseType, setFormOtherExpenseType] = useState<string>("");
+  const [formVendor, setFormVendor] = useState<string>("");
   const [formTripReport, setFormTripReport] = useState<string>("");
+  const [formCustomers, setFormCustomers] = useState([
+    { name: "", company: "", email: "", number: "", time: "", address: "" },
+  ]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [customerIndex, setCustomerIndex] = useState<number>(0);
   const [businessCardFiles, setBusinessCardFiles] = useState<File[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -82,6 +88,7 @@ export default function MileageForm() {
   const [showTripModal, setShowTripModal] = useState(false);
   const [fromAddress, setFromAddress] = useState<string>("");
   const [toAddress, setToAddress] = useState<string>("");
+  const [formFromHome, setFormFromHome] = useState<boolean>(false);
   const [formGoingHome, setFormGoingHome] = useState<boolean>(false);
   const [formTripFromTime, setFormTripFromTime] = useState<Date | null>(null);
   const [formTripToTime, setFormTripToTime] = useState<Date | null>(null);
@@ -98,21 +105,6 @@ export default function MileageForm() {
   const [formGoingDefault, setFormGoingDefault] = useState<number>(0);
   const [selectedFromIndex, setSelectedFromIndex] = useState<number>(0);
   const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
-
-  const [showTravelModal, setShowTravelModal] = useState(false);
-  const [formAirfare, setFormAirfare] = useState<string>("0.00");
-  const [formAirportTax, setFormAirportTax] = useState<string>("0.00");
-  const [formCountry, setFormCountry] = useState<string>("");
-  const [formLocation, setFormLocation] = useState<string>("");
-  const [formTravelParking, setFormTravelParking] = useState<string>("0.00");
-  const [formTravelToll, setFormTravelToll] = useState<string>("0.00");
-  const [formTransportation, setFormTransportation] = useState<string>("0.00");
-  const [formHotel, setFormHotel] = useState<string>("0.00");
-  const [formMealAllowance, setFormMealAllowance] = useState<string>("0.00");
-  const [formTravelEntertainment, setFormTravelEntertainment] =
-    useState<string>("0.00");
-  const [formLaundry, setFormLaundry] = useState<string>("0.00");
-  const [formTravelOthers, setFormTravelOthers] = useState<string>("0.00");
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -443,6 +435,37 @@ export default function MileageForm() {
     }
   };
 
+  // Add a new empty customer row
+  const addCustomerRow = () => {
+    setFormCustomers([
+      ...formCustomers,
+      { name: "", company: "", email: "", number: "", time: "", address: "" },
+    ]);
+  };
+
+  // Remove a specific row by index
+  const removeCustomerRow = (index: number) => {
+    if (formCustomers.length === 1) {
+      // Keep at least one row, just reset it
+      setFormCustomers([
+        { name: "", company: "", email: "", number: "", time: "", address: "" },
+      ]);
+    } else {
+      setFormCustomers(formCustomers.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a specific field for a specific customer row
+  const handleCustomerChange = (
+    index: number,
+    field: string,
+    value: string,
+  ) => {
+    const updatedCustomers = [...formCustomers];
+    updatedCustomers[index][field] = value;
+    setFormCustomers(updatedCustomers);
+  };
+
   /* const getRouteImageUrl = async (origin, destination) => {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
     const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&key=${apiKey}`;
@@ -742,6 +765,7 @@ export default function MileageForm() {
     } */
 
     if (direction === 0) {
+      setFormFromHome(false);
       if (selectedFromIndex === index) {
         setSelectedFromIndex(0);
         clearAddress(0);
@@ -759,6 +783,7 @@ export default function MileageForm() {
         setFromAddress(address);
         setOriginCoord(location);
       } else if (index === 3) {
+        setFormFromHome(true);
         setSelectedFromIndex(index);
         const location = locations[1];
         let homeAddress = await getAddressFromCoords(
@@ -872,6 +897,44 @@ export default function MileageForm() {
 
           console.log(subToAddress);
         }
+      } else if (formFromHome) {
+        const distToCurrent = await getDrivingDistance(originCoord, destCoord);
+        const distToOffice = await getDrivingDistance(
+          officeCoords || { lat: 0, lng: 0 },
+          destCoord,
+        );
+        console.log(distToOffice);
+        console.log(distToCurrent);
+
+        if (distToOffice > distToCurrent) {
+          console.log(`Route Comparison: Using Current.`);
+        } else {
+          console.log(`Route Comparison: Using Office.`);
+          const distanceValue = await distToOffice;
+          if (distanceValue !== undefined) {
+            console.log("updating subdistance");
+            console.log(distanceValue);
+            console.log(distanceValue.toFixed(2));
+            subDistance = parseFloat(distanceValue.toFixed(2));
+            console.log("subdistance");
+            console.log(subDistance);
+          }
+          subToll = await fetchTollCost(
+            originCoord,
+            officeCoords || { lat: 0, lng: 0 },
+          );
+          if (officeCoords) {
+            subToAddress = await getAddressFromCoords(
+              officeCoords.lat,
+              officeCoords.lng,
+            );
+            /* if (currentLocation) {
+              finalToll = await fetchTollCost(currentLocation, officeCoords);
+            } */
+          }
+
+          console.log(subToAddress);
+        }
       }
       //const distanceData = getDrivingDistance(originCoord, destCoord);
       if (!subDistance) {
@@ -912,6 +975,7 @@ export default function MileageForm() {
         remark: formRemark.trim() || "",
         from_time: formTripFromTime,
         to_time: formTripToTime,
+        from_home: formFromHome,
         to_home: formGoingHome,
         route_image_url: routeImageUrl,
         date: formDate,
@@ -954,6 +1018,7 @@ export default function MileageForm() {
     setFormRemark("");
     setFormTripFromTime(null);
     setFormTripToTime(null);
+    setFormFromHome(false);
     setFormGoingHome(false);
     setOriginCoord(null);
     setDestCoord(null);
@@ -973,8 +1038,17 @@ export default function MileageForm() {
   const handleSubmit = async () => {
     const dist = getDistanceValue();
 
-    const otherExpenseValidation =
-      parseFloat(formOtherExpense) !== 0 && !formOtherExpenseType;
+    const otherExpenseValidation = !(
+      (parseFloat(formOtherExpense) !== 0 &&
+        formOtherExpenseType &&
+        formVendor) ||
+      (!parseFloat(formOtherExpense) && !formOtherExpenseType && !formVendor)
+    );
+
+    console.log(otherExpenseValidation);
+    console.log(parseFloat(formOtherExpense));
+    console.log(formOtherExpenseType);
+    console.log(formVendor);
 
     if (parseFloat(formOtherExpense) === 0) {
       setFormOtherExpenseType("");
@@ -983,14 +1057,24 @@ export default function MileageForm() {
     const otherExpensePurpose =
       parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
 
+    const isCustomersFormValid =
+      formCustomers.every(
+        (customer) =>
+          customer.name.trim() !== "" &&
+          customer.company.trim() !== "" &&
+          customer.email.trim() !== "" &&
+          customer.number.trim() !== "" &&
+          customer.time.trim() !== "",
+      ) &&
+      formCustomers.some(
+        (customer) => customer.address && customer.address.trim() !== "",
+      );
+
     if (
       !formPurpose.trim() ||
       !formDate ||
-      !formContactNumber.trim() ||
-      !formEmail.trim() ||
-      !formName.trim() ||
       !formTripReport ||
-      !formCompany.trim() ||
+      !isCustomersFormValid ||
       otherExpenseValidation
     ) {
       alert("Please ensure all required fields are filled.");
@@ -998,16 +1082,6 @@ export default function MileageForm() {
     }
 
     try {
-      /* let businessCardUrl = "";
-      if (businessCardFiles) {
-        const storageRef = ref(
-          storage,
-          `business-cards/${Date.now()}_${businessCardFiles.name}`,
-        );
-        const uploadResult = await uploadBytes(storageRef, businessCardFiles);
-        businessCardUrl = await getDownloadURL(uploadResult.ref);
-      } */
-
       const businessCardUrls: string[] = [];
       for (const file of businessCardFiles) {
         const storageRef = ref(
@@ -1026,10 +1100,6 @@ export default function MileageForm() {
         user_name: username,
         date: formDate,
         purpose: formPurpose,
-        company: formCompany,
-        name: formName,
-        contact_number: formContactNumber,
-        email: formEmail,
         from_time: fromTime,
         to_time: toTime,
         duration: calculateDuration(),
@@ -1041,6 +1111,8 @@ export default function MileageForm() {
         mileage: parseFloat(calculateMileage()),
         expense: parseFloat(formOtherExpense),
         expense_purpose: otherExpensePurpose,
+        vendor: formVendor,
+        customers: formCustomers,
         cost: parseFloat(calculateCost()),
         type: 1, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,
@@ -1067,9 +1139,14 @@ export default function MileageForm() {
     setFormToll("0.00");
     setFormOtherExpense("0.00");
     setFormOtherExpenseType("");
+    setFormVendor("");
     setBusinessCardFiles([]);
     setReceiptFiles([]);
     setFormEmail("");
+    setFormCustomers([
+      { name: "", company: "", email: "", number: "", time: "", address: "" },
+    ]);
+    setCustomerIndex(0);
   };
 
   const renderTripModal = () => (
@@ -1114,6 +1191,91 @@ export default function MileageForm() {
                     setSelectedTripId(trip.id);
                     setIsDropdownOpen(false);
                     handleAddTrip(trip.id);
+                  }}
+                >
+                  <Text
+                    style={[styles.timeText, isAdded && styles.disabledText]}
+                  >
+                    {formatTripTime(trip.from_time)} -{" "}
+                    {formatTripTime(trip.to_time)}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Platform: </Text>
+                    {trip?.platform === 2 ? "Web" : "Mobile"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>Remark: </Text>
+                    {trip.remark || "No Remark"}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>From: </Text>
+                    {trip.from_address}
+                  </Text>
+                  <Text
+                    style={[styles.addressText, isAdded && styles.disabledText]}
+                  >
+                    <Text style={styles.boldLabel}>To: </Text>
+                    {trip.to_address}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  const renderTripAddressModal = () => (
+    <Modal
+      visible={showAddressModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowAddressModal(false)}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowAddressModal(false)}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              Select a Trip from {formatDate(formDate)}
+            </Text>
+            <TouchableOpacity onPress={() => setShowAddressModal(false)}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList}>
+            {tripsForSelectedDate.length === 0 && (
+              <Text style={styles.noTripsText}>No trips added</Text>
+            )}
+            {addedTrips.map((trip) => {
+              //const isAdded = addedTrips.some(  (added) => added.id === trip.id);
+              const isAdded = false;
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[
+                    styles.modalTripItem,
+                    isAdded && styles.disabledTripItem,
+                  ]}
+                  onPress={() => {
+                    if (isAdded) return;
+                    setShowAddressModal(false);
+                    console.log(trip.to_address);
+                    handleCustomerChange(
+                      customerIndex,
+                      "address",
+                      trip.to_address,
+                    );
                   }}
                 >
                   <Text
@@ -1777,7 +1939,7 @@ export default function MileageForm() {
                 <option value="Site visitation">Site visitation</option>
               </select>
             </View>
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
+            {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                 Company/Site:
               </Text>
@@ -1817,7 +1979,7 @@ export default function MileageForm() {
                 placeholder="Email"
                 keyboardType="email-address"
               />
-            </View>
+            </View> */}
             <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Text style={styles.fieldLabel}>Start Trip Time:</Text>
               <Text style={styles.fieldValue}>
@@ -1872,6 +2034,201 @@ export default function MileageForm() {
                 <option value="Staff benefits">Staff benefits</option>
                 <option value="Others">Others</option>
               </select>
+
+              <Text style={[styles.fieldLabel]}>Vendor:</Text>
+              <TextInput
+                value={formVendor}
+                onChangeText={setFormVendor}
+                style={styles.webTextInput}
+                placeholder="Vendor"
+              />
+            </View>
+            <View style={[{ marginTop: 10 }]}>
+              <Text style={[styles.formLabel, { fontSize: 16 }]}>
+                Customer Details:
+              </Text>
+
+              {formCustomers.map((customer, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.inputRow,
+                    { marginBottom: 10, alignItems: "center" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.fieldLabel,
+                      styles.fieldLabelMandatory,
+                      { width: 70 },
+                    ]}
+                  >
+                    Company:
+                  </Text>
+                  <TextInput
+                    placeholder="Company"
+                    value={customer.company}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "company", text)
+                    }
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={!isSaving}
+                  />
+                  <Text
+                    style={[
+                      styles.fieldLabel,
+                      styles.fieldLabelMandatory,
+                      { width: 70 },
+                    ]}
+                  >
+                    Name:
+                  </Text>
+                  <TextInput
+                    placeholder="Name"
+                    value={customer.name}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "name", text)
+                    }
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={!isSaving}
+                  />
+
+                  <Text
+                    style={[
+                      styles.fieldLabel,
+                      styles.fieldLabelMandatory,
+                      { width: 70 },
+                    ]}
+                  >
+                    Email:
+                  </Text>
+                  <TextInput
+                    placeholder="Email"
+                    value={customer.email}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "email", text)
+                    }
+                    keyboardType="email-address"
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={!isSaving}
+                  />
+
+                  <Text
+                    style={[
+                      styles.fieldLabel,
+                      styles.fieldLabelMandatory,
+                      { width: 70 },
+                    ]}
+                  >
+                    Number:
+                  </Text>
+                  <TextInput
+                    placeholder="Number"
+                    value={customer.number}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "number", text)
+                    }
+                    keyboardType="phone-pad"
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={!isSaving}
+                  />
+
+                  <View
+                    style={[{ alignItems: "center", flexDirection: "row" }]}
+                  >
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        styles.fieldLabelMandatory,
+                        { width: 70 },
+                      ]}
+                    >
+                      Time:
+                    </Text>
+                    <input
+                      type="time"
+                      value={customer.time}
+                      onChange={(e) =>
+                        handleCustomerChange(index, "time", e.target.value)
+                      }
+                      style={{
+                        maxWidth: 150,
+                        backgroundColor: "#f9f9f9",
+                        border: "1px solid #eee",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        fontSize: "16px",
+                        color: "#333",
+                        boxSizing: "border-box",
+                        height: "40px",
+                        margin: 0,
+                      }}
+                      disabled={isSaving}
+                    />
+                  </View>
+
+                  <Text
+                    style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
+                  >
+                    Address:
+                  </Text>
+                  <TextInput
+                    placeholder="Address"
+                    value={customer.address}
+                    onChangeText={(text) =>
+                      handleCustomerChange(index, "address", text)
+                    }
+                    style={[styles.webTextInput, { maxWidth: 150 }]}
+                    editable={false}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowAddressModal(true);
+                      setCustomerIndex(index);
+                      console.log(index);
+                    }}
+                    style={[
+                      styles.dropdownInput,
+                      { marginLeft: 10, paddingVertical: 10, maxWidth: 130 },
+                    ]}
+                    disabled={isSaving}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Select Address
+                    </Text>
+                  </TouchableOpacity>
+
+                  {renderTripAddressModal()}
+
+                  {/* Remove Button for this row */}
+                  <TouchableOpacity
+                    onPress={() => removeCustomerRow(index)}
+                    style={{ marginLeft: 10, padding: 5 }}
+                    disabled={isSaving}
+                  >
+                    <Text style={{ color: "red", fontWeight: "bold" }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {/* Button to add another customer row */}
+              <TouchableOpacity
+                onPress={addCustomerRow}
+                style={{
+                  marginTop: 10,
+                  alignSelf: "flex-start",
+                  backgroundColor: "#2196F3",
+                  padding: 8,
+                  borderRadius: 4,
+                  marginBottom: 10,
+                }}
+                disabled={isSaving}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  + Add Customer
+                </Text>
+              </TouchableOpacity>
             </View>
             <View
               style={[
