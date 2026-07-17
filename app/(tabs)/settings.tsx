@@ -60,6 +60,7 @@ export default function settings() {
   const [username, setUsername] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [role, setRole] = useState<number>(1);
+  const [userHomeAddress, setUserHomeAddress] = useState<string>("");
 
   const [password, setPassword] = useState("");
 
@@ -169,7 +170,7 @@ export default function settings() {
                 homeCoord.latitude,
                 homeCoord.longitude,
               );
-              setHomeAddress(address || "");
+              setUserHomeAddress(address || "");
             } catch (error) {
               console.log("Error fetching home address");
               console.log(error);
@@ -1089,6 +1090,12 @@ export default function settings() {
       <Text style={styles.label}>
         Email:{" "}
         <Text style={styles.details}>{email || "Fetching email..."}</Text>
+      </Text>
+      <Text style={styles.label}>
+        Home Address:{" "}
+        <Text style={styles.details}>
+          {userHomeAddress || "Fetching home address..."}
+        </Text>
       </Text>
       <TouchableOpacity
         onPress={() => setUsernameModalVisible(true)}
