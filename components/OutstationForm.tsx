@@ -76,6 +76,68 @@ type Country =
 type CountryRates = Record<Grade, number>;
 type MealExpense = Record<Country, CountryRates>;
 
+interface OutstationExpense {
+  id: string;
+  user_id: string;
+  username: string;
+  user_name: string;
+  request_id: string;
+  start_date: string;
+  end_date: string;
+  travel_purposes: string[];
+  trip_title: string;
+  date: string;
+  country: string;
+  location: string;
+  airfare: number;
+  airfare_remark: string;
+  mileage: number;
+  trip_ids: string[];
+  toll: number;
+  toll_remark: string;
+  parking: number;
+  parking_remark: string;
+  transport: number;
+  transport_remark: string;
+  hotel: number;
+  hotel_remark: string;
+  own_acc: number;
+  own_acc_sharing: string;
+  own_acc_remark: string;
+  entertainment: number;
+  entertainment_remark: string;
+  laundry: number;
+  laundry_remark: string;
+  others: number;
+  others_remark: string;
+  total: number;
+  departure_time: string;
+  arrival_time: string;
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+  meal: number;
+  trip_report: string;
+  customers: any[];
+  business_card_urls: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
+
+interface ExpenseGroup {
+  request_id: string;
+  user_id: string;
+  user_name: string;
+  trip_title: string;
+  start_date: string;
+  end_date: string;
+  travel_purposes: string[];
+  data: OutstationExpense[];
+  total_amount: number;
+  type: number;
+}
+
 export default function OutstationExpenseForm() {
   const [userId, setUserId] = useState<string>("");
   const [username, setUsername] = useState<string>("");
@@ -104,6 +166,7 @@ export default function OutstationExpenseForm() {
   const [editingRequest, setEditingRequest] = useState(false);
   //const [addedPlace, setFormAddedPlace] = useState({})
 
+  const [editTripId, setEditTripId] = useState<string>("");
   const [allRequests, setAllRequest] = useState<any[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
   const [selectedTripTitle, setSelectedTripTitle] = useState<string>("");
@@ -130,7 +193,7 @@ export default function OutstationExpenseForm() {
   const [formDepartureTime, setFormDepartureTime] = useState<Date | null>(null);
   const [formArrivalTime, setFormArrivalTime] = useState<Date | null>(null);
 
-  const [formBrakfast, setFormBreakfast] = useState(false);
+  const [formBreakfast, setFormBreakfast] = useState(false);
   const [formLunch, setFormLunch] = useState(false);
   const [formDinner, setFormDinner] = useState(false);
 
@@ -199,6 +262,11 @@ export default function OutstationExpenseForm() {
   const [showTripModal, setShowTripModal] = useState(false);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditTripModal, setShowEditTripModal] = useState(false);
+
+  const [outstationExpense, setOutstationExpense] = useState<
+    OutstationExpense[]
+  >([]);
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -749,6 +817,35 @@ export default function OutstationExpenseForm() {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+
+    const q = query(
+      collection(db, "expenses"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const outstationExpenseData: OutstationExpense[] = [];
+      /* querySnapshot.forEach((doc) =>
+          expensesData.push({ id: doc.id, ...doc.data() } as Expense),
+        ); */
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.type === 3) {
+          outstationExpenseData.push({
+            id: doc.id,
+            ...data,
+          } as OutstationExpense);
+        }
+      });
+      setOutstationExpense(outstationExpenseData);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  useEffect(() => {
     if (formDepartureTime) {
       const eightAM = new Date(formDepartureTime);
       eightAM.setHours(8, 0, 0, 0);
@@ -817,7 +914,7 @@ export default function OutstationExpenseForm() {
         const data = docSnap.data();
         if (data.mileage_rate) setMileageRate(data.mileage_rate);
         if (data.mileage_rate_outstation)
-          setMileageRateOutstation(data.mileage_rate_oustation);
+          setMileageRateOutstation(data.mileage_rate_outstation);
         if (data.outstation_disance)
           setOutstationDistance(data.outstation_distance);
       }
@@ -847,6 +944,49 @@ export default function OutstationExpenseForm() {
       Required fields in <Text style={{ color: "#2196F3" }}>blue</Text>.
     </Text>
   );
+
+  const groupedExpense = (outstationExpense: OutstationExpense[]) => {
+    return outstationExpense.reduce<ExpenseGroup[]>((acc, expense) => {
+      const requestId =
+        expense.request_id || `temp_${Date.now()}_${Math.random()}`;
+      const existingGroup = acc.find((group) => group.request_id === requestId);
+
+      const tripTitle = expense.trip_title || "Untitled Trip";
+      const userId = expense.user_id || "";
+      const username = expense.user_name || expense.username || "";
+      const type = expense.type || 3;
+      const startDate = expense.start_date || "N/A";
+      const endDate = expense.end_date || "N/A";
+      const travelPurposes = expense.travel_purposes || [];
+
+      const expenseTotal =
+        typeof expense.total === "string"
+          ? parseFloat(expense.total) || 0
+          : Number(expense.total) || 0;
+
+      if (existingGroup) {
+        existingGroup.data.push(expense);
+        existingGroup.total_amount =
+          (Number(existingGroup.total_amount) || 0) + expenseTotal;
+      } else {
+        acc.push({
+          request_id: requestId,
+          user_id: userId,
+          user_name: username,
+          start_date: startDate,
+          end_date: endDate,
+          travel_purposes: travelPurposes,
+          trip_title: tripTitle,
+          data: [expense],
+          total_amount: expenseTotal,
+          type: type,
+        });
+      }
+      return acc;
+    }, []);
+  };
+
+  const groupedExpenses = groupedExpense(outstationExpense);
 
   const getDaysDifference = (startStr: string, endStr: string): number => {
     const start = new Date(startStr);
@@ -1046,7 +1186,7 @@ export default function OutstationExpenseForm() {
     let mealExpense = getMealExpense(formTripCountry, grade);
     const totalMeal = getMealExpense(formTripCountry, grade);
 
-    if (formBrakfast) {
+    if (formBreakfast) {
       mealExpense = mealExpense - totalMeal * 0.2;
     }
     if (formLunch) {
@@ -1166,7 +1306,7 @@ export default function OutstationExpenseForm() {
         total: getTotal(),
         departure_time: formDepartureTime,
         arrival_time: formArrivalTime,
-        breakfast: formBrakfast,
+        breakfast: formBreakfast,
         lunch: formLunch,
         dinner: formDinner,
         meal: getMealCost(),
@@ -1229,7 +1369,7 @@ export default function OutstationExpenseForm() {
         total: getTotal(),
         departure_time: formDepartureTime,
         arrival_time: formArrivalTime,
-        breakfast: formBrakfast,
+        breakfast: formBreakfast,
         lunch: formLunch,
         dinner: formDinner,
         trip_report: formTripReport,
@@ -2402,7 +2542,7 @@ export default function OutstationExpenseForm() {
         total: getTotal(),
         departure_time: formDepartureTime,
         arrival_time: formArrivalTime,
-        breakfast: formBrakfast,
+        breakfast: formBreakfast,
         lunch: formLunch,
         dinner: formDinner,
         trip_report: formTripReport,
@@ -2488,6 +2628,7 @@ export default function OutstationExpenseForm() {
     setFormArrivalDate("");
     setFormTripPurposes([]);
     setAllDays([]);
+    setEditTripId("");
     console.log("resetting all days");
   };
 
@@ -2557,9 +2698,262 @@ export default function OutstationExpenseForm() {
     setFormCustomers(updatedCustomers);
   };
 
+  // Helper to convert Firestore Timestamp to Date
+  const convertTimestampToDate = (timestamp: any): Date | null => {
+    if (!timestamp) return null;
+
+    // If it's a Firestore Timestamp object
+    if (timestamp.seconds !== undefined) {
+      return new Date(
+        timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000,
+      );
+    }
+
+    // If it's already a Date or can be converted
+    if (timestamp instanceof Date) return timestamp;
+
+    // If it's a string, try to parse it
+    if (typeof timestamp === "string") {
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? null : date;
+    }
+
+    return null;
+  };
+
+  const editTrip = async () => {
+    console.log("form others");
+    console.log(formOthers);
+    console.log(editTripId);
+    console.log(getTotal());
+    const isCustomersFormValid =
+      formCustomers.every(
+        (customer) =>
+          customer.name.trim() !== "" &&
+          customer.company.trim() !== "" &&
+          customer.email.trim() !== "" &&
+          customer.number.trim() !== "" &&
+          customer.time.trim() !== "",
+      ) &&
+      (addedTrips.length === 0 ||
+        formCustomers.some(
+          (customer) => customer.address && customer.address.trim() !== "",
+        ));
+
+    const timeEmpty =
+      (formTripDate === formDepartureDate && !formDepartureTime) ||
+      (formTripDate === formArrivalDate && !formArrivalTime);
+    if (
+      !selectedRequestId.trim() ||
+      !formTripReport.trim() ||
+      !formTripCountry.trim() ||
+      !formTripLocation.trim() ||
+      !isCustomersFormValid ||
+      timeEmpty
+    ) {
+      alert("Please ensure all required fields are filled.");
+      console.log("not valid");
+      console.log(selectedRequestId);
+      console.log(formTripReport);
+      console.log(isCustomersFormValid);
+      console.log(formCustomers);
+      return;
+    }
+
+    let ownAccExpense = ownAccCost;
+
+    if (formOwnAccSelect === "") {
+      ownAccExpense = 0;
+    } else if (formOwnAccSelect == "Duo") {
+      ownAccExpense = ownAccExpense / 2;
+    }
+    try {
+      const businessCardUrls: string[] = [];
+      for (const file of businessCardFiles) {
+        const storageRef = ref(
+          storage,
+          `business-cards/${userId}/${Date.now()}_${file.name}`,
+        );
+        const uploadResult = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(uploadResult.ref);
+        businessCardUrls.push(url);
+      }
+      const docRef = doc(db, "expenses", editTripId);
+      const expense = {
+        user_id: userId,
+        username: username,
+        request_id: selectedRequestId,
+        trip_title: selectedTripTitle,
+        start_date: formDepartureDate,
+        end_date: formArrivalDate,
+        travel_purposes: formTripPurposes,
+        date: formDate,
+        country: formTripCountry,
+        location: formTripLocation,
+        mileage: getTotalMileage().toFixed(2),
+        trip_ids: addedTrips.map((trip) => trip.id),
+        toll: parseFloat(formToll),
+        toll_remark: formTollRemark,
+        airfare: parseFloat(formAirfare),
+        airfare_remark: formAirfareRemark,
+        parking: parseFloat(formParking),
+        parking_remark: formParkingRemark,
+        transport: parseFloat(formTransport),
+        transport_remark: formTransportRemark,
+        hotel: parseFloat(formHotel),
+        hotel_remark: formHotelRemark,
+        own_acc: parseFloat(formOwnAcc),
+        own_acc_sharing: formOwnAccSelect,
+        own_acc_remark: formOwnAccRemark,
+        entertainment: parseFloat(formEntertainment),
+        entertainment_remark: formEntertainmentRemark,
+        laundry: parseFloat(formLaundry),
+        laundry_remark: formLaundryRemark,
+        others: parseFloat(formOthers),
+        others_remark: formOthersRemark,
+        total: parseFloat(getTotal()),
+        departure_time: formDepartureTime,
+        arrival_time: formArrivalTime,
+        breakfast: formBreakfast,
+        lunch: formLunch,
+        dinner: formDinner,
+        meal: getMealCost(),
+        trip_report: formTripReport,
+        customers: formCustomers,
+      } as any; // Type assertion
+
+      if (businessCardUrls && businessCardUrls.length > 0) {
+        expense.business_card_urls = businessCardUrls;
+      }
+
+      console.log("expense");
+      console.log(expense);
+
+      await updateDoc(docRef, expense);
+
+      resetTripForm();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save trip.");
+    }
+  };
+
   const setEditTrip = (id: string) => {
     if (!id) {
       console.log("No Trip");
+      return;
+    }
+    setEditingRequest(true);
+    setEditTripId(id.trim());
+
+    const selectedTrip = outstationExpense.find((e) => e.id === id);
+
+    if (selectedTrip) {
+      // Helper to format currency
+      // Helper to format currency - with proper type checking
+      const formatCurrency = (value: any): string => {
+        // Handle null, undefined, or non-numeric values
+        const num = typeof value === "number" ? value : parseFloat(value);
+        // Check if it's a valid number
+        if (isNaN(num) || num === undefined || num === null) {
+          return "0.00";
+        }
+        return num.toFixed(2);
+      };
+      // Helper to safely parse JSON
+      const safeParseJSON = (value) => {
+        if (!value) return [];
+        try {
+          return typeof value === "string" ? JSON.parse(value) : value;
+        } catch {
+          return [];
+        }
+      };
+
+      console.log(selectedTrip.arrival_time);
+      console.log(new Date(selectedTrip.arrival_time));
+
+      // Basic trip information
+      setFormDepartureDate(selectedTrip.start_date.trim() || "");
+      setFormArrivalDate(selectedTrip.end_date.trim() || "");
+      setFormTripDate(selectedTrip.date.trim() || "");
+      setSelectedRequestId(selectedTrip.request_id || "");
+      setSelectedTripTitle(selectedTrip.trip_title || "");
+      setFormTripCountry(selectedTrip.country || "");
+      setFormTripLocation(selectedTrip.location || "");
+      setFormTripPurposes(selectedTrip.travel_purposes || []);
+
+      // Financial fields
+      setFormAirfare(formatCurrency(selectedTrip.airfare));
+      setFormAirfareRemark(selectedTrip.airfare_remark || "");
+      setFormToll(formatCurrency(selectedTrip.toll));
+      setFormTollRemark(selectedTrip.toll_remark || "");
+      setFormParking(formatCurrency(selectedTrip.parking));
+      setFormParkingRemark(selectedTrip.parking_remark || "");
+      setFormTransport(formatCurrency(selectedTrip.transport));
+      setFormTransportRemark(selectedTrip.transport_remark || "");
+      setFormHotel(formatCurrency(selectedTrip.hotel));
+      setFormHotelRemark(selectedTrip.hotel_remark || "");
+      setFormOwnAcc(formatCurrency(selectedTrip.own_acc));
+      setFormOwnAccRemark(selectedTrip.own_acc_remark || "");
+      setFormEntertainment(formatCurrency(selectedTrip.entertainment));
+      setFormEntertainmentRemark(selectedTrip.entertainment_remark || "");
+      setFormLaundry(formatCurrency(selectedTrip.laundry));
+      setFormLaundryRemark(selectedTrip.laundry_remark || "");
+      setFormOthers(formatCurrency(selectedTrip.others));
+      setFormOthersRemark(selectedTrip.others_remark || "");
+
+      // Meal flags
+      /* setFormBreakfast(selectedTrip.breakfast || false);
+      setFormLunch(selectedTrip.lunch || false);
+      setFormDinner(selectedTrip.dinner || false); */
+
+      // Trip report
+      setFormTripReport(selectedTrip.trip_report || "");
+
+      // Business cards
+      //setBusinessCardFiles(safeParseJSON(selectedTrip.business_card_urls));
+
+      // Time fields - Convert string to Date
+      setFormArrivalTime(convertTimestampToDate(selectedTrip.arrival_time));
+      setFormDepartureTime(convertTimestampToDate(selectedTrip.departure_time));
+
+      // Customers
+      setFormCustomers(
+        selectedTrip.customers?.length > 0
+          ? selectedTrip.customers
+          : [
+              {
+                name: "",
+                company: "",
+                email: "",
+                number: "",
+                time: "",
+                address: "",
+              },
+            ],
+      );
+
+      addTripsByIds(selectedTrip.trip_ids || []);
+
+      // Days between start and end date
+      if (selectedTrip.start_date && selectedTrip.end_date) {
+        const start = new Date(selectedTrip.start_date);
+        const end = new Date(selectedTrip.end_date);
+        const days = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          days.push(new Date(d));
+        }
+        setAllDays(days);
+      } else {
+        setAllDays([]);
+      }
+    }
+  };
+
+  const setEditRequest = (id: string) => {
+    if (!id) {
+      console.log("No Request");
       return;
     }
     setEditingRequest(true);
@@ -2656,6 +3050,106 @@ export default function OutstationExpenseForm() {
     );
   };
 
+  const renderEditTripModal = () => {
+    return (
+      <Modal
+        visible={showEditTripModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEditTripModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEditTripModal(false)}
+          disabled={true}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a Trip</Text>
+              <TouchableOpacity onPress={() => setShowEditTripModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {groupedExpenses.length === 0 && (
+                <Text style={styles.noTripsText}>No trips found</Text>
+              )}
+              {groupedExpenses.map((trip) => {
+                const isAdded = false;
+
+                return (
+                  <View key={trip.request_id} style={styles.tripGroupContainer}>
+                    {/* Trip Header */}
+                    <View style={styles.tripHeader}>
+                      <Text style={styles.tripTitle}>{trip.trip_title}</Text>
+                      <Text style={styles.tripDates}>
+                        {formatDate(trip.start_date)} -{" "}
+                        {formatDate(trip.end_date)}
+                      </Text>
+                      <Text style={styles.tripPurposes}>
+                        {trip.travel_purposes?.join(", ") || ""}
+                      </Text>
+                      <Text style={[styles.timeText, { fontSize: 14 }]}>
+                        Total: RM {trip.total_amount.toFixed(2)}
+                      </Text>
+                    </View>
+
+                    {/* Loop through data array */}
+                    {trip.data.map((expense) => (
+                      <TouchableOpacity
+                        key={expense.id || Math.random().toString()}
+                        style={[
+                          styles.modalTripItem,
+                          isAdded && styles.disabledTripItem,
+                        ]}
+                        onPress={() => {
+                          console.log(expense.id);
+                          //setShowEditModal(false);
+                          setShowEditTripModal(false);
+                          setEditTrip(expense.id);
+                          //setEditRequest(trip.id);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.tripRemark,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          {formatDate(expense?.date)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.addressText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          {expense?.country}, {expense?.location}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.timeText,
+                            isAdded && styles.disabledText,
+                          ]}
+                        >
+                          RM{" "}
+                          {expense?.total
+                            ? `${parseFloat(expense.total).toFixed(2)}`
+                            : "0.00"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const renderEditModal = () => {
     return (
       <Modal
@@ -2695,7 +3189,7 @@ export default function OutstationExpenseForm() {
                       /* resetTripForm();
                       setSelectedRequestId(trip.id); */
                       setShowEditModal(false);
-                      setEditTrip(trip.id);
+                      setEditRequest(trip.id);
                       //handleSelectRequest(trip.id);
                       //handleAddTrip(trip.id);
                     }}
@@ -2846,7 +3340,34 @@ export default function OutstationExpenseForm() {
   const renderTripForm = () => {
     return (
       <View>
-        <Text style={styles.formLabel}>Submit Outstation Trip</Text>
+        <Text style={styles.formLabel}>
+          {editingRequest ? "Edit Outstation Trip" : "Submit Outstation Trip"}
+        </Text>
+
+        <View style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setShowEditTripModal(true);
+            }}
+            style={styles.button}
+            disabled={isSaving}
+          >
+            <Text style={styles.buttonText}>Edit Outstation Trip</Text>
+          </TouchableOpacity>
+          {editingRequest && (
+            <TouchableOpacity
+              onPress={() => {
+                setEditingRequest(false);
+                resetTripForm();
+              }}
+              style={styles.button}
+              disabled={isSaving}
+            >
+              <Text style={styles.buttonText}>Cancel Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {renderEditTripModal()}
         {fieldMessage}
         <View style={[styles.dropdownInput, { marginTop: 10 }]}>
           <TouchableOpacity
@@ -3243,7 +3764,7 @@ export default function OutstationExpenseForm() {
             trackColor={{ false: "#767577", true: "#81b0ff" }}
             thumbColor="#2196F3"
             ios_backgroundColor="#3e3e3e"
-            value={formBrakfast}
+            value={formBreakfast}
             onValueChange={setFormBreakfast}
             disabled={lockBreakfast}
           />
@@ -3571,33 +4092,43 @@ export default function OutstationExpenseForm() {
             </View>
           )}
         </View>
-        <View style={{ flexDirection: "row" }}>
+        {editingRequest ? (
           <TouchableOpacity
-            onPress={handlePreviousDay}
-            style={[
-              styles.button,
-              { marginRight: 10 },
-              { opacity: isFirstDay() ? 0.5 : 1 },
-              { marginBottom: 20 },
-            ]}
-            disabled={isSaving || isFirstDay()}
+            onPress={editTrip}
+            style={[styles.button, { marginRight: 10 }, { marginBottom: 20 }]}
+            disabled={isSaving}
           >
-            <Text style={styles.buttonText}>Previous Day </Text>
+            <Text style={styles.buttonText}>Submit Edit</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={{ flexDirection: "row" }}>
+            <TouchableOpacity
+              onPress={handlePreviousDay}
+              style={[
+                styles.button,
+                { marginRight: 10 },
+                { opacity: isFirstDay() ? 0.5 : 1 },
+                { marginBottom: 20 },
+              ]}
+              disabled={isSaving || isFirstDay()}
+            >
+              <Text style={styles.buttonText}>Previous Day </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleNextDay}
-            style={[
-              styles.button,
-              { opacity: selectedRequestId ? 1 : 0.5, marginBottom: 20 },
-            ]}
-            disabled={isSaving || !selectedRequestId}
-          >
-            <Text style={styles.buttonText}>
-              {isFinalDay() ? "Finish" : "Next Day"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleNextDay}
+              style={[
+                styles.button,
+                { opacity: selectedRequestId ? 1 : 0.5, marginBottom: 20 },
+              ]}
+              disabled={isSaving || !selectedRequestId}
+            >
+              <Text style={styles.buttonText}>
+                {isFinalDay() ? "Finish" : "Next Day"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* <TouchableOpacity
           onPress={handleTripSubmit}
@@ -3620,6 +4151,29 @@ export default function OutstationExpenseForm() {
         <Text style={styles.formLabel}>
           {editingRequest ? "Edit Travel Request" : "Submit Travel Request"}
         </Text>
+        <View style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setShowEditModal(true);
+            }}
+            style={styles.button}
+            disabled={isSaving}
+          >
+            <Text style={styles.buttonText}>Edit Travel Request</Text>
+          </TouchableOpacity>
+          {editingRequest && (
+            <TouchableOpacity
+              onPress={() => {
+                setEditingRequest(false);
+                resetRequestForm();
+              }}
+              style={styles.button}
+              disabled={isSaving}
+            >
+              <Text style={styles.buttonText}>Cancel Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {fieldMessage}
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -3845,30 +4399,6 @@ export default function OutstationExpenseForm() {
           />
         </View> */}
         {renderEditModal()}
-
-        <View style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}>
-          <TouchableOpacity
-            onPress={() => {
-              setShowEditModal(true);
-            }}
-            style={styles.button}
-            disabled={isSaving}
-          >
-            <Text style={styles.buttonText}>Edit Request</Text>
-          </TouchableOpacity>
-          {editingRequest && (
-            <TouchableOpacity
-              onPress={() => {
-                setEditingRequest(false);
-                resetRequestForm();
-              }}
-              style={styles.button}
-              disabled={isSaving}
-            >
-              <Text style={styles.buttonText}>Cancel Edit</Text>
-            </TouchableOpacity>
-          )}
-        </View>
 
         <TouchableOpacity
           onPress={handleRequestSubmit}
@@ -4295,6 +4825,7 @@ const styles = StyleSheet.create({
     color: "#333",
     boxSizing: "border-box",
     marginBottom: 16,
+    marginRight: 10,
   },
   disabledTripItem: {
     backgroundColor: "#e0e0e0",
@@ -4452,5 +4983,50 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  tripGroupContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    paddingVertical: 12,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+
+  // Trip Header Section
+  tripHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    marginBottom: 8,
+  },
+
+  tripTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 4,
+  },
+
+  tripDates: {
+    fontSize: 13,
+    color: "#666666",
+    marginBottom: 2,
+  },
+
+  tripPurposes: {
+    fontSize: 13,
+    color: "#666666",
+    marginBottom: 2,
+  },
+
+  tripTotal: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2E7D32",
+    marginTop: 4,
   },
 });

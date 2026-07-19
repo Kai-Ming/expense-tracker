@@ -245,6 +245,7 @@ export default function settings() {
       snapshot.forEach((doc) => {
         userData.push({ id: doc.id, ...doc.data() } as User);
       });
+      userData.sort((a, b) => a.username.localeCompare(b.username));
       setAllUsers(userData);
     });
     return () => unsubscribe();
@@ -1097,12 +1098,12 @@ export default function settings() {
           {userHomeAddress || "Fetching home address..."}
         </Text>
       </Text>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         onPress={() => setUsernameModalVisible(true)}
         style={styles.button}
       >
         <Text style={styles.buttonText}>Change Username</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -2317,6 +2318,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
+      <Text style={styles.bottomScrollText}>v1.0</Text>
     </View>
   );
 }
@@ -2517,5 +2519,14 @@ const styles = StyleSheet.create({
   tableCell: {
     fontSize: 13,
     color: "#666",
+  },
+  bottomScrollText: {
+    textAlign: "right",
+    color: "#999",
+    fontSize: 12,
+    fontStyle: "italic",
+    paddingTop: 20,
+    paddingBottom: 10,
+    paddingRight: 10,
   },
 });

@@ -29,6 +29,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { db, storage } from "../../firebaseConfig";
 
@@ -97,6 +98,7 @@ interface Trip {
   to_time?: string;
   remark: string;
   route_image_url?: string;
+  from_home: boolean;
   to_home: boolean;
   platform: number;
   created_at: any;
@@ -309,6 +311,10 @@ export default function ExpensesWebScreen() {
     "3": "Outstation",
   };
 
+  const { height, width } = useWindowDimensions();
+
+  const skipDates = true;
+
   const generalExpensePurposeMap = Object.fromEntries(
     generalExpensePurpose.map((p) => [p.id, p.value]),
   );
@@ -355,6 +361,7 @@ export default function ExpensesWebScreen() {
       snapshot.forEach((doc) => {
         userData.push({ id: doc.id, ...doc.data() } as User);
       });
+      userData.sort((a, b) => a.username.localeCompare(b.username));
       setAllUsers(userData);
     });
     return () => unsubscribe();
@@ -605,89 +612,95 @@ export default function ExpensesWebScreen() {
     setAppliedGrade(user.grade);
   };
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (appliedExpenseType == "General" || appliedExpenseType == "Outstation")
-      return false;
-    if (
-      !e.date ||
-      (!appliedStartDate &&
+  const filteredExpenses = expenses
+    .filter((e) => {
+      if (appliedExpenseType == "General" || appliedExpenseType == "Outstation")
+        return false;
+      if (
+        !e.date ||
+        (!appliedStartDate &&
+          !appliedEndDate &&
+          !usernameFilter &&
+          (expenseType != "Mileage" || !appliedExpensePurpose))
+      )
+        return true;
+      return (
+        !(appliedStartDate && e.date < appliedStartDate) &&
+        !(appliedEndDate && e.date > appliedEndDate) &&
+        !(appliedUsername && e.user_name != appliedUsername) &&
+        !(appliedExpensePurpose && e.expense_purpose != appliedExpensePurpose)
+      );
+    })
+    .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
+
+  const filteredGeneralExpenses = generalExpense
+    .filter((e) => {
+      if (appliedExpenseType == "Mileage" || appliedExpenseType == "Outstation")
+        return false;
+      if (
+        !e.date ||
+        (!appliedStartDate &&
+          !appliedEndDate &&
+          !usernameFilter &&
+          (expenseType != "General" || !appliedExpensePurpose))
+      )
+        return true;
+      return (
+        !(appliedStartDate && e.date < appliedStartDate) &&
+        !(appliedEndDate && e.date > appliedEndDate) &&
+        !(appliedUsername && e.user_name != appliedUsername) &&
+        !(appliedExpensePurpose && e.expense_type != appliedExpensePurpose)
+      );
+    })
+    .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
+
+  const filteredOutstationExpense = oustationExpense
+    .filter((e) => {
+      // Start with all items
+      let include = true;
+
+      // Exclude Mileage and General
+      if (appliedExpenseType == "Mileage" || appliedExpenseType == "General") {
+        include = false;
+      }
+
+      // Filter by request_id
+      if (appliedRequestId && e.request_id !== appliedRequestId) {
+        include = false;
+      }
+
+      // Filter by start date
+      if (appliedStartDate && e.date < appliedStartDate) {
+        include = false;
+      }
+
+      // Filter by end date
+      if (appliedEndDate && e.date > appliedEndDate) {
+        include = false;
+      }
+
+      // Filter by username
+      if (
+        appliedUsername &&
+        e.user_name !== appliedUsername &&
+        e.username !== appliedUsername
+      ) {
+        include = false;
+      }
+
+      // If no filters are applied, include all
+      if (
+        !appliedRequestId &&
+        !appliedStartDate &&
         !appliedEndDate &&
-        !usernameFilter &&
-        (expenseType != "Mileage" || !appliedExpensePurpose))
-    )
-      return true;
-    return (
-      !(appliedStartDate && e.date < appliedStartDate) &&
-      !(appliedEndDate && e.date > appliedEndDate) &&
-      !(appliedUsername && e.user_name != appliedUsername) &&
-      !(appliedExpensePurpose && e.expense_purpose != appliedExpensePurpose)
-    );
-  });
+        !appliedUsername
+      ) {
+        include = true;
+      }
 
-  const filteredGeneralExpenses = generalExpense.filter((e) => {
-    if (appliedExpenseType == "Mileage" || appliedExpenseType == "Outstation")
-      return false;
-    if (
-      !e.date ||
-      (!appliedStartDate &&
-        !appliedEndDate &&
-        !usernameFilter &&
-        (expenseType != "General" || !appliedExpensePurpose))
-    )
-      return true;
-    return (
-      !(appliedStartDate && e.date < appliedStartDate) &&
-      !(appliedEndDate && e.date > appliedEndDate) &&
-      !(appliedUsername && e.user_name != appliedUsername) &&
-      !(appliedExpensePurpose && e.expense_type != appliedExpensePurpose)
-    );
-  });
-
-  const filteredOutstationExpense = oustationExpense.filter((e) => {
-    // Start with all items
-    let include = true;
-
-    // Exclude Mileage and General
-    if (appliedExpenseType == "Mileage" || appliedExpenseType == "General") {
-      include = false;
-    }
-
-    // Filter by request_id
-    if (appliedRequestId && e.request_id !== appliedRequestId) {
-      include = false;
-    }
-
-    // Filter by start date
-    if (appliedStartDate && e.date < appliedStartDate) {
-      include = false;
-    }
-
-    // Filter by end date
-    if (appliedEndDate && e.date > appliedEndDate) {
-      include = false;
-    }
-
-    // Filter by username
-    if (
-      appliedUsername &&
-      e.user_name !== appliedUsername &&
-      e.username !== appliedUsername
-    ) {
-      include = false;
-    }
-
-    // If no filters are applied, include all
-    if (
-      !appliedRequestId &&
-      !appliedStartDate &&
-      !appliedEndDate &&
-      !appliedUsername
-    ) {
-      include = true;
-    }
-
-    return include;
-  });
+      return include;
+    })
+    .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
 
   const groupedExpense = (outstationExpense: OutstationExpense[]) => {
     return outstationExpense.reduce<ExpenseGroup[]>((acc, expense) => {
@@ -1026,6 +1039,7 @@ export default function ExpensesWebScreen() {
             const distance = trip.distance?.toFixed(2) || "0.00";
             const platform = trip.platform === 2 ? "Web" : "Mobile";
             const goingHome = trip.to_home === true ? "Yes" : "No";
+            const fromHome = trip.from_home ? "Yes" : "No";
 
             const fromTime = formatFirebaseTime(trip.from_time);
             const toTime = formatFirebaseTime(trip.to_time);
@@ -1040,7 +1054,8 @@ export default function ExpensesWebScreen() {
               </div>
               
               
-              <strong>Going Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
+              <strong>From Home: </strong>${fromHome ? `<div style="font-size: 9px; color: #888;">${fromHome}</div>` : ""}
+              <strong>To Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
               
               
             </div>
@@ -1555,10 +1570,10 @@ export default function ExpensesWebScreen() {
     // Normalize a mileage expense
     console.log("export");
 
-    /* if (!appliedStartDate || !appliedEndDate) {
+    if ((!appliedStartDate || !appliedEndDate) && !skipDates) {
       alert("Please ensure the dates are added.");
       return;
-    } */
+    }
 
     let reportUsername = username;
     let reportEssNo = essNo;
@@ -1674,6 +1689,7 @@ export default function ExpensesWebScreen() {
             const distance = trip.distance?.toFixed(2) || "0.00";
             const platform = trip.platform === 2 ? "Web" : "Mobile";
             const goingHome = trip.to_home === true ? "Yes" : "No";
+            const fromHome = trip.from_home ? "Yes" : "No";
 
             const fromTime = formatFirebaseTime(trip.from_time);
             const toTime = formatFirebaseTime(trip.to_time);
@@ -1688,7 +1704,8 @@ export default function ExpensesWebScreen() {
               </div>
               
               
-              <strong>Going Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
+              <strong>From Home: </strong>${fromHome ? `<div style="font-size: 9px; color: #888;">${fromHome}</div>` : ""}
+              <strong>To Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
               
               
             </div>
@@ -2171,10 +2188,10 @@ export default function ExpensesWebScreen() {
     // Normalize a mileage expense
     console.log("export");
 
-    /* if (!appliedStartDate || !appliedEndDate) {
+    if ((!appliedStartDate || !appliedEndDate) && !skipDates) {
       alert("Please ensure the dates are added.");
       return;
-    } */
+    }
 
     let reportUsername = username;
     let reportEssNo = essNo;
@@ -4064,7 +4081,7 @@ export default function ExpensesWebScreen() {
       <Text
         style={{
           textAlign: "center",
-          marginTop: 50,
+          marginTop: 20,
           color: "#999",
           fontSize: 16,
         }}
@@ -4603,11 +4620,15 @@ export default function ExpensesWebScreen() {
                     </Text> */}
                     <Text style={styles.tripDetail}>
                       <strong>Trip: </strong>
-                      {trip.from_address} → {trip.to_address} (
-                      {trip.distance?.toFixed(2)} km)
+                      {trip.from_address} →{"\n"}
+                      {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
                     </Text>
                     <Text style={styles.tripDetail}>
-                      <strong>Going Home: </strong>
+                      <strong>From Home: </strong>
+                      {trip.from_home ? "Yes" : "No"}
+                    </Text>
+                    <Text style={styles.tripDetail}>
+                      <strong>To Home: </strong>
                       {trip.to_home === true ? "Yes" : "No"}
                     </Text>
                   </View>
@@ -6039,11 +6060,15 @@ export default function ExpensesWebScreen() {
                     </Text> */}
                   <Text style={styles.tripDetail}>
                     <strong>Trip: </strong>
-                    {trip.from_address} → {trip.to_address} (
-                    {trip.distance?.toFixed(2)} km)
+                    {trip.from_address} →{"\n"}
+                    {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
                   </Text>
                   <Text style={styles.tripDetail}>
-                    <strong>Going Home: </strong>
+                    <strong>From Home: </strong>
+                    {trip.from_home ? "Yes" : "No"}
+                  </Text>
+                  <Text style={styles.tripDetail}>
+                    <strong>To Home: </strong>
                     {trip.to_home === true ? "Yes" : "No"}
                   </Text>
                 </View>
@@ -6669,8 +6694,19 @@ export default function ExpensesWebScreen() {
         </ScrollView>
 
         {/* RIGHT PANEL: 70% width, detail view */}
-        <ScrollView style={{ width: "70%", padding: 24 }}>
-          <View style={styles.wrapper}>
+        <ScrollView
+          style={{ width: "70%", paddingHorizontal: 24 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <View
+            style={[
+              styles.wrapper,
+              {
+                minHeight: height * 0.8, // 80% of screen height
+                minWidth: width * 0.5,
+              },
+            ]}
+          >
             <ScrollView
               horizontal={true}
               showsHorizontalScrollIndicator={true}
@@ -7285,7 +7321,7 @@ const styles = StyleSheet.create({
   },
   horizontalContent: {
     flexGrow: 1,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "flex-start",
   },
 });

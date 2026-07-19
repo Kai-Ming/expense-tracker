@@ -284,6 +284,7 @@ export default function ExpensesScreen() {
       snapshot.forEach((doc) => {
         userData.push({ id: doc.id, ...doc.data() } as User);
       });
+      userData.sort((a, b) => a.username.localeCompare(b.username));
       setAllUsers(userData);
     });
     return () => unsubscribe();
