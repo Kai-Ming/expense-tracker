@@ -2872,6 +2872,9 @@ export default function OutstationExpenseForm() {
 
       console.log(selectedTrip.arrival_time);
       console.log(new Date(selectedTrip.arrival_time));
+      console.log(selectedTrip.breakfast);
+      console.log(selectedTrip.lunch);
+      console.log(selectedTrip.dinner);
 
       // Basic trip information
       setFormDepartureDate(selectedTrip.start_date.trim() || "");
@@ -2904,9 +2907,11 @@ export default function OutstationExpenseForm() {
       setFormOthersRemark(selectedTrip.others_remark || "");
 
       // Meal flags
-      /* setFormBreakfast(selectedTrip.breakfast || false);
-      setFormLunch(selectedTrip.lunch || false);
-      setFormDinner(selectedTrip.dinner || false); */
+      setTimeout(() => {
+        setFormBreakfast(selectedTrip.breakfast || false);
+        setFormLunch(selectedTrip.lunch || false);
+        setFormDinner(selectedTrip.dinner || false);
+      }, 0);
 
       // Trip report
       setFormTripReport(selectedTrip.trip_report || "");
