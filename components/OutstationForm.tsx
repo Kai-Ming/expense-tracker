@@ -971,10 +971,10 @@ export default function OutstationExpenseForm() {
   useEffect(() => {
     const selectedDateStr = formTripDate;
     const filtered = allUserTrips.filter((trip) => {
-      if (!trip.created_at) return false;
-      const tripDate = trip.created_at.toDate
-        ? trip.created_at.toDate()
-        : new Date(trip.created_at);
+      if (!trip.date) return false;
+      const tripDate = trip.date.toDate
+        ? trip.date.toDate()
+        : new Date(trip.date);
       const tripDateStr = tripDate.toISOString().split("T")[0];
       return tripDateStr === selectedDateStr;
     });
@@ -1143,8 +1143,7 @@ export default function OutstationExpenseForm() {
       !formEndDate.trim() ||
       !isPlacesFormValid ||
       formTravelPurposes.length === 0 ||
-      !formTransportMode.trim() ||
-      !ownAccValid
+      !formTransportMode.trim()
     ) {
       alert("Please ensure all required fields are filled.");
       return;
@@ -3438,7 +3437,7 @@ export default function OutstationExpenseForm() {
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select a User</Text>
+              <Text style={styles.modalTitle}>Select a Travelmate</Text>
               <TouchableOpacity onPress={() => setShowUserModal(false)}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
@@ -3576,7 +3575,6 @@ export default function OutstationExpenseForm() {
 
                 console.log(addedTrips);
               }}
-              disabled={!(tripsForSelectedDate.length > 0)}
             >
               <Text style={styles.buttonText}>
                 {selectedTripId
@@ -4018,91 +4016,8 @@ export default function OutstationExpenseForm() {
           </Text>
 
           {formCustomers.map((customer, index) => (
-            <View
-              key={index}
-              style={[
-                styles.inputRow,
-                { marginBottom: 10, alignItems: "center" },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.fieldLabelMandatory,
-                  { width: 70 },
-                ]}
-              >
-                Company:
-              </Text>
-              <TextInput
-                placeholder="Company"
-                value={customer.company}
-                onChangeText={(text) =>
-                  handleCustomerChange(index, "company", text)
-                }
-                style={[styles.webTextInput, { maxWidth: 150 }]}
-                editable={!isSaving}
-              />
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.fieldLabelMandatory,
-                  { width: 70 },
-                ]}
-              >
-                Name:
-              </Text>
-              <TextInput
-                placeholder="Name"
-                value={customer.name}
-                onChangeText={(text) =>
-                  handleCustomerChange(index, "name", text)
-                }
-                style={[styles.webTextInput, { maxWidth: 150 }]}
-                editable={!isSaving}
-              />
-
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.fieldLabelMandatory,
-                  { width: 70 },
-                ]}
-              >
-                Email:
-              </Text>
-              <TextInput
-                placeholder="Email"
-                value={customer.email}
-                onChangeText={(text) =>
-                  handleCustomerChange(index, "email", text)
-                }
-                keyboardType="email-address"
-                style={[styles.webTextInput, { maxWidth: 150 }]}
-                editable={!isSaving}
-              />
-
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.fieldLabelMandatory,
-                  { width: 70 },
-                ]}
-              >
-                Number:
-              </Text>
-              <TextInput
-                placeholder="Number"
-                value={customer.number}
-                onChangeText={(text) =>
-                  handleCustomerChange(index, "number", text)
-                }
-                keyboardType="phone-pad"
-                style={[styles.webTextInput, { maxWidth: 150 }]}
-                editable={!isSaving}
-              />
-
-              <View style={[{ alignItems: "center", flexDirection: "row" }]}>
+            <View key={index} style={{ marginBottom: 10 }}>
+              <View style={[styles.inputRow, { alignItems: "center" }]}>
                 <Text
                   style={[
                     styles.fieldLabel,
@@ -4110,75 +4025,155 @@ export default function OutstationExpenseForm() {
                     { width: 70 },
                   ]}
                 >
-                  Time:
+                  Company:
                 </Text>
-                <input
-                  type="time"
-                  value={customer.time}
-                  onChange={(e) =>
-                    handleCustomerChange(index, "time", e.target.value)
+                <TextInput
+                  placeholder="Company"
+                  value={customer.company}
+                  onChangeText={(text) =>
+                    handleCustomerChange(index, "company", text)
                   }
-                  style={{
-                    maxWidth: 150,
-                    backgroundColor: "#f9f9f9",
-                    border: "1px solid #eee",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    fontSize: "16px",
-                    color: "#333",
-                    boxSizing: "border-box",
-                    height: "40px",
-                    margin: 0,
-                  }}
-                  disabled={isSaving}
+                  style={[styles.webTextInput, { maxWidth: 150 }]}
+                  editable={!isSaving}
+                />
+                <Text
+                  style={[
+                    styles.fieldLabel,
+                    styles.fieldLabelMandatory,
+                    { width: 70 },
+                  ]}
+                >
+                  Name:
+                </Text>
+                <TextInput
+                  placeholder="Name"
+                  value={customer.name}
+                  onChangeText={(text) =>
+                    handleCustomerChange(index, "name", text)
+                  }
+                  style={[styles.webTextInput, { maxWidth: 150 }]}
+                  editable={!isSaving}
+                />
+
+                <Text
+                  style={[
+                    styles.fieldLabel,
+                    styles.fieldLabelMandatory,
+                    { width: 70 },
+                  ]}
+                >
+                  Email:
+                </Text>
+                <TextInput
+                  placeholder="Email"
+                  value={customer.email}
+                  onChangeText={(text) =>
+                    handleCustomerChange(index, "email", text)
+                  }
+                  keyboardType="email-address"
+                  style={[styles.webTextInput, { maxWidth: 150 }]}
+                  editable={!isSaving}
+                />
+
+                <Text
+                  style={[
+                    styles.fieldLabel,
+                    styles.fieldLabelMandatory,
+                    { width: 70 },
+                  ]}
+                >
+                  Number:
+                </Text>
+                <TextInput
+                  placeholder="Number"
+                  value={customer.number}
+                  onChangeText={(text) =>
+                    handleCustomerChange(index, "number", text)
+                  }
+                  keyboardType="phone-pad"
+                  style={[styles.webTextInput, { maxWidth: 150 }]}
+                  editable={!isSaving}
                 />
               </View>
-
-              {addedTrips.length !== 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={[styles.inputRow, { alignItems: "center" }]}>
+                <View style={[{ alignItems: "center", flexDirection: "row" }]}>
                   <Text
-                    style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
-                  >
-                    Address:
-                  </Text>
-                  <TextInput
-                    placeholder="Address"
-                    value={customer.address}
-                    onChangeText={(text) =>
-                      handleCustomerChange(index, "address", text)
-                    }
-                    style={[styles.webTextInput, { maxWidth: 150 }]}
-                    editable={false}
-                  />
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowAddressModal(true);
-                      setCustomerIndex(index);
-                      console.log(index);
-                    }}
                     style={[
-                      styles.dropdownInput,
-                      { marginLeft: 10, paddingVertical: 10, maxWidth: 130 },
+                      styles.fieldLabel,
+                      styles.fieldLabelMandatory,
+                      { width: 70 },
                     ]}
-                    disabled={isSaving}
                   >
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                      Select Address
-                    </Text>
-                  </TouchableOpacity>
+                    Time:
+                  </Text>
+                  <input
+                    type="time"
+                    value={customer.time}
+                    onChange={(e) =>
+                      handleCustomerChange(index, "time", e.target.value)
+                    }
+                    style={{
+                      maxWidth: 150,
+                      backgroundColor: "#f9f9f9",
+                      border: "1px solid #eee",
+                      borderRadius: "8px",
+                      padding: "8px 12px",
+                      fontSize: "16px",
+                      color: "#333",
+                      boxSizing: "border-box",
+                      height: "40px",
+                      margin: 0,
+                    }}
+                    disabled={isSaving}
+                  />
                 </View>
-              )}
 
-              {renderTripAddressModal()}
+                {addedTrips.length !== 0 && (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text
+                      style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
+                    >
+                      Address:
+                    </Text>
+                    <TextInput
+                      placeholder="Address"
+                      value={customer.address}
+                      onChangeText={(text) =>
+                        handleCustomerChange(index, "address", text)
+                      }
+                      style={[styles.webTextInput, { maxWidth: 150 }]}
+                      editable={false}
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowAddressModal(true);
+                        setCustomerIndex(index);
+                        console.log(index);
+                      }}
+                      style={[
+                        styles.dropdownInput,
+                        { marginLeft: 10, paddingVertical: 10, maxWidth: 130 },
+                      ]}
+                      disabled={isSaving}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                        Select Address
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-              {/* Remove Button for this row */}
-              <TouchableOpacity
-                onPress={() => removeCustomerRow(index)}
-                style={{ marginLeft: 10, padding: 5 }}
-                disabled={isSaving}
-              >
-                <Text style={{ color: "red", fontWeight: "bold" }}>✕</Text>
-              </TouchableOpacity>
+                {renderTripAddressModal()}
+
+                {/* Remove Button for this row */}
+                <TouchableOpacity
+                  onPress={() => removeCustomerRow(index)}
+                  style={{ marginLeft: 10, padding: 5 }}
+                  disabled={isSaving}
+                >
+                  <Text style={{ color: "red", fontWeight: "bold" }}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
 
@@ -4352,7 +4347,7 @@ export default function OutstationExpenseForm() {
           </Text>
         </View>
 
-        <View style={[styles.inputRow, { marginTop: 10 }]}>
+        <View style={[styles.inputRow, { marginTop: 10, maxWidth: 1200 }]}>
           <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
             Travel Purpose:
           </Text>
@@ -4495,29 +4490,23 @@ export default function OutstationExpenseForm() {
             value={formRequestOwnAcc}
             onValueChange={(newValue) => setFormRequestOwnAcc(newValue)}
           />
+        </View>
 
-          {formRequestOwnAcc && (
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.fieldLabelMandatory,
-                  { marginLeft: 20 },
-                ]}
-              >
-                Room Sharing:
-              </Text>
-              <Text>{selectedUser?.username}</Text>
-              <TouchableOpacity
-                style={[styles.button, { marginLeft: 20 }]}
-                onPress={() => {
-                  setShowUserModal(true);
-                }}
-              >
-                <Text style={styles.buttonText}>Select User</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+              Room Sharing:
+            </Text>
+            <Text>{selectedUser?.username}</Text>
+            <TouchableOpacity
+              style={[styles.button, { marginLeft: 20 }]}
+              onPress={() => {
+                setShowUserModal(true);
+              }}
+            >
+              <Text style={styles.buttonText}>Select Travelmate</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         {renderSelectUserModal()}
 

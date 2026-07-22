@@ -1178,7 +1178,7 @@ export default function ExpensesWebScreen() {
               </div>
               <div class="header-title">
                 <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
-                <strong><p class="report-title">LOCAL MILEAGE</p></strong>
+                <strong><p class="report-title">TRAVEL REQUEST  </p></strong>
                 <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER RETURN FROM TRIP</p>
                 
               </div>
@@ -5966,7 +5966,7 @@ export default function ExpensesWebScreen() {
               </View>
             )}
 
-            <View style={{ marginBottom: 10 }}>
+            <View style={{ marginBottom: 10, maxWidth: 600 }}>
               <Text
                 style={{
                   fontSize: 12,
