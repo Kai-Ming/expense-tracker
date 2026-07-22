@@ -315,10 +315,13 @@ export default function OutstationExpenseForm() {
         userData.push({ id: doc.id, ...doc.data() } as User);
       });
       userData.sort((a, b) => a.username.localeCompare(b.username));
-      setAllUsers(userData);
+
+      // Remove the user with id === userId
+      const filteredUsers = userData.filter((user) => user.id !== userId);
+      setAllUsers(filteredUsers);
     });
     return () => unsubscribe();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     setAddedTrips([]);
