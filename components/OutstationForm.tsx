@@ -1113,7 +1113,7 @@ export default function OutstationExpenseForm() {
     }
     const selectedRequest = allRequests.find((r) => r.id === idToAdd);
     setFormTripDate(selectedRequest.start_date);
-    setFormTripPlaces(selectedRequest.places);
+    setFormTripPlaces(selectedRequest.places || []);
     setFormTripPurposes(selectedRequest.travel_purposes);
     setFormDepartureDate(selectedRequest.start_date);
     setFormArrivalDate(selectedRequest.end_date);
@@ -1195,7 +1195,7 @@ export default function OutstationExpenseForm() {
           room_sharing: selectedUser?.id || "",
           room_sharing_name: selectedUser?.username || "",
           advance_allowance: parseFloat(formAdvance),
-          advance_allowance_reamrk: formAdvanceRemark,
+          advance_allowance_remark: formAdvanceRemark,
           visitation_plan: formRequestVisitation,
           approval_status: 0,
           created_at: serverTimestamp(),
@@ -2682,6 +2682,9 @@ export default function OutstationExpenseForm() {
     setFormTransportMode("");
     setFormRequestOwnAcc(false);
     setSelectedUser(null);
+    setFormAdvance("0.00");
+    setFormAdvanceRemark("");
+    setFormRequestVisitation("");
   };
 
   const resetTripForm = () => {
@@ -3046,6 +3049,14 @@ export default function OutstationExpenseForm() {
     }
     setFormTransportMode(selectedRequest.transport_mode);
     setFormRequestOwnAcc(selectedRequest.transport_mode);
+
+    setFormAdvance(selectedRequest.advance_allowance);
+    setFormAdvanceRemark(selectedRequest.advance_allowance_remark);
+
+    setSelectedUser(
+      allUsers.find((user) => user.id === selectedRequest.room_sharing) || null,
+    );
+    setFormRequestVisitation(selectedRequest.visitation_plan);
 
     setEditingRequest(true);
   };
@@ -3592,10 +3603,10 @@ export default function OutstationExpenseForm() {
               styles.dropdownInput,
               {
                 marginLeft: 10,
-                opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5,
+                opacity: selectedRequestId ? 1 : 0.5,
               },
             ]}
-            disabled={!(tripsForSelectedDate.length > 0)}
+            disabled={!selectedRequestId}
           >
             <Text style={styles.buttonText}>Add Trip</Text>
           </TouchableOpacity>
