@@ -203,6 +203,7 @@ export default function ExpensesWebScreen() {
   const [expenseType, setExpenseType] = useState<string>("All");
   const [expensePurpose, setExpensePurpose] = useState<string>("");
   const [requestId, setRequestId] = useState<string>("");
+  const [printRequestId, setPrintRequestId] = useState<string>("");
 
   const [appliedStartDate, setAppliedStartDate] = useState<string>("");
   const [appliedEndDate, setAppliedEndDate] = useState<string>("");
@@ -249,6 +250,7 @@ export default function ExpensesWebScreen() {
   const [selectedExpenseType, setSelectedExpenseType] = useState<number>(1);
 
   const [showTripModal, setShowTripModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   const purposeList = [
     { label: "Application support", value: "Application support" },
@@ -954,195 +956,9 @@ export default function ExpensesWebScreen() {
     return `${day}/${month}/${year}`;
   };
 
-  const exportRequestToPdf = () => {
+  const exportRequestToPdf = (requestId: string) => {
     // Normalize a mileage expense
     console.log("export");
-    let reportUsername = username;
-    let reportEssNo = essNo;
-    let reportDepartment = department;
-    let reportGrade = grade;
-    let reportCostCenter = costCenter;
-
-    if (appliedUsername != "") {
-      reportUsername = appliedUsername;
-      reportEssNo = appliedEssNo;
-      reportDepartment = appliedDepartment;
-      reportGrade = appliedGrade;
-      reportCostCenter = appliedCostCenter;
-    }
-
-    // Convert allTrips array to a map for easy lookup
-    const tripsMap = {};
-    allTrips.forEach((trip) => {
-      tripsMap[trip.id] = trip;
-    });
-
-    const normalizeMileage = (item) => ({
-      date: item.date || "",
-      typeOfExpense: "Local Mileage",
-      purpose: item.purpose || "",
-      name: item.name || "",
-      email: item.email || "",
-      contactNumber: item.contact_number || "",
-      parking: item.parking || 0,
-      toll: item.toll || 0,
-      mileage: item.mileage || 0,
-      expense: item.expense || 0,
-      expensePurpose: item.expense_purpose || "",
-      subTotal: item.cost || 0,
-      trip_ids: item.trip_ids || [],
-    });
-
-    // Normalize a general expense
-    const normalizeGeneral = (item) => ({
-      date: item.date || "",
-      typeOfExpense: "General Expense",
-      purpose: item.purpose || "",
-      name: item.name || "",
-      email: item.email || "",
-      contactNumber: item.contact_number || "",
-      parking: 0,
-      toll: 0,
-      mileage: 0,
-      expense: parseFloat(item.amount) || 0,
-      expensePurpose: item.expense_type || "",
-      subTotal: parseFloat(item.amount) || 0,
-      trip_ids: [],
-    });
-
-    // Function to get trip by ID from the tripsMap
-    const getTripById = (tripId) => {
-      return tripsMap[tripId] || null;
-    };
-
-    // Function to format Firebase timestamp to 12-hour time format
-    const formatFirebaseTime = (timestamp) => {
-      if (!timestamp) return "N/A";
-
-      // If it's a Firebase timestamp object with seconds and nanoseconds
-      if (timestamp.seconds !== undefined) {
-        const date = new Date(timestamp.seconds * 1000);
-        return date.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-      }
-
-      // If it's a string, try to parse it
-      if (typeof timestamp === "string") {
-        const date = new Date(timestamp);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          });
-        }
-        return timestamp; // Return as is if not a valid date
-      }
-
-      // If it's a Date object
-      if (timestamp instanceof Date) {
-        return timestamp.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-      }
-
-      return "N/A";
-    };
-
-    // Function to generate trip details HTML
-    const generateTripDetails = (tripIds) => {
-      if (!tripIds || !Array.isArray(tripIds) || tripIds.length === 0) {
-        return "";
-      }
-
-      return tripIds
-        .map((tripId) => {
-          const trip = getTripById(tripId);
-
-          if (trip) {
-            const distance = trip.distance?.toFixed(2) || "0.00";
-            const platform = trip.platform === 2 ? "Web" : "Mobile";
-            const goingHome = trip.to_home === true ? "Yes" : "No";
-            const fromHome = trip.from_home ? "Yes" : "No";
-
-            const fromTime = formatFirebaseTime(trip.from_time);
-            const toTime = formatFirebaseTime(trip.to_time);
-
-            return `
-            <div style="margin-bottom: 8px; padding: 5px 0; border-bottom: 1px solid #f0f0f0;">
-              <div style="font-size: 9px; color: #888;"><strong>Platform: </strong>${platform}</div>
-              ${trip.remark ? `<div style="font-size: 9px; color: #666;"><strong>Remark: </strong>${trip.remark}</div>` : ""}
-              <div style="font-size: 9px; color: #888;"><strong>Time: </strong>${fromTime} - ${toTime}</div>
-              <div style="font-size: 10px; color: #333; margin-bottom: 2px;">
-                <strong>Trip: </strong>${trip.from_address || "N/A"} → ${trip.to_address || "N/A"} (${distance} km)
-              </div>
-              
-              
-              <strong>From Home: </strong>${fromHome ? `<div style="font-size: 9px; color: #888;">${fromHome}</div>` : ""}
-              <strong>To Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
-              
-              
-            </div>
-          `;
-          } else {
-            return `
-            <div style="font-size: 9px; color: #999; padding: 3px 0;">
-              Trip data not available (ID: ${tripId})
-            </div>
-          `;
-          }
-        })
-        .join("");
-    };
-
-    const combinedData = [
-      ...filteredExpenses.map(normalizeMileage),
-      ...filteredGeneralExpenses.map(normalizeGeneral),
-    ];
-
-    const totalParking = combinedData.reduce(
-      (sum, item) => sum + item.parking,
-      0,
-    );
-    const totalToll = combinedData.reduce((sum, item) => sum + item.toll, 0);
-    const totalMileage = combinedData.reduce(
-      (sum, item) => sum + item.mileage,
-      0,
-    );
-    const totalExpense = combinedData.reduce(
-      (sum, item) => sum + item.expense,
-      0,
-    );
-    const totalAmount = combinedData.reduce(
-      (sum, item) => sum + item.subTotal,
-      0,
-    );
-
-    const formattedParking = totalParking.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formattedToll = totalToll.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formattedMileage = totalMileage.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formattedExpense = totalExpense.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formattedTotal = totalAmount.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
 
     const selectedRequest =
       allRequests.length > 0
@@ -1150,6 +966,21 @@ export default function ExpensesWebScreen() {
           ? allRequests.find((item) => item.id == requestId) || allRequests[0]
           : allRequests[0]
         : null;
+
+    const user = allUsers.find((user) => user.id === selectedRequest.user_id);
+    let reportUsername = user?.username;
+    let reportEssNo = user?.ess_no;
+    let reportDepartment = user?.department;
+    let reportGrade = user?.grade;
+    let reportCostCenter = user?.cost_center;
+
+    if (!user) {
+      reportUsername = appliedUsername;
+      reportEssNo = appliedEssNo;
+      reportDepartment = appliedDepartment;
+      reportGrade = appliedGrade;
+      reportCostCenter = appliedCostCenter;
+    }
 
     const htmlContent = `
       <html>
@@ -1378,7 +1209,7 @@ export default function ExpensesWebScreen() {
               <tbody>
                 ${allRequests
                   .map((item) => {
-                    if (requestId == "" || requestId === item.id) {
+                    if (printRequestId == "" || printRequestId === item.id) {
                       return `
                             <tr>
                               <td>${item.trip_title}</td>
@@ -1419,7 +1250,7 @@ export default function ExpensesWebScreen() {
               <h1>Detailed Report for ${selectedRequest?.trip_title || ""}</h1>
               ${allRequests
                 .map((item) => {
-                  if (requestId == "" || requestId === item.id) {
+                  if (printRequestId == "" || printRequestId === item.id) {
                     return `
                       <div class="details-container">
                         <div class="details-row">
@@ -3447,6 +3278,128 @@ export default function ExpensesWebScreen() {
     );
   };
 
+  const renderRequestModal = () => {
+    return (
+      <Modal
+        visible={showRequestModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRequestModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRequestModal(false)}
+        >
+          <View style={styles.userModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTripTitle}>Select a Trip</Text>
+              <TouchableOpacity onPress={() => setShowRequestModal(false)}>
+                <Text style={styles.closeModal}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.tableContainer}>
+              <View style={styles.tableHeader}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Trip Title</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>User</Text>
+                </View>
+              </View>
+
+              <ScrollView style={styles.modalList}>
+                {allRequests.map((trip) => {
+                  const isAdded = false;
+
+                  return (
+                    <TouchableOpacity
+                      key={trip.request_id}
+                      style={[
+                        styles.tableRow,
+                        isAdded && styles.disabledPlaceItem,
+                      ]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        //setPrintRequestId(trip.id);
+                        setShowRequestModal(false);
+                        exportRequestToPdf(trip.id);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {trip?.trip_title}
+                        </Text>
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {trip?.user_name || "N/A"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* <ScrollView style={styles.modalList}>
+              {groupedExpenses.length === 0 && (
+                <Text style={styles.noTripsText}>No trips found</Text>
+              )}
+              {groupedExpenses.map((trip) => {
+                //const isAdded = selectedRequestId == trip.id || trip.locked;
+                const isAdded = false;
+
+                return (
+                  <TouchableOpacity
+                    key={trip.trip_title}
+                    style={[
+                      styles.modalTripItem,
+                      isAdded && styles.disabledTripItem,
+                    ]}
+                    onPress={() => {
+                      if (isAdded) return;
+                      setShowTripModal(false);
+                      //handleAddTrip(trip.id);
+                    }}
+                  >
+                    <Text
+                      style={[styles.tripTitle, isAdded && styles.disabledText]}
+                    >
+                      {trip?.trip_title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tripPurpose,
+                        isAdded && styles.disabledText,
+                      ]}
+                    >
+                      {trip?.user_name || "N/A"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView> */}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const renderHeader = () => (
     <View
       style={[
@@ -3863,7 +3816,9 @@ export default function ExpensesWebScreen() {
               {appliedExpenseType === "Outstation" && (
                 <TouchableOpacity
                   style={[styles.exportButton, { marginTop: 10 }]}
-                  onPress={exportRequestToPdf}
+                  onPress={() => {
+                    setShowRequestModal(true);
+                  }}
                 >
                   <Text style={styles.exportButtonText}>
                     Generate PDF Report (Travel Requests)
@@ -3872,6 +3827,7 @@ export default function ExpensesWebScreen() {
               )}
 
               {renderSelectUserModal()}
+              {renderRequestModal()}
             </View>
           )}
         </>
