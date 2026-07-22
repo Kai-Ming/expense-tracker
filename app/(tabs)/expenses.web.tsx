@@ -191,6 +191,8 @@ export default function ExpensesWebScreen() {
   const [oustationExpense, setOutstationExpense] = useState<
     OutstationExpense[]
   >([]);
+
+  const [allRequests, setAllRequest] = useState<any[]>([]);
   const [allTripIds, setAllTripIds] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -313,7 +315,7 @@ export default function ExpensesWebScreen() {
 
   const { height, width } = useWindowDimensions();
 
-  const skipDates = true;
+  const skipDates = false;
 
   const generalExpensePurposeMap = Object.fromEntries(
     generalExpensePurpose.map((p) => [p.id, p.value]),
@@ -366,6 +368,33 @@ export default function ExpensesWebScreen() {
     });
     return () => unsubscribe();
   }, [role]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (role === null) return;
+
+    let q;
+    if (role === 0) {
+      q = query(
+        collection(db, "travel_requests"),
+        orderBy("created_at", "desc"),
+      );
+    } else {
+      q = query(
+        collection(db, "travel_requests"),
+        where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    }
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const trips = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAllRequest(trips);
+    });
+    return () => unsubscribe();
+  }, [userId, role]);
 
   useEffect(() => {
     if (!userId) return;
@@ -925,7 +954,7 @@ export default function ExpensesWebScreen() {
     return `${day}/${month}/${year}`;
   };
 
-  const exportToPdf = () => {
+  const exportRequestToPdf = () => {
     // Normalize a mileage expense
     console.log("export");
     let reportUsername = username;
@@ -1114,6 +1143,13 @@ export default function ExpensesWebScreen() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+    const selectedRequest =
+      allRequests.length > 0
+        ? requestId
+          ? allRequests.find((item) => item.id == requestId) || allRequests[0]
+          : allRequests[0]
+        : null;
 
     const htmlContent = `
       <html>
@@ -1311,11 +1347,12 @@ export default function ExpensesWebScreen() {
               <div class="header-title">
                 <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
                 <strong><p class="report-title">LOCAL MILEAGE</p></strong>
+                <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER RETURN FROM TRIP</p>
                 
               </div>
               <div class="header-empty"></div>
             </div>
-            <h1>Expense Report from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
+            <h1>${selectedRequest?.trip_title || ""}</h1>
             <div class="employee-info-section">
             <div class="employee-info">Name: <u>${reportUsername}</u></div>
             <div class="employee-info">ESS No: <u>${reportEssNo}</u></div>
@@ -1326,50 +1363,39 @@ export default function ExpensesWebScreen() {
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Type of Expense</th>
-                  <th>Purpose</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Contact Number</th>
-                  <th>Expense Purpose</th>
-                  <th>Expense</th>
-                  <th>Parking</th>
-                  <th>Toll</th>
-                  <th>Mileage</th>
-                  <th>Sub Total</th>
+                  <th>Trip Title</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Country</th>
+                  <th>Location</th>
+                  <th>Travel Purpose</th>
+                  <th>Mode of Transport</th>
+                  <th>Own Accommodation</th>
+                  <th>Room Sharing</th>
+                  <th>Advance Allowance</th>
                 </tr>
               </thead>
               <tbody>
-                ${combinedData
-                  .map(
-                    (item) => `
-                      <tr>
-                        <td>${formatDateString(item.date)}</td>
-                        <td>${item.typeOfExpense}</td>
-                        <td>${item.purpose}</td>
-                        <td>${item.name}</td>
-                        <td>${item.email}</td>
-                        <td>${item.contactNumber}</td>
-                        <td>${item.expensePurpose}</td>
-                        <td class="amount">${item.expense.toFixed(2)}</td>
-                        <td class="amount">${item.parking.toFixed(2)}</td>
-                        <td class="amount">${item.toll.toFixed(2)}</td>
-                        <td class="amount">${item.mileage.toFixed(2)}</td>
-                        <td class="amount">${item.subTotal.toFixed(2)}</td>
-                      </tr>
-                    `,
-                  )
-                  .join("")}
-                  
-                <tr class="total-row">
-                  <td colspan="7" class="total-label">Total:</td>
-                  <td style="font-weight: bold;">${formattedExpense}</td>
-                  <td style="font-weight: bold;">${formattedParking}</td>
-                  <td style="font-weight: bold;">${formattedToll}</td>
-                  <td style="font-weight: bold;">${formattedMileage}</td>
-                  <td style="font-weight: bold;">${formattedTotal}</td>
-                </tr>
+                ${allRequests
+                  .map((item) => {
+                    if (requestId == "" || requestId === item.id) {
+                      return `
+                            <tr>
+                              <td>${item.trip_title}</td>
+                              <td>${formatDateString(item.start_date)}</td>
+                              <td>${formatDateString(item.end_date)}</td>
+                              <td>${item.country || item.places[0].country || "N/A"}</td>
+                              <td>${item.location || item.places[0].location || "N/A"}</td>
+                              <td>${(item.travel_purposes || []).join(", ")}</td>
+                              <td>${item.transport_mode || "N/A"}</td>
+                              <td>${item.own_acc ? "Yes" : "No"}</td>
+                              <td>${item.room_sharing_name || "N/A"}</td>
+                              <td class="amount">${(item.advance_allowance || 0).toFixed(2)}</td>
+                            </tr>
+                          `;
+                    }
+                  })
+                  .join("")}  
               </tbody>
               
             </table>
@@ -1388,157 +1414,73 @@ export default function ExpensesWebScreen() {
                 <p class="signature-date">Date: </p>
               </div>
             </div>
+            
             <div>
-              <h1>Detailed Reports from ${formatDateString(startDate)} - ${formatDateString(endDate)} </h1>
-              ${filteredExpenses
-                .map(
-                  (item) => `
-                  <div class="details-container">
-                    <div class="details-row">
-                      <div class="details">
-                        <div class="details-label">Username: </div>
-                        <div class="details-value">${item.user_name}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Date: </div>
-                        <div class="details-value">${item.date}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Type: </div>
-                        <div class="details-value">Mileage Expense</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Customer Name: </div>
-                        <div class="details-value">${item.name}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Company: </div>
-                        <div class="details-value">${item.company}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Contact Number: </div>
-                        <div class="details-value">${item.contact_number}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Email: </div>
-                        <div class="details-value">${item.email}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Purpose: </div>
-                        <div class="details-value">${item.purpose}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Distance: </div>
-                        <div class="details-value">${item.distance} km</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Time: </div>
-                        <div class="details-value">${item.from_time} - ${item.to_time} (${item.duration})</div>
-                      </div>
-                    </div>
-
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Parking: </div>
-                        <div class="details-value">RM ${item.parking}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Toll: </div>
-                        <div class="details-value">RM ${item.toll}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Mileage: </div>
-                        <div class="details-value">RM ${item.mileage}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Expense: </div>
-                        <div class="details-value">RM ${item.expense}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Expense Purpose: </div>
-                        <div class="details-value">${item.expense_purpose || "N/A"}</div>
-                      </div>
-                    </div>
-
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.trip_report}</div>
-                      </div>
-                    </div>
-                    
-                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
-                      <div class="details" style="flex: 1; width: 100%;">
-                        <div class="details-label">Trip Details: </div>
-                        <div class="details-value trip-details-container">
-                          ${generateTripDetails(item.trip_ids || [])}
+              <h1>Detailed Report for ${selectedRequest?.trip_title || ""}</h1>
+              ${allRequests
+                .map((item) => {
+                  if (requestId == "" || requestId === item.id) {
+                    return `
+                      <div class="details-container">
+                        <div class="details-row">
+                          <div class="details">
+                            <div class="details-label">Username: </div>
+                            <div class="details-value">${item.user_name}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Start Date: </div>
+                            <div class="details-value">${item.start_date}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">End Date: </div>
+                            <div class="details-value">${item.end_date}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Country: </div>
+                            <div class="details-value">${item.country || item.places[0].country || "N/A"}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Location: </div>
+                            <div class="details-value">${item.location || item.places[0].location || "N/A"}</div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                `,
-                )
-                .join("")}
+                        
+                        <div class="details-row">
+                          <div class="details">
+                            <div class="details-label">Travel Purposes: </div>
+                            <div class="details-value">${(item.travel_purposes || []).join(", ")}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Transport Mode: </div>
+                            <div class="details-value">${item.start_date}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Own Accommodation: </div>
+                            <div class="details-value">${item.own_acc ? "Yes" : "No"}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Room Sharing: </div>
+                            <div class="details-value">${item.room_sharing_name || "N/A"}</div>
+                          </div>
+                          <div class="details">
+                            <div class="details-label">Advance Allowance: </div>
+                            <div class="details-value">RM ${(item.advance_allowance || 0).toFixed(2)}, ${item.advance_allowance_remark || "N/A"}</div>
+                          </div>
+                        </div>
 
-              ${filteredGeneralExpenses
-                .map(
-                  (item) => `
-                  <div class="details-container">
-                    <div class="details-row">
-                      <div class="details">
-                        <div class="details-label">Username: </div>
-                        <div class="details-value">${item.user_name}</div>
+                        <div class="details-row" style="margin-top: 10px;">
+                          <div class="details">
+                            <div class="details-label">Visitation Plan: </div>
+                            <div class="details-value">${item.visitation_plan || "N/A"}</div>
+                          </div>
+                        </div>
+
                       </div>
-                      <div class="details">
-                        <div class="details-label">Date: </div>
-                        <div class="details-value">${item.date}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Type: </div>
-                        <div class="details-value">General Expense</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Customer Name: </div>
-                        <div class="details-value">${item.name || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Company: </div>
-                        <div class="details-value">${item.company || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Contact Number: </div>
-                        <div class="details-value">${item.contact_number || "N/A"}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Email: </div>
-                        <div class="details-value">${item.email || "N/A"}</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Purpose: </div>
-                        <div class="details-value">${item.expense_type}</div>
-                      </div>
-                      <div class="details">
-                        <div class="details-label">Expense Amount: </div>
-                        <div class="details-value">RM ${item.amount}</div>
-                      </div>
-                    </div>
-                    <div class="details-row" style="margin-top: 10px;">
-                      <div class="details">
-                        <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.expense_report}</div>
-                      </div>
-                    </div>
-                  </div>
-                `,
-                )
-                .join("")}
-            </div>
+                    `;
+                  }
+                })
+                .join("")}          
+           </div>
           </div>
         </body>
       </html>
@@ -3089,6 +3031,7 @@ export default function ExpensesWebScreen() {
               <div class="header-title">
                 <p class="report-title"><strong>KUMPULAN ABEX SDN BHD</strong></p>
                 <strong><p class="report-title">OUTSTATION TRAVELLING CLAIM</p></strong>
+                <p class="report-due">DUE IN <u><strong>3 WORKING DAYS</strong></u> AFTER RETURN FROM TRIP</p>
               </div>
               <div class="header-empty"></div>
             </div>
@@ -3909,11 +3852,21 @@ export default function ExpensesWebScreen() {
               ) : (
                 <TouchableOpacity
                   style={[styles.exportButton, { opacity: 0.5 }]}
-                  onPress={exportToPdf}
                   disabled={true}
                 >
                   <Text style={styles.exportButtonText}>
                     Generate PDF Report
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {appliedExpenseType === "Outstation" && (
+                <TouchableOpacity
+                  style={[styles.exportButton, { marginTop: 10 }]}
+                  onPress={exportRequestToPdf}
+                >
+                  <Text style={styles.exportButtonText}>
+                    Generate PDF Report (Travel Requests)
                   </Text>
                 </TouchableOpacity>
               )}
@@ -6703,7 +6656,7 @@ export default function ExpensesWebScreen() {
               styles.wrapper,
               {
                 minHeight: height * 0.8, // 80% of screen height
-                minWidth: width * 0.5,
+                minWidth: "100%",
               },
             ]}
           >
@@ -6711,7 +6664,10 @@ export default function ExpensesWebScreen() {
               horizontal={true}
               showsHorizontalScrollIndicator={true}
               style={styles.horizontalScrollView}
-              contentContainerStyle={styles.horizontalContent}
+              contentContainerStyle={[
+                styles.horizontalContent,
+                { minWidth: width * 0.7 },
+              ]}
             >
               {renderExpenseDetail()}
             </ScrollView>
@@ -6749,19 +6705,6 @@ export default function ExpensesWebScreen() {
     </View>
   );
 }
-
-const filterInputStyle = {
-  backgroundColor: "rgba(255,255,255,0.1)",
-  color: "#fff",
-  borderRadius: 6,
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-  fontSize: 14,
-  borderWidth: 1,
-  borderColor: "rgba(255,255,255,0.2)",
-  height: 40, // explicit height for consistency
-  lineHeight: 20, // for text vertical centering
-};
 
 // Common style object (same as filterInput)
 const inputBase = {

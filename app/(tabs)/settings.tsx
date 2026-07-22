@@ -54,6 +54,7 @@ interface User {
     latitude: number;
     longitude: number;
   };
+  home_address: string;
 }
 
 export default function settings() {
@@ -655,6 +656,7 @@ export default function settings() {
         cost_center: formCostCenter.trim(),
         office: parseInt(formOffice),
         home_coordinates: new GeoPoint(coordinates.lat, coordinates.lng),
+        home_address: homeAddress,
         active: true,
         permission: 0,
         subordinates: [],
@@ -695,6 +697,18 @@ export default function settings() {
     setFormActive(true);
     setFormOffice("");
     setHomeAddress("");
+  };
+
+  const getAddress = async (coords) => {
+    try {
+      const address = await getAddressFromCoords(
+        coords.latitude,
+        coords.longitude,
+      );
+      return address;
+    } catch (error) {
+      return "";
+    }
   };
 
   const handleSelectUser = async (userId: string) => {
@@ -808,6 +822,7 @@ export default function settings() {
         office: parseInt(formOffice.trim()),
         active: formActive,
         home_coordinates: new GeoPoint(coordinates.lat, coordinates.lng),
+        home_address: homeAddress,
       });
 
       Alert.alert("Success", "User updated successfully!");
@@ -938,6 +953,9 @@ export default function settings() {
                 <View style={{ flex: 1, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Role</Text>
                 </View>
+                <View style={{ flex: 2, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Home Address</Text>
+                </View>
                 <View style={{ flex: 1, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Active</Text>
                 </View>
@@ -1052,6 +1070,18 @@ export default function settings() {
                           numberOfLines={1}
                         >
                           {roleMap[user.role] || "N/A"}
+                        </Text>
+                      </View>
+
+                      <View style={{ flex: 2 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.home_address}
                         </Text>
                       </View>
 
@@ -1994,25 +2024,6 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
-
-                      <Text style={styles.modalSubtitle}>Home Address:</Text>
-                      <View
-                        style={{
-                          width: "100%",
-                          position: "relative",
-                          zIndex: 100,
-                          elevation: 10,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <PlacesInput
-                          value={homeAddress}
-                          placeholder="Search home..."
-                          onPlaceSelected={(address, location) => {
-                            setHomeAddress(address);
-                          }}
-                        />
-                      </View>
                       {/* <View style={styles.modalRow}>
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Role:</Text>
@@ -2031,6 +2042,25 @@ export default function settings() {
                           </select>
                         </View>
                       </View> */}
+                    </View>
+
+                    <Text style={styles.modalSubtitle}>Home Address:</Text>
+                    <View
+                      style={{
+                        width: "100%",
+                        position: "relative",
+                        zIndex: 100,
+                        elevation: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <PlacesInput
+                        value={homeAddress}
+                        placeholder="Search home..."
+                        onPlaceSelected={(address, location) => {
+                          setHomeAddress(address);
+                        }}
+                      />
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -2318,7 +2348,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.1</Text>
+      <Text style={styles.bottomScrollText}>v1.0.2</Text>
     </View>
   );
 }
@@ -2515,10 +2545,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 13,
     color: "#333",
+    textAlign: "center",
   },
   tableCell: {
     fontSize: 13,
     color: "#666",
+    textAlign: "center",
   },
   bottomScrollText: {
     textAlign: "right",

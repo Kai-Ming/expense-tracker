@@ -26,6 +26,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { db } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
@@ -118,6 +119,9 @@ export default function MileageForm() {
       lng: 100.29405526266623,
     },
   ];
+
+  const { width: screenWidth } = useWindowDimensions();
+  const maxWidth = Math.min(screenWidth * 0.9, 1200);
 
   // Fetch all user trips
   useEffect(() => {
@@ -2275,7 +2279,7 @@ export default function MileageForm() {
                     multiline
                     style={[
                       styles.webTextInput,
-                      { minHeight: 200, width: "100%", maxWidth: "100%" },
+                      { minHeight: 200, width: "100%", maxWidth: maxWidth },
                     ]}
                     placeholder="Trip Report"
                   />
@@ -2305,28 +2309,28 @@ export default function MileageForm() {
                   </View>
                 )}
                 {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.fieldLabel}>Receipts:</Text>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setReceiptFiles(Array.from(e.target.files));
-                  }
-                }}
-                style={htmlInputStyle}
-              />
-            </View>
-            {receiptFiles.length > 0 && (
-              <View style={styles.receiptList}>
-                <Text style={styles.receiptLabel}>Selected files:</Text>
-                {receiptFiles.map((file, idx) => (
-                  <Text key={idx} style={styles.receiptFileName}>
-                    {file.name}
-                  </Text>
-                ))}
-              </View>
-            )} */}
+                  <Text style={styles.fieldLabel}>Receipts:</Text>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setReceiptFiles(Array.from(e.target.files));
+                      }
+                    }}
+                    style={htmlInputStyle}
+                  />
+                </View>
+                {receiptFiles.length > 0 && (
+                  <View style={styles.receiptList}>
+                    <Text style={styles.receiptLabel}>Selected files:</Text>
+                    {receiptFiles.map((file, idx) => (
+                      <Text key={idx} style={styles.receiptFileName}>
+                        {file.name}
+                      </Text>
+                    ))}
+                  </View>
+                )} */}
                 <TouchableOpacity
                   onPress={handleSubmit}
                   style={[styles.button, { marginBottom: 20 }]}

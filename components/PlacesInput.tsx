@@ -46,9 +46,58 @@ function PlacesInput({
     };
   }, []);
 
+  /* const fetchPredictions = async (text: string) => {
+    if (text.length < 2) {
+      setPredictions([]);
+      return;
+    }
+
+    try {
+      // Use Geocoding API directly - this finds ANY address
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&key=${GOOGLE_KEY}`,
+      );
+
+      const data = await res.json();
+      console.log(
+        "Geocoding results:",
+        data.status,
+        "found:",
+        data.results?.length || 0,
+      );
+
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        // Format geocoding results to look like autocomplete predictions
+        const formatted = data.results.map((result: any) => ({
+          placePrediction: {
+            placeId:
+              result.place_id || "geocoded_" + Date.now() + "_" + Math.random(),
+            text: { text: result.formatted_address },
+            structuredFormat: {
+              mainText: { text: result.formatted_address },
+              secondaryText: { text: "" },
+            },
+          },
+          // Store the full result for later use
+          _geocodeResult: result,
+        }));
+
+        setPredictions(formatted);
+      } else {
+        // No results found
+        setPredictions([]);
+      }
+    } catch (e) {
+      console.log("Geocoding error:", e);
+      setPredictions([]);
+    }
+  }; */
+
   const fetchPredictions = async (text: string) => {
     if (text.length < 2) return setPredictions([]);
     try {
+      console.log("🔍 Searching for:", text);
+
       const res = await fetch(
         "https://places.googleapis.com/v1/places:autocomplete",
         {
@@ -63,6 +112,7 @@ function PlacesInput({
           }),
         },
       );
+
       const data = await res.json();
       setPredictions(data.suggestions || []);
     } catch (e) {

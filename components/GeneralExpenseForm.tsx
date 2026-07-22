@@ -14,6 +14,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { db } from "../firebaseConfig";
 
@@ -46,6 +47,9 @@ export default function GeneralExpenseForm() {
     "5": "Staff benefits",
     "6": "Others",
   };
+
+  const { width: screenWidth } = useWindowDimensions();
+  const maxWidth = Math.min(screenWidth * 0.9, 1200);
 
   useEffect(() => {
     const auth = getAuth();
@@ -468,7 +472,7 @@ export default function GeneralExpenseForm() {
                     multiline
                     style={[
                       styles.webTextInput,
-                      { minHeight: 200, width: "100%", maxWidth: "100%" },
+                      { minHeight: 200, width: "100%", maxWidth: maxWidth },
                     ]}
                     placeholder="Expense Report"
                   />

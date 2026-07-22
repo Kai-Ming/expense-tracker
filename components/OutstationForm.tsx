@@ -25,6 +25,7 @@ import {
   Switch,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { db, storage } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
@@ -138,10 +139,29 @@ interface ExpenseGroup {
   type: number;
 }
 
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  ess_no: string;
+  department: string;
+  grade: string;
+  cost_center: string;
+  role: number;
+  office: number;
+  active: boolean;
+  home_coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
 export default function OutstationExpenseForm() {
   const [userId, setUserId] = useState<string>("");
   const [username, setUsername] = useState<string>("");
   const [grade, setGrade] = useState<string>("");
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formDate, setFormDate] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
@@ -154,6 +174,12 @@ export default function OutstationExpenseForm() {
     new Date().toISOString().split("T")[0],
   );
   const [formTravelPurposes, setFormTravelPurposes] = useState<string[]>([]);
+  const [formTransportMode, setFormTransportMode] = useState<string>("");
+  const [formRequestOwnAcc, setFormRequestOwnAcc] = useState(false);
+  const [formAdvance, setFormAdvance] = useState<string>("0.00");
+  const [formAdvanceRemark, setFormAdvanceRemark] = useState<string>("");
+  const [formRequestVisitation, setFormRequestVisitation] =
+    useState<string>("");
   const [otherTravelPurpose, setOtherTravelPurpose] = useState("");
   const [formRequestOthers, setFormRequestOthers] = useState<string>("");
   const [formRequestCountry, setFormRequestCountry] = useState<string>("");
@@ -263,6 +289,7 @@ export default function OutstationExpenseForm() {
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEditTripModal, setShowEditTripModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
 
   const [outstationExpense, setOutstationExpense] = useState<
     OutstationExpense[]
@@ -281,6 +308,19 @@ export default function OutstationExpenseForm() {
   ];
 
   useEffect(() => {
+    const q = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userData: User[] = [];
+      snapshot.forEach((doc) => {
+        userData.push({ id: doc.id, ...doc.data() } as User);
+      });
+      userData.sort((a, b) => a.username.localeCompare(b.username));
+      setAllUsers(userData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     setAddedTrips([]);
     setDistance("0.00");
   }, [formTripDate]);
@@ -292,6 +332,9 @@ export default function OutstationExpenseForm() {
     );
     setDistance(totalDist.toFixed(2));
   }, [addedTrips]);
+
+  const { width: screenWidth } = useWindowDimensions();
+  const maxWidth = Math.min(screenWidth * 0.9, 1200);
 
   const expenseType = {
     "1": "Meal with customer",
@@ -1090,11 +1133,15 @@ export default function OutstationExpenseForm() {
       (place) => place.country.trim() !== "" && place.location.trim() !== "",
     );
 
+    const ownAccValid = !formRequestOwnAcc || selectedUser !== null;
+
     if (
       !formStartDate.trim() ||
       !formEndDate.trim() ||
       !isPlacesFormValid ||
-      formTravelPurposes.length === 0
+      formTravelPurposes.length === 0 ||
+      !formTransportMode.trim() ||
+      !ownAccValid
     ) {
       alert("Please ensure all required fields are filled.");
       return;
@@ -1120,6 +1167,13 @@ export default function OutstationExpenseForm() {
           travel_purposes: formTravelPurposes,
           places: formRequestPlaces,
           locked: false,
+          transport_mode: formTransportMode,
+          own_acc: formRequestOwnAcc,
+          room_sharing: selectedUser?.id || "",
+          room_sharing_name: selectedUser?.username || "",
+          advance_allowance: parseFloat(formAdvance),
+          advance_allowance_remark: formAdvanceRemark,
+          visitation_plan: formRequestVisitation,
           approval_status: 0,
         });
       } else {
@@ -1133,6 +1187,13 @@ export default function OutstationExpenseForm() {
           travel_purposes: formTravelPurposes,
           places: formRequestPlaces,
           locked: false,
+          transport_mode: formTransportMode,
+          own_acc: formRequestOwnAcc,
+          room_sharing: selectedUser?.id || "",
+          room_sharing_name: selectedUser?.username || "",
+          advance_allowance: parseFloat(formAdvance),
+          advance_allowance_reamrk: formAdvanceRemark,
+          visitation_plan: formRequestVisitation,
           approval_status: 0,
           created_at: serverTimestamp(),
         });
@@ -1828,7 +1889,7 @@ export default function OutstationExpenseForm() {
       setAddedTrips((prev) => [...prev, newTrip]);
 
       // Reset the trip form and close modal
-      resetTripForm();
+      resetMileageTripForm();
       setShowAddTripModal(false);
     } catch (error) {
       console.error("Save error:", error);
@@ -2615,6 +2676,9 @@ export default function OutstationExpenseForm() {
     setFormRequestPlaces([{ country: "", location: "" }]);
     setEditingRequest(false);
     setEditRequestId("");
+    setFormTransportMode("");
+    setFormRequestOwnAcc(false);
+    setSelectedUser(null);
   };
 
   const resetTripForm = () => {
@@ -2977,6 +3041,9 @@ export default function OutstationExpenseForm() {
     if (description) {
       setOtherTravelPurpose(description);
     }
+    setFormTransportMode(selectedRequest.transport_mode);
+    setFormRequestOwnAcc(selectedRequest.transport_mode);
+
     setEditingRequest(true);
   };
 
@@ -3342,6 +3409,65 @@ export default function OutstationExpenseForm() {
     );
   };
 
+  const renderSelectUserModal = () => {
+    return (
+      <Modal
+        visible={showUserModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUserModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a User</Text>
+              <TouchableOpacity onPress={() => setShowUserModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tableContainer}>
+              {/* Table Body */}
+              <ScrollView style={styles.modalList}>
+                {allUsers.map((user) => {
+                  const isAdded = false;
+
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[styles.tableRow]}
+                      disabled={isAdded}
+                      onPress={() => {
+                        setShowUserModal(false);
+                        setSelectedUser(user);
+                      }}
+                    >
+                      {/* Username */}
+                      <View style={{ flex: 1.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {user.username}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const renderTripForm = () => {
     return (
       <View>
@@ -3459,7 +3585,14 @@ export default function OutstationExpenseForm() {
 
           <TouchableOpacity
             onPress={() => setShowAddTripModal(true)}
-            style={[styles.dropdownInput, { marginLeft: 10 }]}
+            style={[
+              styles.dropdownInput,
+              {
+                marginLeft: 10,
+                opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5,
+              },
+            ]}
+            disabled={!(tripsForSelectedDate.length > 0)}
           >
             <Text style={styles.buttonText}>Add Trip</Text>
           </TouchableOpacity>
@@ -4065,7 +4198,7 @@ export default function OutstationExpenseForm() {
             multiline
             style={[
               styles.webTextInput,
-              { minHeight: 200, width: "100%", maxWidth: "100%" },
+              { minHeight: 200, width: "100%", maxWidth: maxWidth },
             ]}
             placeholder="Trip Report"
           />
@@ -4260,6 +4393,153 @@ export default function OutstationExpenseForm() {
               onChangeText={handleOtherTextChange}
             />
           )}
+        </View>
+
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+            Mode of Transport:
+          </Text>
+
+          <TouchableOpacity
+            style={styles.radioContainer}
+            onPress={() => setFormTransportMode("Air")}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                formTransportMode === "Air" && styles.radioOuterSelected,
+              ]}
+            >
+              {formTransportMode === "Air" && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioText}>Air</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.radioContainer}
+            onPress={() => setFormTransportMode("Rail")}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                formTransportMode === "Rail" && styles.radioOuterSelected,
+              ]}
+            >
+              {formTransportMode === "Rail" && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioText}>Rail</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.radioContainer}
+            onPress={() => setFormTransportMode("Road")}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                formTransportMode === "Road" && styles.radioOuterSelected,
+              ]}
+            >
+              {formTransportMode === "Road" && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioText}>Road</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.radioContainer}
+            onPress={() => setFormTransportMode("Sea")}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                formTransportMode === "Sea" && styles.radioOuterSelected,
+              ]}
+            >
+              {formTransportMode === "Sea" && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioText}>Sea</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
+            Own Accommodation:
+          </Text>
+
+          <Switch
+            trackColor={{ false: "#767577", true: "#81b0ff" }}
+            thumbColor="#2196F3"
+            ios_backgroundColor="#3e3e3e"
+            value={formRequestOwnAcc}
+            onValueChange={(newValue) => setFormRequestOwnAcc(newValue)}
+          />
+
+          {formRequestOwnAcc && (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  styles.fieldLabelMandatory,
+                  { marginLeft: 20 },
+                ]}
+              >
+                Room Sharing:
+              </Text>
+              <Text>{selectedUser?.username}</Text>
+              <TouchableOpacity
+                style={[styles.button, { marginLeft: 20 }]}
+                onPress={() => {
+                  setShowUserModal(true);
+                }}
+              >
+                <Text style={styles.buttonText}>Select User</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        {renderSelectUserModal()}
+
+        <View style={[styles.inputRow, { marginTop: 10 }]}>
+          <Text style={[styles.fieldLabel]}>Travel Advance Allowance:</Text>
+          <TextInput
+            value={formAdvance}
+            onChangeText={setFormAdvance}
+            keyboardType="decimal-pad"
+            style={styles.webTextInput}
+            editable={!isSaving}
+          />
+          <Text style={[styles.fieldLabel]}>Remark:</Text>
+          <TextInput
+            placeholder="Remark"
+            value={formAdvanceRemark}
+            onChangeText={setFormAdvanceRemark}
+            style={styles.webTextInput}
+            editable={!isSaving}
+          />
+        </View>
+
+        <View
+          style={[styles.inputRow, { marginTop: 10, alignItems: "flex-start" }]}
+        >
+          <Text style={[styles.fieldLabel]}>Visitation Plan:</Text>
+          <TextInput
+            value={formRequestVisitation}
+            onChangeText={setFormRequestVisitation}
+            multiline
+            style={[
+              styles.webTextInput,
+              { minHeight: 200, width: "100%", maxWidth: maxWidth },
+            ]}
+            placeholder="Visitation Plan"
+          />
         </View>
 
         {/* <View style={[styles.inputRow, { marginTop: 10 }]}>
