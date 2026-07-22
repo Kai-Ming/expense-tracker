@@ -4922,7 +4922,9 @@ export default function ExpensesWebScreen() {
           >
             Vendor:
           </Text>
-          <Text style={{ fontSize: 14, color: "#444" }}>{expense.vendor}</Text>
+          <Text style={{ fontSize: 14, color: "#444" }}>
+            {expense.vendor || "N/A"}
+          </Text>
         </View>
 
         <View style={{ marginBottom: 10 }}>
@@ -5057,46 +5059,6 @@ export default function ExpensesWebScreen() {
           <Text style={{ fontSize: 20, fontWeight: "600" }}>
             Expense Details
           </Text>
-          {/* <View style={{ flexDirection: "row" }}>
-            {!isEditing &&
-              expense.approval_status === 0 &&
-              expense.user_id === userId && (
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: "#FF9800",
-                    padding: 8,
-                    borderRadius: 6,
-                    minWidth: 60,
-                    alignItems: "center",
-                  }}
-                  onPress={() => {
-                    test();
-                    //handleEditGeneral(expense)
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                    Edit
-                  </Text>
-                </TouchableOpacity>
-              )}
-            {!isEditing && (
-              <TouchableOpacity
-                style={{
-                  backgroundColor: "#F44336",
-                  padding: 8,
-                  borderRadius: 6,
-                  marginLeft: 8,
-                  minWidth: 60,
-                  alignItems: "center",
-                }}
-                onPress={() => handleDelete(expense.id)}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View> */}
         </View>
         <View
           style={{
@@ -5174,856 +5136,871 @@ export default function ExpensesWebScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", marginBottom: 10 }}>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Airfare:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.airfare).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Airfare Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.airfare_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Mileage:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.mileage).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Toll:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.toll).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Toll Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.toll_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Parking:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.parking).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Parking Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.parking_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Transport:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.transport).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Transport Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.transport_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Hotel:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.hotel).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Hotel Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.hotel_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: "row", marginBottom: 10 }}>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Own Acc:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.own_acc).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Solo/Duo:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.own_acc_sharing || "N/A"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Own Acc Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.own_acc_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Entertainment:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.entertainment).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Entertainment Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.entertainment_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Laundry:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.laundry).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Laundry Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.laundry_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Others:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {Number(expense.others).toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Others Remark:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.others_remark || "N/A"}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: "row", marginBottom: 10 }}>
-          {expense.departure_time && (
-            <View style={{ flexDirection: "column", marginRight: 20 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#999",
-                  fontWeight: "bold",
-                  marginBottom: 4,
-                }}
-              >
-                Departure Time:
-              </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {formatFirebaseTime(expense.departure_time)}
-              </Text>
-            </View>
-          )}
-
-          {expense.arrival_time && (
-            <View style={{ flexDirection: "column", marginRight: 20 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#999",
-                  fontWeight: "bold",
-                  marginBottom: 4,
-                }}
-              >
-                Arrival Time:
-              </Text>
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {formatFirebaseTime(expense.arrival_time)}
-              </Text>
-            </View>
-          )}
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Breakfast:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.breakfast ? "No" : "Yes"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Lunch:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.lunch ? "No" : "Yes"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Dinner:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                {expense.dinner ? "No" : "Yes"}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "column", marginRight: 20 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#999",
-                fontWeight: "bold",
-                marginBottom: 4,
-              }}
-            >
-              Meal Cost:
-            </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.inlineInput}
-                value={editFormDataGeneral.name}
-                onChangeText={(text) =>
-                  setEditFormDataGeneral({ ...editFormData, name: text })
-                }
-                placeholder="Customer Name"
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: "#444" }}>
-                RM {mealCost.toFixed(2) || "0.00"}
-              </Text>
-            )}
-          </View>
-        </View>
-        <View style={{ marginBottom: 10 }}>
-          {expense.customers?.map((item, index) => (
-            <View style={{ marginBottom: 10, flexDirection: "column" }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#999",
-                  fontWeight: "bold",
-                  marginBottom: 4,
-                }}
-              >
-                Customer #{index + 1}:
-              </Text>
-              <View style={{ flexDirection: "row" }}>
-                <View style={{ flexDirection: "column", marginRight: 20 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "#999",
-                      fontWeight: "bold",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Name:
-                  </Text>
+        <ScrollView
+          horizontal={true}
+          showsHorizontalScrollIndicator={true}
+          style={styles.horizontalScrollView}
+          contentContainerStyle={[styles.horizontalContent]}
+        >
+          <View>
+            <View style={{ flexDirection: "row", marginBottom: 10 }}>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Airfare:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
                   <Text style={{ fontSize: 14, color: "#444" }}>
-                    {item.name}
+                    RM {Number(expense.airfare).toFixed(2) || "0.00"}
                   </Text>
-                </View>
-                <View style={{ flexDirection: "column", marginRight: 20 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "#999",
-                      fontWeight: "bold",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Email:
-                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Airfare Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
                   <Text style={{ fontSize: 14, color: "#444" }}>
-                    {item.email}
+                    {expense.airfare_remark || "N/A"}
                   </Text>
-                </View>
-                <View style={{ flexDirection: "column", marginRight: 20 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "#999",
-                      fontWeight: "bold",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Number:
-                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Mileage:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
                   <Text style={{ fontSize: 14, color: "#444" }}>
-                    {item.number}
+                    RM {Number(expense.mileage).toFixed(2) || "0.00"}
                   </Text>
-                </View>
-                <View style={{ flexDirection: "column", marginRight: 20 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "#999",
-                      fontWeight: "bold",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Time:
-                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Toll:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
                   <Text style={{ fontSize: 14, color: "#444" }}>
-                    {format12Hour(item.time)}
+                    RM {Number(expense.toll).toFixed(2) || "0.00"}
                   </Text>
-                </View>
-                {item.address && (
-                  <View style={{ flexDirection: "column", marginRight: 20 }}>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: "#999",
-                        fontWeight: "bold",
-                        marginBottom: 4,
-                      }}
-                    >
-                      Address:
-                    </Text>
-                    <Text style={{ fontSize: 14, color: "#444" }}>
-                      {item.address}
-                    </Text>
-                  </View>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Toll Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.toll_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Parking:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.parking).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Parking Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.parking_remark || "N/A"}
+                  </Text>
                 )}
               </View>
             </View>
-          ))}
-        </View>
 
-        {expense.trip_ids && expense.trip_ids.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.descriptionLabel}>Trips:</Text>
-            {expense.trip_ids.map((tripId) => {
-              const trip = getTripById(tripId);
-              return trip ? (
-                <View key={tripId} style={styles.tripItem}>
-                  <Text style={styles.descriptionText}>
-                    {trip.platform === 2 ? "Web" : "Mobile"}
+            <View style={{ flexDirection: "row", marginBottom: 10 }}>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Transport:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.transport).toFixed(2) || "0.00"}
                   </Text>
-                  <Text style={styles.tripDetail}>
-                    <strong>Remark: </strong>
-                    {trip.remark}
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Transport Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.transport_remark || "N/A"}
                   </Text>
-                  {/* <Text style={styles.tripDetail}>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Hotel:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.hotel).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Hotel Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.hotel_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", marginBottom: 10 }}>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Own Acc:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.own_acc).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Solo/Duo:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.own_acc_sharing || "N/A"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Own Acc Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.own_acc_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Entertainment:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.entertainment).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Entertainment Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.entertainment_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", marginBottom: 10 }}>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Laundry:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.laundry).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Laundry Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.laundry_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Others:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {Number(expense.others).toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Others Remark:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.others_remark || "N/A"}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", marginBottom: 10 }}>
+              {expense.departure_time && (
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Departure Time:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {formatFirebaseTime(expense.departure_time)}
+                  </Text>
+                </View>
+              )}
+
+              {expense.arrival_time && (
+                <View style={{ flexDirection: "column", marginRight: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Arrival Time:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {formatFirebaseTime(expense.arrival_time)}
+                  </Text>
+                </View>
+              )}
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Breakfast:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.breakfast ? "No" : "Yes"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Lunch:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.lunch ? "No" : "Yes"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Dinner:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    {expense.dinner ? "No" : "Yes"}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "column", marginRight: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#999",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Meal Cost:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.inlineInput}
+                    value={editFormDataGeneral.name}
+                    onChangeText={(text) =>
+                      setEditFormDataGeneral({ ...editFormData, name: text })
+                    }
+                    placeholder="Customer Name"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 14, color: "#444" }}>
+                    RM {mealCost.toFixed(2) || "0.00"}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={{ marginBottom: 10 }}>
+              {expense.customers?.map((item, index) => (
+                <View style={{ marginBottom: 10, flexDirection: "column" }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#999",
+                      fontWeight: "bold",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Customer #{index + 1}:
+                  </Text>
+                  <View style={{ flexDirection: "row" }}>
+                    <View style={{ flexDirection: "column", marginRight: 20 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#999",
+                          fontWeight: "bold",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Name:
+                      </Text>
+                      <Text style={{ fontSize: 14, color: "#444" }}>
+                        {item.name}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "column", marginRight: 20 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#999",
+                          fontWeight: "bold",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Email:
+                      </Text>
+                      <Text style={{ fontSize: 14, color: "#444" }}>
+                        {item.email}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "column", marginRight: 20 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#999",
+                          fontWeight: "bold",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Number:
+                      </Text>
+                      <Text style={{ fontSize: 14, color: "#444" }}>
+                        {item.number}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "column", marginRight: 20 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#999",
+                          fontWeight: "bold",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Time:
+                      </Text>
+                      <Text style={{ fontSize: 14, color: "#444" }}>
+                        {format12Hour(item.time)}
+                      </Text>
+                    </View>
+                    {item.address && (
+                      <View
+                        style={{ flexDirection: "column", marginRight: 20 }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: "#999",
+                            fontWeight: "bold",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Address:
+                        </Text>
+                        <Text style={{ fontSize: 14, color: "#444" }}>
+                          {item.address}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {expense.trip_ids && expense.trip_ids.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.descriptionLabel}>Trips:</Text>
+                {expense.trip_ids.map((tripId) => {
+                  const trip = getTripById(tripId);
+                  return trip ? (
+                    <View key={tripId} style={styles.tripItem}>
+                      <Text style={styles.descriptionText}>
+                        {trip.platform === 2 ? "Web" : "Mobile"}
+                      </Text>
+                      <Text style={styles.tripDetail}>
+                        <strong>Remark: </strong>
+                        {trip.remark}
+                      </Text>
+                      {/* <Text style={styles.tripDetail}>
                       <strong>Time: </strong>
                       {formatFirebaseTime(trip.from_time)} →{" "}
                       {formatFirebaseTime(trip.to_time)}
                     </Text> */}
-                  <Text style={styles.tripDetail}>
-                    <strong>Trip: </strong>
-                    {trip.from_address} →{"\n"}
-                    {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
-                  </Text>
-                  <Text style={styles.tripDetail}>
-                    <strong>From Home: </strong>
-                    {trip.from_home ? "Yes" : "No"}
-                  </Text>
-                  <Text style={styles.tripDetail}>
-                    <strong>To Home: </strong>
-                    {trip.to_home === true ? "Yes" : "No"}
-                  </Text>
-                </View>
-              ) : (
-                <Text key={tripId} style={styles.descriptionText}>
-                  Trip data not available {tripId}
-                </Text>
-              );
-            })}
-          </View>
-        )}
+                      <Text style={styles.tripDetail}>
+                        <strong>Trip: </strong>
+                        {trip.from_address} →{"\n"}
+                        {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
+                      </Text>
+                      <Text style={styles.tripDetail}>
+                        <strong>From Home: </strong>
+                        {trip.from_home ? "Yes" : "No"}
+                      </Text>
+                      <Text style={styles.tripDetail}>
+                        <strong>To Home: </strong>
+                        {trip.to_home === true ? "Yes" : "No"}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text key={tripId} style={styles.descriptionText}>
+                      Trip data not available {tripId}
+                    </Text>
+                  );
+                })}
+              </View>
+            )}
 
-        <View style={{ marginBottom: 10 }}>
-          <Text
-            style={{
-              fontSize: 12,
-              color: "#999",
-              fontWeight: "bold",
-              marginBottom: 4,
-            }}
-          >
-            Trip Report:
-          </Text>
-          {isEditing ? (
-            <TextInput
-              style={[
-                styles.inlineInput,
-                { minHeight: 200, width: "100%", maxWidth: "100%" },
-              ]}
-              value={editFormDataGeneral.expense_report}
-              multiline
-              onChangeText={(text) =>
-                setEditFormDataGeneral({
-                  ...editFormData,
-                  expense_report: text,
-                })
-              }
-              placeholder="Expense Report"
-            />
-          ) : (
-            <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.trip_report || "N/A"}
-            </Text>
-          )}
-        </View>
+            <View style={{ marginBottom: 10 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  fontWeight: "bold",
+                  marginBottom: 4,
+                }}
+              >
+                Trip Report:
+              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={[
+                    styles.inlineInput,
+                    { minHeight: 200, width: "100%", maxWidth: "100%" },
+                  ]}
+                  value={editFormDataGeneral.expense_report}
+                  multiline
+                  onChangeText={(text) =>
+                    setEditFormDataGeneral({
+                      ...editFormData,
+                      expense_report: text,
+                    })
+                  }
+                  placeholder="Expense Report"
+                />
+              ) : (
+                <Text style={{ fontSize: 14, color: "#444" }}>
+                  {expense.trip_report || "N/A"}
+                </Text>
+              )}
+            </View>
+          </View>
+        </ScrollView>
 
         {isEditing && (
           <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
@@ -6608,11 +6585,12 @@ export default function ExpensesWebScreen() {
           style={{ width: "70%", paddingHorizontal: 24 }}
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <View
+          {renderExpenseDetail()}
+          {/* <View
             style={[
               styles.wrapper,
               {
-                minHeight: height * 0.8, // 80% of screen height
+                minHeight: height * 0.8,
                 minWidth: "100%",
               },
             ]}
@@ -6628,7 +6606,7 @@ export default function ExpensesWebScreen() {
             >
               {renderExpenseDetail()}
             </ScrollView>
-          </View>
+          </View> */}
         </ScrollView>
       </View>
 

@@ -611,14 +611,15 @@ export default function settings() {
       formDepartment.trim() === "" ||
       formGrade.trim() === "" ||
       formCostCenter.trim() === "" ||
-      formOffice.trim() === ""
+      formOffice.trim() === "" ||
+      homeAddress.trim() === ""
     ) {
-      Alert.alert("Signup Error", "Please fill in all fields.");
+      alert("Please fill in all fields.");
       return;
     }
 
     if (formPassword !== formConfirmPassword) {
-      Alert.alert("Signup Error", "Passwords do not match.");
+      alert("Passwords do not match.");
       return;
     }
 
@@ -632,8 +633,7 @@ export default function settings() {
       ); */
       const coordinates = await getCoordinatesFromAddress(homeAddress);
       if (!coordinates) {
-        Alert.alert(
-          "Error",
+        alert(
           "Could not find coordinates for the home address. Please check the address and try again.",
         );
         setIsSaving(false);
@@ -677,9 +677,8 @@ export default function settings() {
           "Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.";
       }
 
-      Alert.alert("Signup Failed", errorMessage);
+      alert(errorMessage);
     } finally {
-      clearUserForm();
       setIsSaving(false);
     }
   };
@@ -2348,7 +2347,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.2.2</Text>
+      <Text style={styles.bottomScrollText}>v1.0.2.3</Text>
     </View>
   );
 }
