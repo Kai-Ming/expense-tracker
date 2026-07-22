@@ -959,6 +959,7 @@ export default function ExpensesWebScreen() {
   const exportRequestToPdf = (requestId: string) => {
     // Normalize a mileage expense
     console.log("export");
+    console.log(requestId);
 
     const selectedRequest =
       allRequests.length > 0
@@ -1209,7 +1210,7 @@ export default function ExpensesWebScreen() {
               <tbody>
                 ${allRequests
                   .map((item) => {
-                    if (printRequestId == "" || printRequestId === item.id) {
+                    if (requestId == "" || requestId === item.id) {
                       return `
                             <tr>
                               <td>${item.trip_title}</td>
@@ -1250,7 +1251,7 @@ export default function ExpensesWebScreen() {
               <h1>Detailed Report for ${selectedRequest?.trip_title || ""}</h1>
               ${allRequests
                 .map((item) => {
-                  if (printRequestId == "" || printRequestId === item.id) {
+                  if (requestId == "" || requestId === item.id) {
                     return `
                       <div class="details-container">
                         <div class="details-row">
