@@ -199,7 +199,7 @@ export default function ExpensesWebScreen() {
   const [role, setRole] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [usernameFilter, setUsenameFilter] = useState<string>("");
+  const [usernameFilter, setUsernameFilter] = useState<string>("");
   const [expenseType, setExpenseType] = useState<string>("All");
   const [expensePurpose, setExpensePurpose] = useState<string>("");
   const [requestId, setRequestId] = useState<string>("");
@@ -3186,52 +3186,45 @@ export default function ExpensesWebScreen() {
               </View>
 
               <ScrollView style={styles.modalList}>
-                {groupedExpense(oustationExpense).map((trip) => {
-                  /* const isAdded =
+                {groupedExpense(oustationExpense)
+                  .filter((trip) => {
+                    if (!usernameFilter) return true;
+                    return (
+                      trip.user_name?.toLowerCase() ===
+                      usernameFilter.toLowerCase()
+                    );
+                  })
+                  .map((trip) => {
+                    /* const isAdded =
                                 formTripCountry === place.country &&
                                 formTripLocation === place.location; */
 
-                  const isAdded = false;
+                    const isAdded = false;
 
-                  return (
-                    <TouchableOpacity
-                      key={trip.request_id}
-                      style={[
-                        styles.tableRow,
-                        isAdded && styles.disabledPlaceItem,
-                      ]}
-                      disabled={isAdded}
-                      onPress={() => {
-                        setRequestId(trip.request_id);
-                        setShowTripModal(false);
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.tableCell,
-                            isAdded && styles.disabledText,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {trip?.trip_title}
-                        </Text>
-                      </View>
+                    return (
+                      <TouchableOpacity
+                        key={trip.request_id}
+                        style={[styles.tableRow]}
+                        disabled={isAdded}
+                        onPress={() => {
+                          setRequestId(trip.request_id);
+                          setShowTripModal(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {trip?.trip_title}
+                          </Text>
+                        </View>
 
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.tableCell,
-                            isAdded && styles.disabledText,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {trip?.user_name || "N/A"}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {trip?.user_name || "N/A"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
             </View>
 
@@ -3311,49 +3304,39 @@ export default function ExpensesWebScreen() {
               </View>
 
               <ScrollView style={styles.modalList}>
-                {allRequests.map((trip) => {
-                  const isAdded = false;
+                {allRequests
+                  .filter((trip) => {
+                    if (!usernameFilter) return true;
+                    return (
+                      trip.user_name?.toLowerCase() ===
+                      usernameFilter.toLowerCase()
+                    );
+                  })
+                  .map((trip) => {
+                    return (
+                      <TouchableOpacity
+                        key={trip.request_id}
+                        style={[styles.tableRow]}
+                        onPress={() => {
+                          //setPrintRequestId(trip.id);
+                          setShowRequestModal(false);
+                          exportRequestToPdf(trip.id);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {trip?.trip_title}
+                          </Text>
+                        </View>
 
-                  return (
-                    <TouchableOpacity
-                      key={trip.request_id}
-                      style={[
-                        styles.tableRow,
-                        isAdded && styles.disabledPlaceItem,
-                      ]}
-                      disabled={isAdded}
-                      onPress={() => {
-                        //setPrintRequestId(trip.id);
-                        setShowRequestModal(false);
-                        exportRequestToPdf(trip.id);
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.tableCell,
-                            isAdded && styles.disabledText,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {trip?.trip_title}
-                        </Text>
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.tableCell,
-                            isAdded && styles.disabledText,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {trip?.user_name || "N/A"}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {trip?.user_name || "N/A"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
             </View>
 
@@ -3616,7 +3599,6 @@ export default function ExpensesWebScreen() {
                         style={styles.tripButton}
                         onPress={() => {
                           setShowTripModal(true);
-                          console.log();
                         }}
                       >
                         <Text ellipsizeMode="tail">
@@ -3744,7 +3726,7 @@ export default function ExpensesWebScreen() {
                     setEndDate("");
                     setAppliedStartDate("");
                     setAppliedEndDate("");
-                    setUsenameFilter("");
+                    setUsernameFilter("");
                     setAppliedUsername("");
                     setExpenseType("All");
                     setAppliedExpenseType("All");
@@ -4098,8 +4080,8 @@ export default function ExpensesWebScreen() {
                   Customer Name:
                 </Text>
                 <Text style={{ fontSize: 14, color: "#444" }}>
-                    {expense.name || "N/A"}
-                  </Text>
+                  {expense.name || "N/A"}
+                </Text>
               </View>
               <View style={{ flexDirection: "column", marginRight: 20 }}>
                 <Text
@@ -6088,7 +6070,7 @@ export default function ExpensesWebScreen() {
                     ]}
                     onPress={() => {
                       if (isAdded) return;
-                      setUsenameFilter(user.username);
+                      setUsernameFilter(user.username);
                       setShowUserModal(false);
                     }}
                   >
@@ -6143,7 +6125,7 @@ export default function ExpensesWebScreen() {
                       disabled={isAdded}
                       onPress={() => {
                         if (isAdded) return;
-                        setUsenameFilter(user.username);
+                        setUsernameFilter(user.username);
                         setShowUserModal(false);
                       }}
                     >
