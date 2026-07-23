@@ -1399,7 +1399,7 @@ export default function MileageForm() {
           <ScrollView style={styles.modalList}>
             {tripsForSelectedDate.length === 0 && (
               <Text style={styles.noTripsText}>
-                No trips found for {formDate.split("-").reverse().join("-")}
+                No trips found for {formDate.split("-").reverse().join("/")}
               </Text>
             )}
             {tripsForSelectedDate.map((trip) => {

@@ -3666,7 +3666,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formTollRemark}
             onChangeText={setFormTollRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3685,7 +3685,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formParkingRemark}
             onChangeText={setFormParkingRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3704,7 +3704,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formAirfareRemark}
             onChangeText={setFormAirfareRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3723,7 +3723,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formTransportRemark}
             onChangeText={setFormTransportRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3756,7 +3756,7 @@ export default function OutstationExpenseForm() {
                 setFormOwnAccRemark("");
               }
             }}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3778,7 +3778,7 @@ export default function OutstationExpenseForm() {
             editable={!isSaving}
           /> */}
 
-          <View style={styles.buttonGroup}>
+          <View style={[styles.buttonGroup, { width: 195 }]}>
             <TouchableOpacity
               style={[
                 styles.optionButton,
@@ -3846,7 +3846,7 @@ export default function OutstationExpenseForm() {
                 setFormHotelRemark("");
               }
             }}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3956,7 +3956,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formEntertainmentRemark}
             onChangeText={setFormEntertainmentRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3975,7 +3975,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formLaundryRemark}
             onChangeText={setFormLaundryRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -3994,7 +3994,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formOthersRemark}
             onChangeText={setFormOthersRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -4366,7 +4366,7 @@ export default function OutstationExpenseForm() {
           {/* Text input for "Others" */}
           {formTravelPurposes.some((item) => item.startsWith("Others")) && (
             <TextInput
-              style={styles.webTextInput}
+              style={[styles.webTextInput, { maxWidth: 700 }]}
               placeholder="Other purpose"
               value={otherTravelPurpose}
               onChangeText={handleOtherTextChange}
@@ -4476,6 +4476,16 @@ export default function OutstationExpenseForm() {
             >
               <Text style={styles.buttonText}>Select Travelmate</Text>
             </TouchableOpacity>
+            {selectedUser !== null && (
+              <TouchableOpacity
+                style={[styles.button, { marginLeft: 20 }]}
+                onPress={() => {
+                  setSelectedUser(null);
+                }}
+              >
+                <Text style={styles.buttonText}>Clear Travelmate</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         {renderSelectUserModal()}
@@ -4494,7 +4504,7 @@ export default function OutstationExpenseForm() {
             placeholder="Remark"
             value={formAdvanceRemark}
             onChangeText={setFormAdvanceRemark}
-            style={styles.webTextInput}
+            style={styles.webRemarkInput}
             editable={!isSaving}
           />
         </View>
@@ -4891,6 +4901,16 @@ const styles = StyleSheet.create({
   webTextInput: {
     flex: 1,
     maxWidth: 200,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    zIndex: 1,
+    position: "relative",
+    marginRight: 10,
+  },
+  webRemarkInput: {
+    flex: 1,
+    maxWidth: 660,
     padding: 10,
     borderWidth: 1,
     borderColor: "#ccc",
