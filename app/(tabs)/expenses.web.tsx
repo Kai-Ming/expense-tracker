@@ -3906,7 +3906,7 @@ export default function ExpensesWebScreen() {
 
             {/* Action buttons (Edit/Delete/Save/Cancel) */}
             <div style={webCardStyles.actionButtons}>
-              {isEditing ? (
+              {/* {isEditing ? (
                 <>
                   <button
                     style={webCardStyles.saveBtn}
@@ -3930,7 +3930,7 @@ export default function ExpensesWebScreen() {
                     Edit
                   </button>
                 )
-              )}
+              )} */}
               <button
                 style={webCardStyles.deleteBtn}
                 onClick={() => handleDelete(item.id)}
@@ -4020,7 +4020,7 @@ export default function ExpensesWebScreen() {
             Expense Details
           </Text>
           <View style={{ flexDirection: "row" }}>
-            {!isEditing &&
+            {/* {!isEditing &&
               expense.approval_status === 0 &&
               expense.user_id === userId && (
                 <TouchableOpacity
@@ -4037,8 +4037,8 @@ export default function ExpensesWebScreen() {
                     Edit
                   </Text>
                 </TouchableOpacity>
-              )}
-            {!isEditing && (
+              )} */}
+            {expense.approval_status === 0 && expense.user_id === userId && (
               <TouchableOpacity
                 style={{
                   backgroundColor: "#F44336",
@@ -4097,20 +4097,9 @@ export default function ExpensesWebScreen() {
                 >
                   Customer Name:
                 </Text>
-                {isEditing ? (
-                  <TextInput
-                    style={styles.inlineInput}
-                    value={editFormData.name}
-                    onChangeText={(text) =>
-                      setEditFormData({ ...editFormData, name: text })
-                    }
-                    placeholder="Customer Name"
-                  />
-                ) : (
-                  <Text style={{ fontSize: 14, color: "#444" }}>
+                <Text style={{ fontSize: 14, color: "#444" }}>
                     {expense.name || "N/A"}
                   </Text>
-                )}
               </View>
               <View style={{ flexDirection: "column", marginRight: 20 }}>
                 <Text
@@ -4636,7 +4625,7 @@ export default function ExpensesWebScreen() {
             Expense Details
           </Text>
           <View style={{ flexDirection: "row" }}>
-            {!isEditing &&
+            {/* {!isEditing &&
               expense.approval_status === 0 &&
               expense.user_id === userId && (
                 <TouchableOpacity
@@ -4653,8 +4642,8 @@ export default function ExpensesWebScreen() {
                     Edit
                   </Text>
                 </TouchableOpacity>
-              )}
-            {!isEditing && (
+              )} */}
+            {expense.approval_status === 0 && expense.user_id === userId && (
               <TouchableOpacity
                 style={{
                   backgroundColor: "#F44336",

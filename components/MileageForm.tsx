@@ -2388,7 +2388,6 @@ export default function MileageForm() {
                           style={[
                             styles.fieldLabel,
                             styles.fieldLabelMandatory,
-                            { width: 70 },
                           ]}
                         >
                           Company:
@@ -2406,7 +2405,6 @@ export default function MileageForm() {
                           style={[
                             styles.fieldLabel,
                             styles.fieldLabelMandatory,
-                            { width: 70 },
                           ]}
                         >
                           Name:
@@ -2425,7 +2423,6 @@ export default function MileageForm() {
                           style={[
                             styles.fieldLabel,
                             styles.fieldLabelMandatory,
-                            { width: 70 },
                           ]}
                         >
                           Email:
@@ -2445,7 +2442,6 @@ export default function MileageForm() {
                           style={[
                             styles.fieldLabel,
                             styles.fieldLabelMandatory,
-                            { width: 70 },
                           ]}
                         >
                           Number:
@@ -2471,7 +2467,6 @@ export default function MileageForm() {
                             style={[
                               styles.fieldLabel,
                               styles.fieldLabelMandatory,
-                              { width: 70 },
                             ]}
                           >
                             Time:
@@ -2668,7 +2663,7 @@ const htmlInputStyle = {
   padding: "8px 12px",
   border: "1px solid #ccc",
   width: "100%",
-  maxWidth: "220px",
+  maxWidth: "200px",
   minHeight: "36px",
   boxSizing: "border-box" as const,
   backgroundColor: "#fff",
@@ -2708,7 +2703,7 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
   fieldLabelMandatory: { color: "#2196F3" },
-  fieldValue: { fontSize: 14, flex: 1 },
+  fieldValue: { fontSize: 14, width: 120 },
   button: {
     backgroundColor: "#2196F3",
     padding: 12,
@@ -2717,7 +2712,7 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   buttonText: { color: "white", fontWeight: "bold" },
-  formLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
+  formLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
   addedTripsContainer: { marginTop: 16 },
   subsectionTitle: {
     fontSize: 14,

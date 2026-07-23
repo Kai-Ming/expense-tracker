@@ -4018,13 +4018,7 @@ export default function OutstationExpenseForm() {
           {formCustomers.map((customer, index) => (
             <View key={index} style={{ marginBottom: 10 }}>
               <View style={[styles.inputRow, { alignItems: "center" }]}>
-                <Text
-                  style={[
-                    styles.fieldLabel,
-                    styles.fieldLabelMandatory,
-                    { width: 70 },
-                  ]}
-                >
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Company:
                 </Text>
                 <TextInput
@@ -4036,13 +4030,7 @@ export default function OutstationExpenseForm() {
                   style={[styles.webTextInput, { maxWidth: 150 }]}
                   editable={!isSaving}
                 />
-                <Text
-                  style={[
-                    styles.fieldLabel,
-                    styles.fieldLabelMandatory,
-                    { width: 70 },
-                  ]}
-                >
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Name:
                 </Text>
                 <TextInput
@@ -4055,13 +4043,7 @@ export default function OutstationExpenseForm() {
                   editable={!isSaving}
                 />
 
-                <Text
-                  style={[
-                    styles.fieldLabel,
-                    styles.fieldLabelMandatory,
-                    { width: 70 },
-                  ]}
-                >
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Email:
                 </Text>
                 <TextInput
@@ -4075,13 +4057,7 @@ export default function OutstationExpenseForm() {
                   editable={!isSaving}
                 />
 
-                <Text
-                  style={[
-                    styles.fieldLabel,
-                    styles.fieldLabelMandatory,
-                    { width: 70 },
-                  ]}
-                >
+                <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                   Number:
                 </Text>
                 <TextInput
@@ -4097,13 +4073,7 @@ export default function OutstationExpenseForm() {
               </View>
               <View style={[styles.inputRow, { alignItems: "center" }]}>
                 <View style={[{ alignItems: "center", flexDirection: "row" }]}>
-                  <Text
-                    style={[
-                      styles.fieldLabel,
-                      styles.fieldLabelMandatory,
-                      { width: 70 },
-                    ]}
-                  >
+                  <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
                     Time:
                   </Text>
                   <input
@@ -4787,7 +4757,7 @@ const htmlInputStyle = {
   padding: "8px 12px",
   border: "1px solid #ccc",
   width: "100%",
-  maxWidth: "220px",
+  maxWidth: "200px",
   minHeight: "36px",
   boxSizing: "border-box" as const,
   backgroundColor: "#fff",
@@ -4935,7 +4905,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
-  fieldValue: { fontSize: 14 },
+  fieldValue: { fontSize: 14, width: 120 },
   button: {
     backgroundColor: "#2196F3",
     padding: 12,
