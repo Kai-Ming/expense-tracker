@@ -849,7 +849,7 @@ export default function settings() {
           activeOpacity={1}
           onPress={() => setSelectUserModalVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { maxHeight: 900 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select a User</Text>
               <TouchableOpacity
@@ -858,95 +858,28 @@ export default function settings() {
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
-            {/* <ScrollView style={styles.modalList}>
-              {allUsers.map((user) => {
-                const isAdded = addedUsers.some(
-                  (added) => added.id === user.id,
-                );
-
-                return (
-                  <TouchableOpacity
-                    key={user.id}
-                    style={[
-                      styles.modalUserItem,
-                      isAdded && styles.disabledUserItem,
-                    ]}
-                    onPress={() => {
-                      if (isAdded) return;
-                      setSelectedUserId(user.id);
-                      setSelectUserModalVisible(false);
-                      handleSelectUser(user.id);
-                    }}
-                  >
-                    <View style={styles.modalRow}>
-                      <View style={styles.selectUser}>
-                        <Text
-                          style={[
-                            styles.userInfoText,
-                            isAdded && styles.disabledText,
-                          ]}
-                        >
-                          <Text style={styles.boldLabel}>Username: </Text>
-                          {user.username}
-                        </Text>
-                      </View>
-                      <View style={styles.selectUser}>
-                        <Text
-                          style={[
-                            styles.userInfoText,
-                            isAdded && styles.disabledText,
-                          ]}
-                        >
-                          <Text style={styles.boldLabel}>Email: </Text>
-                          {user.email}
-                        </Text>
-                      </View>
-                      <View style={styles.selectUser}>
-                        <Text
-                          style={[
-                            styles.userInfoText,
-                            isAdded && styles.disabledText,
-                          ]}
-                        >
-                          <Text style={styles.boldLabel}>Department: </Text>
-                          {user.department}
-                        </Text>
-                      </View>
-                      <View style={styles.selectUser}>
-                        <Text
-                          style={[
-                            styles.userInfoText,
-                            isAdded && styles.disabledText,
-                          ]}
-                        >
-                          <Text style={styles.boldLabel}>Role: </Text>
-                          {roleMap[user.role] || "N/A"}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView> */}
             <View style={styles.tableContainer}>
               {/* Table Header */}
               <View style={styles.tableHeader}>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View
+                  style={{ flex: 0.5, backgroundColor: "transparent" }}
+                ></View>
+                <View style={{ flex: 3, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Username</Text>
                 </View>
                 <View style={{ flex: 2, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Email</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Department</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Grade</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Cost Center</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Office</Text>
                 </View>
                 <View style={{ flex: 1, backgroundColor: "transparent" }}>
@@ -962,7 +895,7 @@ export default function settings() {
 
               {/* Table Body */}
               <ScrollView style={styles.modalList}>
-                {allUsers.map((user) => {
+                {allUsers.map((user, index) => {
                   const isAdded = addedUsers.some(
                     (added) => added.id === user.id,
                   );
@@ -981,8 +914,19 @@ export default function settings() {
                         handleSelectUser(user.id);
                       }}
                     >
+                      <View style={{ flex: 0.5 }}>
+                        <Text
+                          style={[
+                            styles.tableCell,
+                            isAdded && styles.disabledText,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {index + 1}
+                        </Text>
+                      </View>
                       {/* Username */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 3 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -1008,7 +952,7 @@ export default function settings() {
                       </View>
 
                       {/* Department */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 1 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -1021,7 +965,7 @@ export default function settings() {
                       </View>
 
                       {/* Grade */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 0.5 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -1034,7 +978,7 @@ export default function settings() {
                       </View>
 
                       {/* Cost Center */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 1 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -1047,7 +991,7 @@ export default function settings() {
                       </View>
 
                       {/* Office */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 0.5 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -2347,7 +2291,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.2.4</Text>
+      <Text style={styles.bottomScrollText}>v1.0.3</Text>
     </View>
   );
 }

@@ -3493,7 +3493,7 @@ export default function OutstationExpenseForm() {
             onPress={() => {
               setShowEditTripModal(true);
             }}
-            style={styles.button}
+            style={[styles.button, { backgroundColor: "#FFA500" }]}
             disabled={isSaving}
           >
             <Text style={styles.buttonText}>Edit Outstation Trip</Text>
@@ -4303,7 +4303,7 @@ export default function OutstationExpenseForm() {
             onPress={() => {
               setShowEditModal(true);
             }}
-            style={styles.button}
+            style={[styles.button, { backgroundColor: "#FFA500" }]}
             disabled={isSaving}
           >
             <Text style={styles.buttonText}>Edit Travel Request</Text>
@@ -4944,7 +4944,7 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   buttonText: { color: "white", fontWeight: "bold" },
-  formLabel: { fontSize: 20, fontWeight: "bold" },
+  formLabel: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
   addedTripsContainer: { marginTop: 16 },
   subsectionTitle: {
     fontSize: 14,

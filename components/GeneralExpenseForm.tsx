@@ -5,11 +5,17 @@ import {
   collection,
   doc,
   getDoc,
+  onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -17,6 +23,26 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { db } from "../firebaseConfig";
+
+interface GeneralExpense {
+  id: string;
+  distance: number;
+  date?: string;
+  expense_type: string;
+  amount: number;
+  company?: string;
+  name?: string;
+  customers: any[];
+  vendor: string;
+  contact_number?: string;
+  user_id: string;
+  user_name?: string;
+  email?: string;
+  expense_report?: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
 
 export default function GeneralExpenseForm() {
   const [userId, setUserId] = useState<string>("");
@@ -37,7 +63,12 @@ export default function GeneralExpenseForm() {
     { name: "", company: "", email: "", number: "", time: "" },
   ]);
 
+  const [allExpenses, setAllExpenses] = useState<GeneralExpense[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [editingExpense, setEditingExpense] = useState(false);
+  const [editExpenseId, setEditExpenseId] = useState<string>("");
 
   const expenseType = {
     "1": "Meal with customer",
@@ -78,6 +109,32 @@ export default function GeneralExpenseForm() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const q = query(
+      collection(db, "expenses"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const expenseData: GeneralExpense[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.type === 2) {
+          expenseData.push({
+            id: doc.id,
+            ...data,
+          } as GeneralExpense);
+        }
+      });
+      setAllExpenses(expenseData);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
 
   const handleSubmit = async () => {
     const isCustomersFormValid = formCustomers.every(
@@ -130,6 +187,55 @@ export default function GeneralExpenseForm() {
     }
   };
 
+  const handleEdit = async () => {
+    const isCustomersFormValid = formCustomers.every(
+      (customer) =>
+        customer.name.trim() !== "" &&
+        customer.company.trim() !== "" &&
+        customer.email.trim() !== "" &&
+        customer.number.trim() !== "" &&
+        customer.time.trim() !== "",
+    );
+
+    const expensePurposeValidation =
+      (formExpenseType === "1" || formExpenseType === "2") &&
+      !isCustomersFormValid;
+
+    console.log(expensePurposeValidation);
+
+    if (
+      !formExpenseType ||
+      !formDate ||
+      parseFloat(formAmount) === 0 ||
+      !formExpenseReport ||
+      !formVendor ||
+      expensePurposeValidation
+    ) {
+      console.log("not valid");
+      alert("Please ensure all required fields are filled.");
+      return;
+    }
+
+    try {
+      const docRef = doc(db, "expenses", editExpenseId);
+      const expense = {
+        date: formDate,
+        expense_type: expenseType[formExpenseType as keyof typeof expenseType],
+        amount: parseFloat(formAmount),
+        customers: formCustomers,
+        vendor: formVendor,
+        expense_report: formExpenseReport,
+      };
+
+      await updateDoc(docRef, expense);
+
+      resetForm();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save expense.");
+    }
+  };
+
   // Add a new empty customer row
   const addCustomerRow = () => {
     setFormCustomers([
@@ -174,6 +280,130 @@ export default function GeneralExpenseForm() {
     setFormCustomers([
       { name: "", company: "", email: "", number: "", time: "" },
     ]);
+    setEditingExpense(false);
+  };
+
+  const findKeyByValue = (value: string): string | undefined => {
+    return Object.keys(expenseType).find(
+      (key) => expenseType[key as keyof typeof expenseType] === value,
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "";
+    return dateString.split("-").reverse().join("-");
+  };
+
+  const getDisplayText = (item: any) => {
+    const company = item.company || item.customers?.[0]?.company || "";
+    const name = item.name || item.customers?.[0]?.name || "";
+
+    if (company && name) {
+      return `${company} • ${name}`;
+    }
+    return company || name;
+  };
+
+  const setEditExpense = (id: string) => {
+    if (!id) {
+      console.log("Not a valid expense");
+      return;
+    }
+    setEditingExpense(true);
+    setEditExpenseId(id.trim());
+
+    const selectedExpense = allExpenses.find((e) => e.id === id);
+
+    if (selectedExpense) {
+      const formatCurrency = (value: any): string => {
+        // Handle null, undefined, or non-numeric values
+        const num = typeof value === "number" ? value : parseFloat(value);
+        // Check if it's a valid number
+        if (isNaN(num) || num === undefined || num === null) {
+          return "0.00";
+        }
+        return num.toFixed(2);
+      };
+
+      setFormAmount(formatCurrency(selectedExpense.amount));
+      setFormVendor(selectedExpense.vendor);
+      setFormExpenseReport(selectedExpense.expense_report || "");
+
+      const key = findKeyByValue(selectedExpense.expense_type);
+      if (key) {
+        setFormExpenseType(key);
+      }
+
+      setFormCustomers(
+        selectedExpense.customers?.length > 0
+          ? selectedExpense.customers
+          : [
+              {
+                name: "",
+                company: "",
+                email: "",
+                number: "",
+                time: "",
+              },
+            ],
+      );
+    }
+  };
+
+  const renderEditModal = () => {
+    return (
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEditModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select an Expense</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {allExpenses.length === 0 && (
+                <Text style={styles.noTripsText}>No expense found</Text>
+              )}
+              {allExpenses.map((expense) => {
+                return (
+                  <TouchableOpacity
+                    key={expense.id}
+                    style={[styles.modalTripItem]}
+                    onPress={() => {
+                      setShowEditModal(false);
+                      setEditExpense(expense.id);
+                    }}
+                  >
+                    <Text style={[styles.tripRemark]}>
+                      {expense?.expense_type}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#666" }}>
+                      {getDisplayText(expense)}
+                    </Text>
+                    <Text style={[styles.addressText]}>
+                      RM {expense.amount.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.timeText]}>
+                      {formatDate(expense?.date || "")}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   const fieldMessage = (
@@ -196,7 +426,39 @@ export default function GeneralExpenseForm() {
               contentContainerStyle={styles.horizontalContent}
             >
               <View style={styles.formContainer}>
-                <Text style={styles.formLabel}>Submit General Expense</Text>
+                <Text style={styles.formLabel}>
+                  {editingExpense
+                    ? "Edit General Expense"
+                    : "Submit General Expense"}
+                </Text>
+
+                <View
+                  style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowEditModal(true);
+                    }}
+                    style={[styles.button, { backgroundColor: "#FFA500" }]}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.buttonText}>Edit Mileage Expense</Text>
+                  </TouchableOpacity>
+                  {editingExpense && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingExpense(false);
+                        resetForm();
+                      }}
+                      style={styles.button}
+                      disabled={isSaving}
+                    >
+                      <Text style={styles.buttonText}>Cancel Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {renderEditModal()}
+
                 {fieldMessage}
                 <View style={[styles.inputRow, { marginTop: 10 }]}>
                   <Text style={styles.fieldLabel}>Date:</Text>
@@ -479,14 +741,16 @@ export default function GeneralExpenseForm() {
                   />
                 </View>
                 <TouchableOpacity
-                  onPress={handleSubmit}
+                  onPress={editingExpense ? handleEdit : handleSubmit}
                   style={[styles.button, { marginBottom: 20 }]}
                   disabled={isSaving}
                 >
                   {isSaving ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={styles.buttonText}>Submit Expense</Text>
+                    <Text style={styles.buttonText}>
+                      {editingExpense ? "Submit Edit" : "Submit Expense"}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>

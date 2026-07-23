@@ -28,8 +28,40 @@ import {
   TouchableOpacity,
   useWindowDimensions,
 } from "react-native";
-import { db } from "../firebaseConfig";
+import { db, storage } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
+
+interface Expense {
+  id: string;
+  distance: number;
+  date?: string;
+  trip_ids: string[];
+  purpose: string;
+  from_time?: string;
+  to_time?: string;
+  duration?: string;
+  company: string;
+  name: string;
+  trip_report?: string;
+  contact_number: string;
+  email: string;
+  customers: any[];
+  parking: number;
+  toll: number;
+  mileage: number;
+  expense: number;
+  expense_purpose: string;
+  vendor: string;
+  cost: number;
+  user_id: string;
+  user_name?: string;
+  business_card_url?: string;
+  route_image_url?: string;
+  receipt_urls?: string[];
+  approval_status: number;
+  type: number;
+  created_at: any;
+}
 
 export default function MileageForm() {
   const [homeCoords, setHomeCoords] = useState<{
@@ -107,7 +139,12 @@ export default function MileageForm() {
   const [selectedFromIndex, setSelectedFromIndex] = useState<number>(0);
   const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
 
+  const [allMileage, setAllMileage] = useState<Expense[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
+  const [editingMileage, setEditingMileage] = useState(false);
+  const [editMileageId, setEditMileageId] = useState<string>("");
 
   const { calculateDistance, getRouteImageUrl, sdkLoaded } =
     useGoogleMapsDistance();
@@ -241,6 +278,35 @@ export default function MileageForm() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const q = query(
+      collection(db, "expenses"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const expenseData: Expense[] = [];
+      /* querySnapshot.forEach((doc) =>
+            expensesData.push({ id: doc.id, ...doc.data() } as Expense),
+          ); */
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.type === 1) {
+          expenseData.push({
+            id: doc.id,
+            ...data,
+          } as Expense);
+        }
+      });
+      setAllMileage(expenseData);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
 
   useEffect(() => {
     const { fromTime, toTime } = getOverallTimes();
@@ -1131,6 +1197,93 @@ export default function MileageForm() {
     }
   };
 
+  const handleEdit = async () => {
+    const dist = getDistanceValue();
+
+    const otherExpenseValidation = !(
+      (parseFloat(formOtherExpense) !== 0 &&
+        formOtherExpenseType &&
+        formVendor) ||
+      (!parseFloat(formOtherExpense) && !formOtherExpenseType && !formVendor)
+    );
+
+    if (parseFloat(formOtherExpense) === 0) {
+      setFormOtherExpenseType("");
+    }
+
+    const otherExpensePurpose =
+      parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
+
+    const isCustomersFormValid =
+      formCustomers.every(
+        (customer) =>
+          customer.name.trim() !== "" &&
+          customer.company.trim() !== "" &&
+          customer.email.trim() !== "" &&
+          customer.number.trim() !== "" &&
+          customer.time.trim() !== "",
+      ) &&
+      formCustomers.some(
+        (customer) => customer.address && customer.address.trim() !== "",
+      );
+
+    if (
+      !formPurpose.trim() ||
+      !formDate ||
+      !formTripReport ||
+      !isCustomersFormValid ||
+      otherExpenseValidation
+    ) {
+      alert("Please ensure all required fields are filled.");
+      return;
+    }
+
+    try {
+      const businessCardUrls: string[] = [];
+      for (const file of businessCardFiles) {
+        const storageRef = ref(
+          storage,
+          `business-cards/${userId}/${Date.now()}_${file.name}`,
+        );
+        const uploadResult = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(uploadResult.ref);
+        businessCardUrls.push(url);
+      }
+      const { fromTime, toTime } = getOverallTimes();
+      const docRef = doc(db, "expenses", editMileageId);
+      const expense = {
+        date: formDate,
+        purpose: formPurpose,
+        from_time: fromTime,
+        to_time: toTime,
+        duration: calculateDuration(),
+        distance: dist,
+        trip_report: formTripReport,
+        business_card_urls: businessCardUrls,
+        parking: parseFloat(formParking),
+        toll: parseFloat(formToll),
+        mileage: parseFloat(calculateMileage()),
+        expense: parseFloat(formOtherExpense),
+        expense_purpose: otherExpensePurpose,
+        vendor: formVendor,
+        customers: formCustomers,
+        cost: parseFloat(calculateCost()),
+        trip_ids: addedTrips.map((trip) => trip.id),
+      } as any;
+
+      if (businessCardUrls && businessCardUrls.length > 0) {
+        expense.business_card_urls = businessCardUrls;
+      }
+
+      await updateDoc(docRef, expense);
+
+      resetForm();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save expense.");
+    }
+  };
+
   const resetForm = () => {
     setFormPurpose("");
     setFormCompany("");
@@ -1151,6 +1304,75 @@ export default function MileageForm() {
       { name: "", company: "", email: "", number: "", time: "", address: "" },
     ]);
     setCustomerIndex(0);
+    setEditingMileage(false);
+  };
+
+  const getDisplayText = (item: any) => {
+    const company = item.company || item.customers?.[0]?.company || "";
+    const name = item.name || item.customers?.[0]?.name || "";
+
+    if (company && name) {
+      return `${company} • ${name}`;
+    }
+    return company || name;
+  };
+
+  const setEditMileage = (id: string) => {
+    if (!id) {
+      console.log("Not a valid expense");
+      return;
+    }
+    setEditingMileage(true);
+    setEditMileageId(id.trim());
+
+    const selectedMileage = allMileage.find((e) => e.id === id);
+
+    if (selectedMileage) {
+      const formatCurrency = (value: any): string => {
+        // Handle null, undefined, or non-numeric values
+        const num = typeof value === "number" ? value : parseFloat(value);
+        // Check if it's a valid number
+        if (isNaN(num) || num === undefined || num === null) {
+          return "0.00";
+        }
+        return num.toFixed(2);
+      };
+
+      setFormTripReport(selectedMileage.trip_report || "");
+      setFormParking(formatCurrency(selectedMileage.parking));
+      setFormToll(formatCurrency(selectedMileage.toll));
+      setFormOtherExpense(formatCurrency(selectedMileage.expense));
+      setFormOtherExpenseType(selectedMileage.expense_purpose || "");
+      setFormVendor(selectedMileage.vendor || "");
+      setCustomerIndex(0);
+
+      setFormPurpose(selectedMileage.purpose);
+
+      setFormCustomers(
+        selectedMileage.customers?.length > 0
+          ? selectedMileage.customers
+          : [
+              {
+                name: "",
+                company: "",
+                email: "",
+                number: "",
+                time: "",
+                address: "",
+              },
+            ],
+      );
+      addTripsByIds(selectedMileage.trip_ids || []);
+    }
+  };
+
+  const addTripsByIds = (tripIds: string[]) => {
+    const tripsToAdd = allUserTrips.filter(
+      (trip) =>
+        tripIds.includes(trip.id) &&
+        !addedTrips.some((added) => added.id === trip.id),
+    );
+    setAddedTrips((prev) => [...prev, ...tripsToAdd]);
   };
 
   const renderTripModal = () => (
@@ -1321,6 +1543,60 @@ export default function MileageForm() {
     </Modal>
   );
 
+  const renderEditModal = () => {
+    return (
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEditModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select an Expense</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {allMileage.length === 0 && (
+                <Text style={styles.noTripsText}>No expense found</Text>
+              )}
+              {allMileage.map((mileage) => {
+                return (
+                  <TouchableOpacity
+                    key={mileage.id}
+                    style={[styles.modalTripItem]}
+                    onPress={() => {
+                      setShowEditModal(false);
+                      setEditMileage(mileage.id);
+                    }}
+                  >
+                    <Text style={[styles.tripRemark]}>{mileage?.purpose}</Text>
+                    <Text style={{ fontSize: 12, color: "#666" }}>
+                      {getDisplayText(mileage)}
+                    </Text>
+                    <Text style={[styles.addressText]}>
+                      RM {mileage.cost.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.timeText]}>
+                      {formatDate(mileage?.date || "")}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const fieldMessage = (
     <Text
       style={[{ fontSize: 14, fontWeight: "600", marginTop: 10, width: 500 }]}
@@ -1341,7 +1617,39 @@ export default function MileageForm() {
               contentContainerStyle={styles.horizontalContent}
             >
               <View style={styles.formContainer}>
-                <Text style={styles.formLabel}>Submit Travel Expense</Text>
+                <Text style={styles.formLabel}>
+                  {editingMileage
+                    ? "Edit Mileage Expense"
+                    : "Submit Mileage Expense"}
+                </Text>
+
+                <View
+                  style={{ flexDirection: "row", marginBottom: 10, gap: 15 }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowEditModal(true);
+                    }}
+                    style={[styles.button, { backgroundColor: "#FFA500" }]}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.buttonText}>Edit Mileage Expense</Text>
+                  </TouchableOpacity>
+                  {editingMileage && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingMileage(false);
+                        resetForm();
+                      }}
+                      style={styles.button}
+                      disabled={isSaving}
+                    >
+                      <Text style={styles.buttonText}>Cancel Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {renderEditModal()}
+
                 {fieldMessage}
                 <View style={[styles.inputRow, { marginTop: 10 }]}>
                   <Text style={styles.fieldLabel}>Date:</Text>
@@ -2335,14 +2643,16 @@ export default function MileageForm() {
                   </View>
                 )} */}
                 <TouchableOpacity
-                  onPress={handleSubmit}
+                  onPress={editingMileage ? handleEdit : handleSubmit}
                   style={[styles.button, { marginBottom: 20 }]}
                   disabled={isSaving}
                 >
                   {isSaving ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={styles.buttonText}>Submit Expense</Text>
+                    <Text style={styles.buttonText}>
+                      {editingMileage ? "Submit Edit" : "Submit Expense"}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
