@@ -396,12 +396,12 @@ export default function settings() {
 
   const changePassword = async () => {
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      Alert.alert("Error", "Please fill in all fields.");
+      alert("Please fill in all fields.");
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      Alert.alert("Error", "New passwords do not match.");
+      alert("Ppasswords do not match.");
       return;
     }
 
@@ -422,7 +422,7 @@ export default function settings() {
         // 2. Update Password
         await updatePassword(user, newPassword);
 
-        Alert.alert("Success", "Password updated successfully!");
+        alert("Password updated successfully!");
         setPasswordModalVisible(false);
 
         // Reset fields
@@ -431,8 +431,18 @@ export default function settings() {
         setConfirmNewPassword("");
       }
     } catch (error: any) {
-      console.error(error);
-      Alert.alert("Error", error.message);
+      const err = error as any;
+      console.error("Signup error:", err.code, err.message);
+      let errorMessage = "An error occurred during signup.";
+
+      if (err.code === "auth/weak-password") {
+        errorMessage = "Password must be at least 6 characters.";
+      } else if (err.code === "auth/configuration-not-found") {
+        errorMessage =
+          "Firebase Auth is not configured. Please enable Email/Password provider in the Firebase Console.";
+      }
+
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -1878,16 +1888,15 @@ export default function settings() {
                             <option value="MARKETING">MARKETING</option>
                             <option value="MD OFFICE">MD OFFICE</option>
                             <option value="OPERATIONS">OPERATIONS</option>
-                            <option value="PROJECT">PROJECT</option>
-                            <option value="SALES PL1">SALES PL1</option>
-                            <option value="SALES PL2">SALES PL2</option>
-                            <option value="SALES PL3">SALES PL3</option>
-                            <option value="SALES PL4 PNG">SALES PL4</option>
-                            <option value="SC">SC</option>
-                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
                             <option value="OPERATIONS PNG">
                               OPERATIONS PNG
                             </option>
+                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="SALES PL1">SALES PL1</option>
+                            <option value="SALES PL2">SALES PL2</option>
+                            <option value="SALES PL3">SALES PL3</option>
+                            <option value="SALES PL4">SALES PL4</option>
+                            <option value="SC">SC</option>
                           </select>
                         </View>
                         <View style={styles.modalUser}>
@@ -1929,7 +1938,6 @@ export default function settings() {
                             </option>
                             <option value="CSD">CSD</option>
                             <option value="HQ">HQ</option>
-                            <option value="PROJECT">PROJECT</option>
                             <option value="P_LINE1">P_LINE1</option>
                             <option value="P_LINE2">P_LINE2</option>
                             <option value="P_LINE3">P_LINE3</option>
@@ -2134,16 +2142,15 @@ export default function settings() {
                             <option value="MARKETING">MARKETING</option>
                             <option value="MD OFFICE">MD OFFICE</option>
                             <option value="OPERATIONS">OPERATIONS</option>
-                            <option value="PROJECT">PROJECT</option>
-                            <option value="SALES PL1">SALES PL1</option>
-                            <option value="SALES PL2">SALES PL2</option>
-                            <option value="SALES PL3">SALES PL3</option>
-                            <option value="SALES PL4 PNG">SALES PL4</option>
-                            <option value="SC">SC</option>
-                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
                             <option value="OPERATIONS PNG">
                               OPERATIONS PNG
                             </option>
+                            <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="SALES PL1">SALES PL1</option>
+                            <option value="SALES PL2">SALES PL2</option>
+                            <option value="SALES PL3">SALES PL3</option>
+                            <option value="SALES PL4">SALES PL4</option>
+                            <option value="SC">SC</option>
                           </select>
                         </View>
                         <View style={styles.modalUser}>
@@ -2185,7 +2192,6 @@ export default function settings() {
                             </option>
                             <option value="CSD">CSD</option>
                             <option value="HQ">HQ</option>
-                            <option value="PROJECT">PROJECT</option>
                             <option value="P_LINE1">P_LINE1</option>
                             <option value="P_LINE2">P_LINE2</option>
                             <option value="P_LINE3">P_LINE3</option>
@@ -2291,7 +2297,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.3</Text>
+      <Text style={styles.bottomScrollText}>v1.0.3.1</Text>
     </View>
   );
 }
