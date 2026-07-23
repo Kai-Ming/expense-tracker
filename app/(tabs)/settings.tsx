@@ -1892,6 +1892,7 @@ export default function settings() {
                               OPERATIONS PNG
                             </option>
                             <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="PROJECT">PROJECT</option>
                             <option value="SALES PL1">SALES PL1</option>
                             <option value="SALES PL2">SALES PL2</option>
                             <option value="SALES PL3">SALES PL3</option>
@@ -2146,6 +2147,7 @@ export default function settings() {
                               OPERATIONS PNG
                             </option>
                             <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+                            <option value="PROJECT">PROJECT</option>
                             <option value="SALES PL1">SALES PL1</option>
                             <option value="SALES PL2">SALES PL2</option>
                             <option value="SALES PL3">SALES PL3</option>
