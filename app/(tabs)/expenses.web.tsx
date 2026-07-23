@@ -3114,8 +3114,19 @@ export default function ExpensesWebScreen() {
 
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return "";
-    if (timestamp.toDate) return timestamp.toDate().toLocaleDateString();
-    return new Date(timestamp).toLocaleDateString();
+
+    let date: Date;
+    if (timestamp.toDate) {
+      date = timestamp.toDate(); // Firebase Timestamp
+    } else {
+      date = new Date(timestamp);
+    }
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
   };
 
   const formatFirebaseTime = (timestamp: any) => {

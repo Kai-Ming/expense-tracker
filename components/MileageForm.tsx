@@ -401,7 +401,7 @@ export default function MileageForm() {
   };
   const timeStringToDate = (timeString: string): Date | null => {
     if (!formDate || !timeString) return null;
-    const [year, month, day] = formDate.split("-").map(Number);
+    const [year, month, day] = formDate.split("/").map(Number);
     const [hours, minutes] = timeString.split(":").map(Number);
     return new Date(year, month - 1, day, hours, minutes, 0);
   };
@@ -422,7 +422,7 @@ export default function MileageForm() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
-    return dateString.split("-").reverse().join("-");
+    return dateString.split("-").reverse().join("/");
   };
 
   const formatTripTime = (timestamp: any): string => {

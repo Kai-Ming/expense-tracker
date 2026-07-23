@@ -2387,7 +2387,7 @@ export default function OutstationExpenseForm() {
           <ScrollView style={styles.modalList}>
             {tripsForSelectedDate.length === 0 && (
               <Text style={styles.noTripsText}>
-                No trips found for {formTripDate.split("-").reverse().join("-")}
+                No trips found for {formTripDate.split("-").reverse().join("/")}
               </Text>
             )}
             {tripsForSelectedDate.map((trip) => {
@@ -3313,7 +3313,7 @@ export default function OutstationExpenseForm() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
-    return dateString.split("-").reverse().join("-");
+    return dateString.split("-").reverse().join("/");
   };
 
   const dateToTimeString = (date: Date | null): string => {
@@ -3325,7 +3325,7 @@ export default function OutstationExpenseForm() {
 
   const timeStringToDate = (timeString: string): Date | null => {
     if (!formTripDate || !timeString) return null;
-    const [year, month, day] = formTripDate.split("-").map(Number);
+    const [year, month, day] = formTripDate.split("/").map(Number);
     const [hours, minutes] = timeString.split(":").map(Number);
     return new Date(year, month - 1, day, hours, minutes, 0);
   };

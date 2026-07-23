@@ -291,7 +291,7 @@ export default function GeneralExpenseForm() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
-    return dateString.split("-").reverse().join("-");
+    return dateString.split("-").reverse().join("/");
   };
 
   const getDisplayText = (item: any) => {
