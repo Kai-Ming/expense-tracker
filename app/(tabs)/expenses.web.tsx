@@ -164,6 +164,7 @@ interface ExpenseGroup {
   data: OutstationExpense[];
   total_amount: number;
   type: number;
+  created_at: any;
 }
 
 interface User {
@@ -746,6 +747,7 @@ export default function ExpensesWebScreen() {
       const startDate = expense.start_date || "N/A";
       const endDate = expense.end_date || "N/A";
       const travelPurposes = expense.travel_purposes || [];
+      const createdAt = expense.created_at || null;
 
       const expenseTotal =
         typeof expense.total === "string"
@@ -768,6 +770,7 @@ export default function ExpensesWebScreen() {
           data: [expense],
           total_amount: expenseTotal,
           type: type,
+          created_at: createdAt,
         });
       }
       return acc;
@@ -3177,7 +3180,10 @@ export default function ExpensesWebScreen() {
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.3, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Created At</Text>
+                </View>
+                <View style={{ flex: 2.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Trip Title</Text>
                 </View>
                 <View style={{ flex: 1, backgroundColor: "transparent" }}>
@@ -3211,7 +3217,12 @@ export default function ExpensesWebScreen() {
                           setShowTripModal(false);
                         }}
                       >
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flex: 0.3 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {formatTimestamp(trip?.created_at)}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 2.5 }}>
                           <Text style={[styles.tableCell]} numberOfLines={1}>
                             {trip?.trip_title}
                           </Text>
@@ -3295,7 +3306,10 @@ export default function ExpensesWebScreen() {
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.3, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Created At</Text>
+                </View>
+                <View style={{ flex: 2.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Trip Title</Text>
                 </View>
                 <View style={{ flex: 1, backgroundColor: "transparent" }}>
@@ -3323,7 +3337,12 @@ export default function ExpensesWebScreen() {
                           exportRequestToPdf(trip.id);
                         }}
                       >
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flex: 0.3 }}>
+                          <Text style={[styles.tableCell]} numberOfLines={1}>
+                            {formatTimestamp(trip?.created_at)}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 2.5 }}>
                           <Text style={[styles.tableCell]} numberOfLines={1}>
                             {trip?.trip_title}
                           </Text>
@@ -6091,19 +6110,19 @@ export default function ExpensesWebScreen() {
             <View style={styles.tableContainer}>
               {/* Table Header */}
               <View style={styles.tableHeader}>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 3, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Username</Text>
                 </View>
                 <View style={{ flex: 2, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Email</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Department</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Grade</Text>
                 </View>
-                <View style={{ flex: 1.5, backgroundColor: "transparent" }}>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
                   <Text style={styles.headerCell}>Cost Center</Text>
                 </View>
               </View>
@@ -6130,7 +6149,7 @@ export default function ExpensesWebScreen() {
                       }}
                     >
                       {/* Username */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 3 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -6156,7 +6175,7 @@ export default function ExpensesWebScreen() {
                       </View>
 
                       {/* Department */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 1 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -6169,7 +6188,7 @@ export default function ExpensesWebScreen() {
                       </View>
 
                       {/* Grade */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 0.5 }}>
                         <Text
                           style={[
                             styles.tableCell,
@@ -6182,7 +6201,7 @@ export default function ExpensesWebScreen() {
                       </View>
 
                       {/* Cost Center */}
-                      <View style={{ flex: 1.5 }}>
+                      <View style={{ flex: 0.5 }}>
                         <Text
                           style={[
                             styles.tableCell,
