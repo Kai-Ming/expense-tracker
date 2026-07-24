@@ -442,7 +442,7 @@ export default function GeneralExpenseForm() {
                     style={[styles.button, { backgroundColor: "#FFA500" }]}
                     disabled={isSaving}
                   >
-                    <Text style={styles.buttonText}>Edit Mileage Expense</Text>
+                    <Text style={styles.buttonText}>Edit General Expense</Text>
                   </TouchableOpacity>
                   {editingExpense && (
                     <TouchableOpacity
