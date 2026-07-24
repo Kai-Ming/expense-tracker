@@ -93,6 +93,9 @@ export default function settings() {
     useState<string>("0.0");
   const [mobileMileageRateOutstation, setMobileMileageRateOutstation] =
     useState<string>("0.0");
+  const [mileageBike, setMileageBike] = useState<string>("0.00");
+  const [mobileMileageBike, setMobileMileageBikeMobile] =
+    useState<string>("0.00");
   const [oustationDistance, setOutstationDistance] = useState<string>("0.0");
 
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -209,6 +212,14 @@ export default function settings() {
             setMobileMileageRateOutstation(
               data.mileage_rate_outstation_mobile.toString(),
             );
+          if (data.mileage_rate_bike) {
+            setMileageBike(data.mileage_rate_bike.toString());
+          }
+          if (data.mileage_rate_bike_mobile) {
+            setMobileMileageBikeMobile(
+              data.mileage_rate_bike_mobile.toString(),
+            );
+          }
           if (data.outstation_distance)
             setOutstationDistance(data.outstation_distance.toString());
           if (data.arrival_distance)
@@ -513,6 +524,8 @@ export default function settings() {
         mileage_rate_mobile: parseFloat(mobileMileageRate),
         mileage_rate_outstation: parseFloat(mileageRateOutstation),
         mileage_rate_outstation_mobile: parseFloat(mobileMileageRateOutstation),
+        mileage_rate_bike: parseFloat(mileageBike),
+        mileage_rate_bike_mobile: parseFloat(mobileMileageBike),
         outstation_distance: parseFloat(oustationDistance),
       });
       Alert.alert("Success", "Mileage rate updated successfully!");
@@ -1507,7 +1520,7 @@ export default function settings() {
             <View style={styles.screenOverlay}>
               <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.keyboardContainer}
+                style={[styles.keyboardContainer]}
               >
                 <ScrollView
                   style={styles.modalScrollWrapper}
@@ -1539,6 +1552,30 @@ export default function settings() {
                         placeholderTextColor="#999999"
                         value={mobileMileageRate}
                         onChangeText={setMobileMileageRate}
+                        editable={!isSaving}
+                        keyboardType="decimal-pad"
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Web Mileage (Motorbike):
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholderTextColor="#999999"
+                        value={mileageBike}
+                        onChangeText={setMileageBike}
+                        editable={!isSaving}
+                        keyboardType="decimal-pad"
+                      />
+
+                      <Text style={styles.modalSubtitle}>
+                        Mobile Mileage (Motorbike):
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholderTextColor="#999999"
+                        value={mobileMileageBike}
+                        onChangeText={setMobileMileageBikeMobile}
                         editable={!isSaving}
                         keyboardType="decimal-pad"
                       />
@@ -2299,7 +2336,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.3.3</Text>
+      <Text style={styles.bottomScrollText}>v1.0.4</Text>
     </View>
   );
 }
@@ -2369,11 +2406,9 @@ const styles = StyleSheet.create({
   modalScrollWrapper: {
     flex: 1,
     width: "100%",
-    maxHeight: "80%",
   },
   modalScrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
     alignItems: "center",
     paddingVertical: 40,
   },

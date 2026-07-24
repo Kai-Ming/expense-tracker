@@ -255,6 +255,7 @@ export default function OutstationExpenseForm() {
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [mileageRateOutstation, setMileageRateOutstation] =
     useState<number>(0.7);
+  const [mileageRateBike, setMileageRateBike] = useState<number>(0.35);
   const [outStationDistance, setOutstationDistance] = useState<number>(50);
 
   const [allUserTrips, setAllUserTrips] = useState<any[]>([]);
@@ -265,6 +266,7 @@ export default function OutstationExpenseForm() {
   const [selectedGoingIndex, setSelectedGoingIndex] = useState<number>(0);
   const [fromAddress, setFromAddress] = useState<string>("");
   const [toAddress, setToAddress] = useState<string>("");
+  const [formVehicle, setFormVehicle] = useState<string>("");
   const [formFromHome, setFormFromHome] = useState<boolean>(false);
   const [formGoingHome, setFormGoingHome] = useState<boolean>(false);
   const [formTripFromTime, setFormTripFromTime] = useState<Date | null>(null);
@@ -959,9 +961,10 @@ export default function OutstationExpenseForm() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.mileage_rate) setMileageRate(data.mileage_rate);
+        if (data.mileage_rate_bike) setMileageRateBike(data.mileage_rate_bike);
         if (data.mileage_rate_outstation)
           setMileageRateOutstation(data.mileage_rate_outstation);
-        if (data.outstation_disance)
+        if (data.outstation_distance)
           setOutstationDistance(data.outstation_distance);
       }
     });
@@ -1734,6 +1737,10 @@ export default function OutstationExpenseForm() {
       alert("Please fill in both 'Departure' and 'Arrival' times.");
       return;
     }
+    if (!formVehicle) {
+      alert("Please select a vehicle type.");
+      return;
+    }
     if (!userId) {
       alert("You must be logged in.");
       return;
@@ -1843,7 +1850,9 @@ export default function OutstationExpenseForm() {
 
       let mileageRateTemp = mileageRate;
 
-      if (subDistance > outStationDistance) {
+      if (formVehicle === "Motorbike") {
+        mileageRateTemp = mileageRateBike;
+      } else if (subDistance > outStationDistance) {
         mileageRateTemp = mileageRateOutstation;
       }
 
@@ -1862,6 +1871,7 @@ export default function OutstationExpenseForm() {
         mileage: parseFloat(mileage.toFixed(2)),
         toll: parseFloat(subToll.toFixed(2)),
         total: (mileage + subToll).toFixed(2),
+        vehicle: formVehicle,
         remark: formRemark.trim() || "",
         from_time: formTripFromTime,
         to_time: formTripToTime,
@@ -2185,6 +2195,57 @@ export default function OutstationExpenseForm() {
                       >
                         Home
                       </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.modalSubtitle,
+                      styles.fieldLabelMandatory,
+                      { marginTop: 10 },
+                    ]}
+                  >
+                    Vehicle:
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={[styles.radioContainer, { marginVertical: 0 }]}
+                      onPress={() => setFormVehicle("Car")}
+                    >
+                      <View
+                        style={[
+                          styles.radioOuter,
+                          formVehicle === "Car" && styles.radioOuterSelected,
+                        ]}
+                      >
+                        {formVehicle === "Car" && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
+                      <Text style={styles.radioText}>Car</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.radioContainer, { marginVertical: 0 }]}
+                      onPress={() => setFormVehicle("Motorbike")}
+                    >
+                      <View
+                        style={[
+                          styles.radioOuter,
+                          formVehicle === "Motorbike" &&
+                            styles.radioOuterSelected,
+                        ]}
+                      >
+                        {formVehicle === "Motorbike" && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
+                      <Text style={styles.radioText}>Motorbike</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -2713,6 +2774,7 @@ export default function OutstationExpenseForm() {
     setDestCoord(null);
     setSelectedFromIndex(0);
     setSelectedGoingIndex(0);
+    setFormVehicle("");
   };
 
   const addPlaceRow = () => {
@@ -3325,7 +3387,7 @@ export default function OutstationExpenseForm() {
 
   const timeStringToDate = (timeString: string): Date | null => {
     if (!formTripDate || !timeString) return null;
-    const [year, month, day] = formTripDate.split("/").map(Number);
+    const [year, month, day] = formTripDate.split("-").map(Number);
     const [hours, minutes] = timeString.split(":").map(Number);
     return new Date(year, month - 1, day, hours, minutes, 0);
   };

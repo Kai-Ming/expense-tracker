@@ -97,6 +97,7 @@ export default function MileageForm() {
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [mileageRateOutstation, setMileageRateOutstation] =
     useState<number>(0.7);
+  const [mileageRateBike, setMileageRateBike] = useState<number>(0.35);
   const [outStationDistance, setOutstationDistance] = useState<number>(50);
   const [officeCoords, setOfficeCoords] = useState<{
     lat: number;
@@ -126,6 +127,7 @@ export default function MileageForm() {
   const [formTripFromTime, setFormTripFromTime] = useState<Date | null>(null);
   const [formTripToTime, setFormTripToTime] = useState<Date | null>(null);
   const [formRemark, setFormRemark] = useState<string>("");
+  const [formVehicle, setFormVehicle] = useState<string>("");
   const [originCoord, setOriginCoord] = useState<{
     lat: number;
     lng: number;
@@ -220,9 +222,10 @@ export default function MileageForm() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.mileage_rate) setMileageRate(data.mileage_rate);
+        if (data.mileage_rate_bike) setMileageRateBike(data.mileage_rate_bike);
         if (data.mileage_rate_outstation)
           setMileageRateOutstation(data.mileage_rate_oustation);
-        if (data.outstation_disance)
+        if (data.outstation_distance)
           setOutstationDistance(data.outstation_distance);
         /* if (data.office_coordinates) {
           setOfficeCoords({
@@ -401,7 +404,7 @@ export default function MileageForm() {
   };
   const timeStringToDate = (timeString: string): Date | null => {
     if (!formDate || !timeString) return null;
-    const [year, month, day] = formDate.split("/").map(Number);
+    const [year, month, day] = formDate.split("-").map(Number);
     const [hours, minutes] = timeString.split(":").map(Number);
     return new Date(year, month - 1, day, hours, minutes, 0);
   };
@@ -914,6 +917,10 @@ export default function MileageForm() {
       alert("Please fill in both 'Departure' and 'Arrival' times.");
       return;
     }
+    if (!formVehicle) {
+      alert("Please select a vehicle type.");
+      return;
+    }
     if (!userId) {
       alert("You must be logged in.");
       return;
@@ -1023,7 +1030,9 @@ export default function MileageForm() {
 
       let mileageRateTemp = mileageRate;
 
-      if (subDistance > outStationDistance) {
+      if (formVehicle === "Motorbike") {
+        mileageRateTemp = mileageRateBike;
+      } else if (subDistance > outStationDistance) {
         mileageRateTemp = mileageRateOutstation;
       }
 
@@ -1033,6 +1042,7 @@ export default function MileageForm() {
       console.log(subDistance);
       console.log(subToAddress);
       console.log(mileage);
+      console.log(mileageRateTemp);
 
       const tripToSave = {
         user_id: userId,
@@ -1042,6 +1052,7 @@ export default function MileageForm() {
         mileage: parseFloat(mileage.toFixed(2)),
         toll: parseFloat(subToll.toFixed(2)),
         total: (mileage + subToll).toFixed(2),
+        vehicle: formVehicle,
         remark: formRemark.trim() || "",
         from_time: formTripFromTime,
         to_time: formTripToTime,
@@ -1057,11 +1068,10 @@ export default function MileageForm() {
       console.log("Trip saved with ID:", docRef.id);
       console.log(tripToSave);
 
-      // --- Create a local trip object for immediate addition ---
       const newTrip = {
         id: docRef.id,
         ...tripToSave,
-        created_at: new Date(), // local timestamp for display; Firestore will have serverTimestamp
+        created_at: new Date(),
       };
 
       console.log("new trip");
@@ -1094,6 +1104,7 @@ export default function MileageForm() {
     setDestCoord(null);
     setSelectedFromIndex(0);
     setSelectedGoingIndex(0);
+    setFormVehicle("");
   };
 
   const saveTravel = async () => {
@@ -1893,6 +1904,59 @@ export default function MileageForm() {
                                     ]}
                                   >
                                     Home
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                              <Text
+                                style={[
+                                  styles.modalSubtitle,
+                                  styles.fieldLabelMandatory,
+                                  { marginTop: 10 },
+                                ]}
+                              >
+                                Vehicle:
+                              </Text>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <TouchableOpacity
+                                  style={styles.radioContainer}
+                                  onPress={() => setFormVehicle("Car")}
+                                >
+                                  <View
+                                    style={[
+                                      styles.radioOuter,
+                                      formVehicle === "Car" &&
+                                        styles.radioOuterSelected,
+                                    ]}
+                                  >
+                                    {formVehicle === "Car" && (
+                                      <View style={styles.radioInner} />
+                                    )}
+                                  </View>
+                                  <Text style={styles.radioText}>Car</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={styles.radioContainer}
+                                  onPress={() => setFormVehicle("Motorbike")}
+                                >
+                                  <View
+                                    style={[
+                                      styles.radioOuter,
+                                      formVehicle === "Motorbike" &&
+                                        styles.radioOuterSelected,
+                                    ]}
+                                  >
+                                    {formVehicle === "Motorbike" && (
+                                      <View style={styles.radioInner} />
+                                    )}
+                                  </View>
+                                  <Text style={styles.radioText}>
+                                    Motorbike
                                   </Text>
                                 </TouchableOpacity>
                               </View>
@@ -2908,4 +2972,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  radioContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  radioOuter: {
+    height: 20,
+    width: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  radioOuterSelected: { borderColor: "#007AFF" },
+  radioInner: {
+    height: 10,
+    width: 10,
+    borderRadius: 5,
+    backgroundColor: "#007AFF",
+  },
+  radioText: { fontSize: 16 },
 });

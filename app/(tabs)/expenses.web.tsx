@@ -96,6 +96,7 @@ interface Trip {
   to_address: string;
   from_time?: string;
   to_time?: string;
+  vehicle?: string;
   remark: string;
   route_image_url?: string;
   from_home: boolean;
