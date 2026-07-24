@@ -1974,12 +1974,12 @@ export default function settings() {
                             <option value="" disabled>
                               Select a cost center...
                             </option>
-                            <option value="CSD">CSD</option>
                             <option value="HQ">HQ</option>
                             <option value="P_LINE1">P_LINE1</option>
                             <option value="P_LINE2">P_LINE2</option>
                             <option value="P_LINE3">P_LINE3</option>
                             <option value="P_LINE4">P_LINE4</option>
+                            <option value="SVC_REP">SVC_REP</option>
                           </select>
                         </View>
                         <View style={styles.modalUser}>
@@ -2229,12 +2229,12 @@ export default function settings() {
                             <option value="" disabled>
                               Select a cost center...
                             </option>
-                            <option value="CSD">CSD</option>
                             <option value="HQ">HQ</option>
                             <option value="P_LINE1">P_LINE1</option>
                             <option value="P_LINE2">P_LINE2</option>
                             <option value="P_LINE3">P_LINE3</option>
                             <option value="P_LINE4">P_LINE4</option>
+                            <option value="SVC_REP">SVC_REP</option>
                           </select>
                         </View>
                         <View style={styles.modalUser}>
@@ -2336,7 +2336,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.4.1</Text>
+      <Text style={styles.bottomScrollText}>v1.0.4.2</Text>
     </View>
   );
 }
