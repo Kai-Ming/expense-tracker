@@ -758,7 +758,7 @@ export default function GeneralExpenseForm() {
 }
 
 const htmlInputStyle = {
-  padding: "8px 12px",
+  padding: "10px",
   border: "1px solid #ccc",
   width: "100%",
   maxWidth: "200px",

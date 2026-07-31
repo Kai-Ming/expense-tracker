@@ -127,6 +127,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="dashboard" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="submit"
         options={{
           title: "Submit Expense",
