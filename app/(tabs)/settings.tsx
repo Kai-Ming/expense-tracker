@@ -10,6 +10,7 @@ import {
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
+  addDoc,
   collection,
   doc,
   GeoPoint,
@@ -21,6 +22,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,7 +37,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { createNewUser, db } from "../../firebaseConfig";
+import { createNewUser, db, storage } from "../../firebaseConfig";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -505,6 +507,38 @@ export default function settings() {
       alert("An error occurred while updating the address.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const uploadDocuments = async () => {
+    if (documentFiles.length === 0) {
+      alert("Please select a document to upload");
+    }
+
+    try {
+      const documentUrls: string[] = [];
+      for (const file of documentFiles) {
+        const storageRef = ref(
+          storage,
+          `documents/${userId}/${Date.now()}_${file.name}`,
+        );
+        const uploadResult = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(uploadResult.ref);
+        documentUrls.push(url);
+      }
+
+      await addDoc(collection(db, "documents"), {
+        user_id: userId,
+        user_name: username,
+        document_urls: documentUrls,
+        created_at: serverTimestamp(),
+      });
+      setDocumentFiles([]);
+      setDocumentModalVisible(false);
+      alert("Documents submitted successfully!");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save documents.");
     }
   };
 
@@ -1430,12 +1464,12 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      {/* <TouchableOpacity
+      <TouchableOpacity
         onPress={() => setDocumentModalVisible(true)}
         style={styles.button}
       >
         <Text style={styles.buttonText}>Add Documents</Text>
-      </TouchableOpacity> */}
+      </TouchableOpacity>
       <Modal
         animationType="fade"
         transparent={true}
@@ -1457,22 +1491,34 @@ export default function settings() {
                 <Text style={styles.modalTitle}>Set Document</Text>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.modalSubtitle}>Current Password:</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Current Password"
-                    placeholderTextColor="#999999"
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    secureTextEntry
-                    editable={!isSaving}
+                  <Text style={styles.modalSubtitle}>Documents:</Text>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setDocumentFiles(Array.from(e.target.files));
+                      }
+                    }}
+                    style={htmlInputStyle}
                   />
+                  {documentFiles.length > 0 && (
+                    <View style={styles.documentList}>
+                      <Text style={styles.documentLabel}>Selected files:</Text>
+                      {documentFiles.map((file, idx) => (
+                        <Text key={idx} style={styles.documentFileName}>
+                          {file.name}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={[styles.dialogButton, styles.cancelButton]}
                     onPress={() => {
+                      setDocumentFiles([]);
                       setDocumentModalVisible(false);
                     }}
                     disabled={isSaving}
@@ -1486,7 +1532,7 @@ export default function settings() {
                       styles.submitButton,
                       isSaving && { opacity: 0.7 },
                     ]}
-                    onPress={changePassword}
+                    onPress={uploadDocuments}
                     disabled={isSaving}
                   >
                     {isSaving ? (
@@ -2336,10 +2382,22 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.0.4.2</Text>
+      <Text style={styles.bottomScrollText}>v1.1</Text>
     </View>
   );
 }
+
+const htmlInputStyle = {
+  padding: "10px",
+  border: "1px solid #ccc",
+  width: "100%",
+  maxWidth: "200px",
+  minHeight: "36px",
+  boxSizing: "border-box" as const,
+  backgroundColor: "#fff",
+  marginRight: "10px",
+};
+const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
 
 const dropdownInput = {
   width: "100%",
@@ -2547,4 +2605,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingRight: 10,
   },
+  documentList: { marginTop: 5, marginBottom: 10 },
+  documentLabel: { fontSize: 12, fontWeight: "500", color: "#555" },
+  documentFileName: { fontSize: 11, color: "#666", marginLeft: 10 },
 });
