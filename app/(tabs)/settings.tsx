@@ -37,6 +37,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import Icon from "react-native-vector-icons/Ionicons";
 import { createNewUser, db, storage } from "../../firebaseConfig";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -115,6 +116,7 @@ export default function settings() {
   const [formEmail, setFormEmail] = useState<string>("");
   const [formPassword, setFormPassword] = useState<string>("");
   const [formConfirmPassword, setFormConfirmPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formEssNo, setFormEssNo] = useState<string>("");
   const [formDepartment, setFormDepartment] = useState<string>("");
   const [formGrade, setFormGrade] = useState<string>("");
@@ -442,6 +444,7 @@ export default function settings() {
         setCurrentPassword("");
         setNewPassword("");
         setConfirmNewPassword("");
+        setShowPassword(false);
       }
     } catch (error: any) {
       const err = error as any;
@@ -741,6 +744,7 @@ export default function settings() {
   };
 
   const clearUserForm = () => {
+    setShowPassword(false);
     setFormUsername("");
     setFormEmail("");
     setFormPassword("");
@@ -1311,44 +1315,79 @@ export default function settings() {
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>Current Password:</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Current Password"
-                    placeholderTextColor="#999999"
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    secureTextEntry
-                    editable={!isSaving}
-                    autoComplete="new-password"
-                  />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Current Password"
+                      placeholderTextColor="#999999"
+                      value={currentPassword}
+                      onChangeText={setCurrentPassword}
+                      secureTextEntry={!showPassword}
+                      editable={!isSaving}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Icon
+                        name={showPassword ? "eye" : "eye-off"}
+                        size={24}
+                        color="#888"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>New Password:</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="New Password"
-                    placeholderTextColor="#999999"
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    secureTextEntry
-                    editable={!isSaving}
-                  />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="New Password"
+                      placeholderTextColor="#999999"
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      secureTextEntry={!showPassword}
+                      editable={!isSaving}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Icon
+                        name={showPassword ? "eye" : "eye-off"}
+                        size={24}
+                        color="#888"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>
                     Confirm New Password:
                   </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm New Password"
-                    placeholderTextColor="#999999"
-                    value={confirmNewPassword}
-                    onChangeText={setConfirmNewPassword}
-                    secureTextEntry
-                    editable={!isSaving}
-                  />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Confirm New Password"
+                      placeholderTextColor="#999999"
+                      value={confirmNewPassword}
+                      onChangeText={setConfirmNewPassword}
+                      secureTextEntry={!showPassword}
+                      editable={!isSaving}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Icon
+                        name={showPassword ? "eye" : "eye-off"}
+                        size={24}
+                        color="#888"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.buttonRow}>
@@ -1359,6 +1398,7 @@ export default function settings() {
                       setCurrentPassword("");
                       setNewPassword("");
                       setConfirmNewPassword("");
+                      setShowPassword(false);
                     }}
                     disabled={isSaving}
                   >
@@ -1464,12 +1504,12 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         onPress={() => setDocumentModalVisible(true)}
         style={styles.button}
       >
         <Text style={styles.buttonText}>Add Documents</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -1488,7 +1528,7 @@ export default function settings() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.modalView}>
-                <Text style={styles.modalTitle}>Set Document</Text>
+                <Text style={styles.modalTitle}>Upload Document</Text>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.modalSubtitle}>Documents:</Text>
@@ -1918,31 +1958,54 @@ export default function settings() {
                       />
 
                       <Text style={styles.modalSubtitle}>Password:</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter Password"
-                        placeholderTextColor="#999999"
-                        value={formPassword}
-                        onChangeText={setFormPassword}
-                        editable={!isSaving}
-                        keyboardType="default"
-                        secureTextEntry
-                        autoComplete="new-password"
-                      />
+                      <View style={styles.passwordContainer}>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter Password"
+                          placeholderTextColor="#999999"
+                          value={formPassword}
+                          onChangeText={setFormPassword}
+                          editable={!isSaving}
+                          keyboardType="default"
+                          secureTextEntry={!showPassword}
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeButton}
+                          onPress={() => setShowPassword(!showPassword)}
+                        >
+                          <Icon
+                            name={showPassword ? "eye" : "eye-off"}
+                            size={24}
+                            color="#888"
+                          />
+                        </TouchableOpacity>
+                      </View>
 
                       <Text style={styles.modalSubtitle}>
                         Confirm Password:
                       </Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter Password"
-                        placeholderTextColor="#999999"
-                        value={formConfirmPassword}
-                        onChangeText={setFormConfirmPassword}
-                        editable={!isSaving}
-                        keyboardType="default"
-                        secureTextEntry
-                      />
+                      <View style={styles.passwordContainer}>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter Password"
+                          placeholderTextColor="#999999"
+                          value={formConfirmPassword}
+                          onChangeText={setFormConfirmPassword}
+                          editable={!isSaving}
+                          keyboardType="default"
+                          secureTextEntry={!showPassword}
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeButton}
+                          onPress={() => setShowPassword(!showPassword)}
+                        >
+                          <Icon
+                            name={showPassword ? "eye" : "eye-off"}
+                            size={24}
+                            color="#888"
+                          />
+                        </TouchableOpacity>
+                      </View>
 
                       <Text style={styles.modalSubtitle}>ESS No.:</Text>
                       <TextInput
@@ -2382,7 +2445,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.1</Text>
+      <Text style={styles.bottomScrollText}>v1.1.1</Text>
     </View>
   );
 }
@@ -2608,4 +2671,14 @@ const styles = StyleSheet.create({
   documentList: { marginTop: 5, marginBottom: 10 },
   documentLabel: { fontSize: 12, fontWeight: "500", color: "#555" },
   documentFileName: { fontSize: 11, color: "#666", marginLeft: 10 },
+  passwordContainer: {
+    position: "relative",
+    width: "100%",
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    padding: 2,
+  },
 });

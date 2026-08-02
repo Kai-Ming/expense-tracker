@@ -16,11 +16,13 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import Icon from "react-native-vector-icons/Ionicons";
 import { auth } from "../firebaseConfig";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [formEmail, setFormEmail] = useState("");
@@ -37,7 +39,7 @@ export default function LoginPage() {
     try {
       //const auth = getAuth();
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      router.replace("/submit");
+      router.replace("/dashboard");
     } catch (error: any) {
       console.error("Login error:", error.code, error.message);
       let errorMessage = "An error occurred during login.";
@@ -54,7 +56,7 @@ export default function LoginPage() {
           "Invalid email or password. Please check your credentials and try again.";
       }
 
-      Alert.alert("Login Failed", errorMessage);
+      alert(`Login Failed: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -100,14 +102,26 @@ export default function LoginPage() {
         autoCapitalize="none"
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={[styles.input, { width: "100%" }]}
+          placeholder="Password"
+          placeholderTextColor="#888"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+        />
+        <TouchableOpacity
+          style={styles.eyeButton}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Icon
+            name={showPassword ? "eye" : "eye-off"}
+            size={24}
+            color="#888"
+          />
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
@@ -318,5 +332,15 @@ const styles = StyleSheet.create({
   textStyle: {
     color: "white",
     fontWeight: "bold",
+  },
+  passwordContainer: {
+    position: "relative",
+    width: "80%",
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    padding: 2,
   },
 });
