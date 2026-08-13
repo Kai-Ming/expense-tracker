@@ -4051,23 +4051,24 @@ export default function ExpensesWebScreen() {
                   </Text>
                 </TouchableOpacity>
               )} */}
-            {expense.approval_status === 0 && expense.user_id === userId && (
-              <TouchableOpacity
-                style={{
-                  backgroundColor: "#F44336",
-                  padding: 8,
-                  borderRadius: 6,
-                  marginLeft: 8,
-                  minWidth: 60,
-                  alignItems: "center",
-                }}
-                onPress={() => handleDelete(expense.id)}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-            )}
+            {expense.approval_status === 0 &&
+              (expense.user_id === userId || role === 0) && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#F44336",
+                    padding: 8,
+                    borderRadius: 6,
+                    marginLeft: 8,
+                    minWidth: 60,
+                    alignItems: "center",
+                  }}
+                  onPress={() => handleDelete(expense.id)}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         </View>
 
@@ -4656,23 +4657,24 @@ export default function ExpensesWebScreen() {
                   </Text>
                 </TouchableOpacity>
               )} */}
-            {expense.approval_status === 0 && expense.user_id === userId && (
-              <TouchableOpacity
-                style={{
-                  backgroundColor: "#F44336",
-                  padding: 8,
-                  borderRadius: 6,
-                  marginLeft: 8,
-                  minWidth: 60,
-                  alignItems: "center",
-                }}
-                onPress={() => handleDelete(expense.id)}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-            )}
+            {expense.approval_status === 0 &&
+              (expense.user_id === userId || role === 0) && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#F44336",
+                    padding: 8,
+                    borderRadius: 6,
+                    marginLeft: 8,
+                    minWidth: 60,
+                    alignItems: "center",
+                  }}
+                  onPress={() => handleDelete(expense.id)}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         </View>
 
@@ -5025,6 +5027,40 @@ export default function ExpensesWebScreen() {
     );
   };
 
+  const editRequest = async (id: string) => {
+    const docRef = doc(db, "travel_requests", id);
+    await updateDoc(docRef, {
+      locked: false,
+    });
+  };
+
+  const deleteRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "travel_requests", id));
+    } catch (error) {
+      console.error("Error deleting trip:", error);
+      if (Platform.OS === "web") {
+        window.alert("Error deleting expense. Please try again.");
+      } else {
+        alert("Could not delete the expense.");
+      }
+    }
+  };
+
+  const deleteOutstation = async (trip: ExpenseGroup, editTrip: boolean) => {
+    const expenses = trip.data;
+
+    for (const e of expenses) {
+      await handleDelete(e.id);
+    }
+
+    if (editTrip) {
+      await editRequest(trip.request_id);
+    } else {
+      await deleteRequest(trip.request_id);
+    }
+  };
+
   const renderOutstationDetailView = (trip: ExpenseGroup) => {
     //const isEditing = editingId === expense.id;
     const isEditing = false;
@@ -5061,6 +5097,50 @@ export default function ExpensesWebScreen() {
           <Text style={{ fontSize: 20, fontWeight: "600" }}>
             Expense Details
           </Text>
+
+          <View style={{ flexDirection: "row" }}>
+            {expense.approval_status === 0 &&
+              (expense.user_id === userId || role === 0) && (
+                <>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#F44336",
+                      padding: 8,
+                      borderRadius: 6,
+                      marginLeft: 8,
+                      minWidth: 60,
+                      alignItems: "center",
+                    }}
+                    onPress={() => {
+                      console.log(trip);
+                      deleteOutstation(trip, true);
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Delete Trip & Expenses
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#F44336",
+                      padding: 8,
+                      borderRadius: 6,
+                      marginLeft: 8,
+                      minWidth: 60,
+                      alignItems: "center",
+                    }}
+                    onPress={() => {
+                      console.log(trip);
+                      deleteOutstation(trip, false);
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Delete Expenses
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+          </View>
         </View>
         <View
           style={{

@@ -5,6 +5,8 @@ import {
   addDoc,
   collection,
   doc,
+  DocumentData,
+  DocumentReference,
   getDoc,
   onSnapshot,
   orderBy,
@@ -17,6 +19,7 @@ import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -1129,6 +1132,36 @@ export default function OutstationExpenseForm() {
 
   const handleRequestEdit = async () => {
     console.log("editing");
+  };
+
+  const handleDeleteRequest = async () => {
+    const performDelete = async () => {
+      try {
+        await deleteDoc(doc(db, "travel_requests", editRequestId));
+      } catch (error) {
+        console.error("Error deleting expense:", error);
+        if (Platform.OS === "web") {
+          window.alert("Error deleting expense. Please try again.");
+        } else {
+          Alert.alert("Error", "Could not delete the expense.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to delete this expense?")) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Delete Expense",
+        "Are you sure you want to delete this expense?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: performDelete },
+        ],
+      );
+    }
   };
 
   const handleRequestSubmit = async () => {
@@ -4728,19 +4761,38 @@ export default function OutstationExpenseForm() {
         </View> */}
         {renderEditModal()}
 
-        <TouchableOpacity
-          onPress={handleRequestSubmit}
-          style={[styles.button, { marginBottom: 20 }]}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {editingRequest ? "Submit Edit" : "Submit Request"}
-            </Text>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <TouchableOpacity
+            onPress={handleRequestSubmit}
+            style={[styles.button, { marginBottom: 20 }]}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {editingRequest ? "Submit Edit" : "Submit Request"}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {editingRequest && (
+            <TouchableOpacity
+              onPress={handleDeleteRequest}
+              style={[
+                styles.button,
+                { marginBottom: 20, backgroundColor: "#F44336" },
+              ]}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.buttonText}>Delete Request</Text>
+              )}
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -5368,3 +5420,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+function deleteDoc(arg0: DocumentReference<DocumentData, DocumentData>) {
+  throw new Error("Function not implemented.");
+}
