@@ -1,5 +1,5 @@
 import { Text, View } from "@/components/Themed";
-import YearLineChart from "@/components/YearLineChart";
+import YearLineChart from "@/components/YearBarChart";
 import { db } from "@/firebaseConfig";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
@@ -11,7 +11,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -176,6 +176,7 @@ export default function dashboard() {
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedUser, setSelectedUser] = useState<string>("");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
 
   const [showUserModal, setShowUserModal] = useState(false);
   const [tabIndex, setTabIndex] = useState<number>(1);
@@ -355,11 +356,32 @@ export default function dashboard() {
     return items.filter((item) => item.date?.startsWith(searchPrefix) ?? false);
   };
 
+  const userMap = useMemo(() => {
+    const map = new Map();
+    allUsers.forEach((user) => {
+      map.set(user.username, user);
+    });
+    return map;
+  }, [allUsers]);
+
+  const filteredUsers = useMemo(() => {
+    if (!selectedDepartment) return allUsers;
+    return allUsers.filter((user) => user.department === selectedDepartment);
+  }, [allUsers, selectedDepartment]);
+
   const filteredUserMileage = allMileage.filter((e) => {
-    if (!selectedUser) {
-      return true;
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedDepartment && user.department !== selectedDepartment) {
+      return false;
     }
-    return !(selectedUser && e.user_name != selectedUser);
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
   });
 
   const filteredMileage = filteredUserMileage.filter((e) => {
@@ -417,10 +439,18 @@ export default function dashboard() {
   );
 
   const filteredUserGeneral = allGeneral.filter((e) => {
-    if (!selectedUser) {
-      return true;
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedDepartment && user.department !== selectedDepartment) {
+      return false;
     }
-    return !(selectedUser && e.user_name != selectedUser);
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
   });
 
   const filteredGeneral = filteredUserGeneral.filter((e) => {
@@ -455,10 +485,18 @@ export default function dashboard() {
   };
 
   const filteredUserOutstation = allOutstation.filter((e) => {
-    if (!selectedUser) {
-      return true;
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedDepartment && user.department !== selectedDepartment) {
+      return false;
     }
-    return !(selectedUser && e.user_name != selectedUser);
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
   });
 
   const filteredOutstation = filteredUserOutstation.filter((e) => {
@@ -1317,15 +1355,15 @@ export default function dashboard() {
       ],
     };
     const barColors = [
-      ...stateChartData.datasets[0].data.map(() => "rgba(66, 133, 244, 1)"),
+      ...stateChartData.datasets[0].data.map(() => "rgb(9, 67, 161)"),
       "rgba(0, 0, 0, 0)", // Transparent for dummy
     ];
 
     return (
       <View>
-        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
-          Trips by Region
-        </Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.titleText}>Trips by Region</Text>
+        </View>
         <BarChart
           data={realData}
           width={screenWidth - 30}
@@ -1333,14 +1371,15 @@ export default function dashboard() {
           chartConfig={{
             backgroundGradientFrom: "#ffffff",
             backgroundGradientTo: "#ffffff",
-            color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
+            color: (opacity = 1) => `rgba(0, 9, 0, ${opacity})`,
             labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
             style: {
               borderRadius: 16,
             },
             propsForLabels: {
-              fontSize: 10,
+              fontSize: 14,
             },
+            barPercentage: 3,
           }}
           style={{
             marginVertical: 8,
@@ -1398,7 +1437,7 @@ export default function dashboard() {
 
               {/* Table Body */}
               <ScrollView style={styles.modalList}>
-                {allUsers.map((user) => {
+                {filteredUsers.map((user) => {
                   return (
                     <TouchableOpacity
                       key={user.id}
@@ -2134,6 +2173,32 @@ export default function dashboard() {
           </View>
         )}
 
+        {role === 0 && (
+          <View style={{ marginLeft: 10 }}>
+            <Text>Department:</Text>
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              style={dropdownInput}
+            >
+              <option value="">Select a department...</option>
+              <option value="CSD">CSD</option>
+              <option value="FINANCE">FINANCE</option>
+              <option value="MARKETING">MARKETING</option>
+              <option value="MD OFFICE">MD OFFICE</option>
+              <option value="OPERATIONS">OPERATIONS</option>
+              <option value="OPERATIONS PNG">OPERATIONS PNG</option>
+              <option value="PRODUCT MGMT.">PRODUCT MGMT.</option>
+              <option value="PROJECT">PROJECT</option>
+              <option value="SALES PL1">SALES PL1</option>
+              <option value="SALES PL2">SALES PL2</option>
+              <option value="SALES PL3">SALES PL3</option>
+              <option value="SALES PL4">SALES PL4</option>
+              <option value="SC">SC</option>
+            </select>
+          </View>
+        )}
+
         {renderSelectUserModal()}
       </View>
       <View style={styles.tabRow}>
@@ -2198,6 +2263,17 @@ const htmlMultiSelectStyle = {
   maxHeight: "150px", // Allow scrolling if many items
   overflowY: "auto" as const,
   minHeight: "36px", // Same as single select
+};
+
+const dropdownInput = {
+  width: "100%",
+  backgroundColor: "#f9f9f9",
+  borderWidth: 0,
+  borderColor: "#eee",
+  borderRadius: 8,
+  padding: 12,
+  fontSize: 16,
+  color: "#333",
 };
 
 const styles = StyleSheet.create({
@@ -2469,7 +2545,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   titleText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#333",
     textAlign: "center",

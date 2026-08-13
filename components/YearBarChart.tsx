@@ -1,4 +1,4 @@
-// YearLineChart.tsx - Labels hidden
+// YearBarChart.tsx - Full text without cutting
 import React, { useMemo, useState } from "react";
 import {
   Dimensions,
@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { LineChart } from "react-native-chart-kit";
+import { BarChart } from "react-native-chart-kit";
 
 const screenWidth = Dimensions.get("window").width;
 
-export interface YearLineChartProps {
+export interface YearBarChartProps {
   data: number[];
   labels: string[];
   labelFormatter: (value: string) => string;
@@ -20,9 +20,11 @@ export interface YearLineChartProps {
   strokeColor?: string;
   segments?: number;
   formatTooltip?: (value: number) => string;
+  showValuesOnTop?: boolean;
+  valueFormatter?: (value: number) => string;
 }
 
-const YearLineChart: React.FC<YearLineChartProps> = ({
+const YearBarChart: React.FC<YearBarChartProps> = ({
   data,
   labels,
   labelFormatter,
@@ -30,8 +32,10 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
   strokeColor = "#6200ee",
   segments = 5,
   formatTooltip,
+  showValuesOnTop = true,
+  valueFormatter,
 }) => {
-  const [selectedPoint, setSelectedPoint] = useState<{
+  const [selectedBar, setSelectedBar] = useState<{
     index: number;
     value: number;
   } | null>(null);
@@ -44,7 +48,6 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
     const maxDataValue = Math.max(...data);
     let step = 10;
 
-    // Auto-calculate step based on data range
     if (maxDataValue > 100000000) step = 10000000;
     else if (maxDataValue > 50000000) step = 5000000;
     else if (maxDataValue > 10000000) step = 1000000;
@@ -73,6 +76,24 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
     return data.map((value) => value * scaleFactor);
   }, [data, maxValue]);
 
+  // Calculate bar positions for custom value labels
+  const barPositions = useMemo(() => {
+    const padding = 32;
+    const chartAreaWidth = chartWidth - padding * 2;
+    const barWidth = chartAreaWidth / data.length;
+    const chartHeight = 220;
+    const topPadding = 30;
+
+    return data.map((value, index) => {
+      const x = padding + index * barWidth + barWidth / 2;
+      const scaleFactor = maxValue / Math.max(...data);
+      const barHeight = (value / maxValue) * (chartHeight - topPadding);
+      const y = chartHeight - barHeight - topPadding / 2;
+
+      return { x, y, value };
+    });
+  }, [data, maxValue, chartWidth]);
+
   // PanResponder for touch handling
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -80,12 +101,12 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
       const { locationX } = evt.nativeEvent;
       const padding = 32;
       const chartAreaWidth = chartWidth - padding * 2;
-      const step = chartAreaWidth / (data.length - 1);
+      const barWidth = chartAreaWidth / data.length;
       const relativeX = locationX - padding;
-      const index = Math.round(relativeX / step);
+      const index = Math.floor(relativeX / barWidth);
 
       if (index >= 0 && index < data.length) {
-        setSelectedPoint({
+        setSelectedBar({
           index: index,
           value: data[index],
         });
@@ -97,16 +118,25 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
     },
   });
 
+  // Format value for display
+  const formatValue = (value: number) => {
+    if (valueFormatter) {
+      return valueFormatter(value);
+    }
+    if (formatTooltip) {
+      return formatTooltip(value);
+    }
+    return value.toString();
+  };
+
   return (
     <View style={{ position: "relative" }}>
-      <LineChart
+      <BarChart
         data={{
           labels: labels,
           datasets: [
             {
               data: scaledData,
-              color: (opacity = 1) => color.replace("1)", `${opacity})`),
-              strokeWidth: 3,
             },
           ],
         }}
@@ -117,13 +147,12 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
           backgroundGradientFrom: "#ffffff",
           backgroundGradientTo: "#ffffff",
           decimalPlaces: 0,
-          color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+          color: (opacity = 1) => color.replace("1)", `${opacity})`),
           labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
           style: { borderRadius: 16 },
-          propsForDots: {
-            r: "6",
-            strokeWidth: "2",
-            stroke: strokeColor,
+          propsForLabels: {
+            fontSize: 14,
+            fontWeight: "600",
           },
           propsForBackgroundLines: {
             strokeDasharray: "5, 5",
@@ -133,17 +162,64 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
           marginVertical: 8,
           borderRadius: 16,
         }}
-        formatYLabel={() => ""} // Remove Y-axis labels
+        formatYLabel={() => ""}
         fromZero={true}
         withVerticalLabels={true}
-        withHorizontalLabels={false} // Hide horizontal labels
-        withVerticalLines={true}
+        withHorizontalLabels={false}
+        withVerticalLines={false}
         withHorizontalLines={true}
         segments={segments}
+        showValuesOnTopOfBars={false}
       />
 
+      {/* Custom value labels on top of bars - Full text without cutting */}
+      {showValuesOnTop && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: "none",
+          }}
+        >
+          {barPositions.map((bar, index) => {
+            const formattedValue = formatValue(bar.value);
+            // Calculate text width based on content
+            const textWidth = Math.max(60, formattedValue.length * 10);
+
+            return (
+              <Text
+                key={index}
+                style={{
+                  position: "absolute",
+                  left: bar.x - textWidth / 2,
+                  top: bar.y - 25,
+                  width: textWidth,
+                  fontSize: 14,
+                  fontFamily: "serif",
+                  color: strokeColor,
+                  textAlign: "center",
+                  backgroundColor: "rgba(255,255,255,0.9)", // Slight background for readability
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                }}
+                numberOfLines={1}
+                minimumFontScale={0.8}
+                adjustsFontSizeToFit
+                allowFontScaling
+              >
+                {formattedValue}
+              </Text>
+            );
+          })}
+        </View>
+      )}
+
       {/* Touch overlay */}
-      <View
+      {/* <View
         {...panResponder.panHandlers}
         style={{
           position: "absolute",
@@ -154,9 +230,9 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
           backgroundColor: "transparent",
           zIndex: 1,
         }}
-      />
+      /> */}
 
-      {selectedPoint && (
+      {selectedBar && (
         <View
           style={[
             styles.tooltip,
@@ -167,15 +243,15 @@ const YearLineChart: React.FC<YearLineChartProps> = ({
             },
           ]}
         >
-          <Text style={styles.tooltipLabel}>{labels[selectedPoint.index]}</Text>
+          <Text style={styles.tooltipLabel}>{labels[selectedBar.index]}</Text>
           <Text style={[styles.tooltipValue, { color: strokeColor }]}>
             {formatTooltip
-              ? formatTooltip(selectedPoint.value)
-              : selectedPoint.value.toString()}
+              ? formatTooltip(selectedBar.value)
+              : selectedBar.value.toString()}
           </Text>
           <TouchableOpacity
             style={styles.tooltipClose}
-            onPress={() => setSelectedPoint(null)}
+            onPress={() => setSelectedBar(null)}
           >
             <Text style={styles.tooltipCloseText}>×</Text>
           </TouchableOpacity>
@@ -189,8 +265,8 @@ const styles = StyleSheet.create({
   tooltip: {
     position: "absolute",
     backgroundColor: "white",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#ddd",
@@ -199,16 +275,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    minWidth: 80,
+    minWidth: 120,
+    maxWidth: 250, // Allow tooltip to expand
     alignItems: "center",
   },
   tooltipLabel: {
-    fontSize: 10,
+    fontSize: 14,
     color: "#666",
-    marginBottom: 2,
+    marginBottom: 4,
+    fontWeight: "500",
   },
   tooltipValue: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "bold",
   },
   tooltipClose: {
@@ -229,4 +307,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default YearLineChart;
+export default YearBarChart;

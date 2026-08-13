@@ -16,6 +16,7 @@ import {
   GeoPoint,
   getDocs,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -23,7 +24,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +59,116 @@ interface User {
     longitude: number;
   };
   home_address: string;
+}
+
+interface Expense {
+  id: string;
+  distance: number;
+  date?: string;
+  trip_ids: string[];
+  purpose: string;
+  from_time?: string;
+  to_time?: string;
+  duration?: string;
+  company: string;
+  name: string;
+  trip_report?: string;
+  contact_number: string;
+  email: string;
+  customers: any[];
+  parking: number;
+  toll: number;
+  mileage: number;
+  expense: number;
+  expense_purpose: string;
+  vendor: string;
+  cost: number;
+  user_id: string;
+  user_name?: string;
+  business_card_url?: string;
+  route_image_url?: string;
+  receipt_urls?: string[];
+  approval_status: number;
+  type: number;
+  created_at: any;
+}
+
+interface GeneralExpense {
+  id: string;
+  distance: number;
+  date?: string;
+  expense_type: string;
+  amount: number;
+  company?: string;
+  name?: string;
+  customers: any[];
+  vendor: string;
+  contact_number?: string;
+  user_id: string;
+  user_name?: string;
+  email?: string;
+  expense_report?: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
+
+interface OutstationExpense {
+  id: string;
+  user_id: string;
+  username: string;
+  user_name: string;
+  request_id: string;
+  start_date: string;
+  end_date: string;
+  travel_purposes: string[];
+  trip_title: string;
+  date: string;
+  country: string;
+  location: string;
+  airfare: number;
+  airfare_remark: string;
+  mileage: number;
+  trip_ids: string[];
+  toll: number;
+  toll_remark: string;
+  parking: number;
+  parking_remark: string;
+  transport: number;
+  transport_remark: string;
+  hotel: number;
+  hotel_remark: string;
+  own_acc: number;
+  own_acc_sharing: string;
+  own_acc_remark: string;
+  entertainment: number;
+  entertainment_remark: string;
+  laundry: number;
+  laundry_remark: string;
+  others: number;
+  others_remark: string;
+  total: number;
+  departure_time: string;
+  arrival_time: string;
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+  meal: number;
+  trip_report: string;
+  customers: any[];
+  business_card_urls: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
+
+interface Customers {
+  name: string;
+  company: string;
+  email: string;
+  number: string;
+  time: string;
+  address: string;
 }
 
 export default function settings() {
@@ -124,6 +235,12 @@ export default function settings() {
   const [formRole, setFormRole] = useState<string>("");
   const [formOffice, setFormOffice] = useState<string>("");
   const [formActive, setFormActive] = useState(true);
+
+  const [customerModalVisible, setCustomerModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<string>("");
+  const [allMileage, setAllMileage] = useState<Expense[]>([]);
+  const [allGeneral, setAllGeneral] = useState<GeneralExpense[]>([]);
+  const [allOutstation, setAllOutstation] = useState<OutstationExpense[]>([]);
 
   const [editUserModalVisible, setEditUserModalVisible] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -266,6 +383,50 @@ export default function settings() {
     });
     return () => unsubscribe();
   }, [role]);
+
+  useEffect(() => {
+    if (!userId) return;
+    // Wait until role is determined (not null)
+    if (role === null) return;
+
+    let q;
+    if (role === 0) {
+      // Admin: fetch all expenses (no user_id filter)
+      q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
+    } else {
+      // Regular user: fetch only their own expenses
+      q = query(
+        collection(db, "expenses"),
+        where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const expensesData: Expense[] = [];
+      const generalExpenseData: GeneralExpense[] = [];
+      const outstationExpenseData: OutstationExpense[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.type === 1) {
+          expensesData.push({ id: doc.id, ...data } as Expense);
+        } else if (data.type === 2) {
+          generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
+        } else if (data.type === 3) {
+          outstationExpenseData.push({
+            id: doc.id,
+            ...data,
+          } as OutstationExpense);
+        }
+      });
+      setAllMileage(expensesData);
+      setAllGeneral(generalExpenseData);
+      setAllOutstation(outstationExpenseData);
+    });
+
+    return () => unsubscribe();
+  }, [userId, role]);
 
   const getAddressFromCoords = async (
     lat: number,
@@ -971,6 +1132,7 @@ export default function settings() {
                       disabled={isAdded}
                       onPress={() => {
                         setSelectedUserId(user.id);
+                        setSelectedUser(user.username);
                         setSelectUserModalVisible(false);
                         handleSelectUser(user.id);
                       }}
@@ -1114,6 +1276,60 @@ export default function settings() {
         </TouchableOpacity>
       </Modal>
     );
+  };
+
+  const userMap = useMemo(() => {
+    const map = new Map();
+    allUsers.forEach((user) => {
+      map.set(user.username, user);
+    });
+    return map;
+  }, [allUsers]);
+
+  const filteredMileage = allMileage.filter((e) => {
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const filteredGeneral = allGeneral.filter((e) => {
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const filteredOutstation = allOutstation.filter((e) => {
+    const user = userMap.get(e.user_name);
+    if (!user) return false;
+
+    if (selectedUser && e.user_name !== selectedUser) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const handleExport = async () => {
+    if (selectedUser === "" || selectedUserId === "") {
+      console.log("stop");
+      return;
+    }
+    console.log("exporting");
+    /* await exportCustomersToCSV(
+      filteredMileage,
+      filteredGeneral,
+      filteredOutstation,
+    ); */
   };
 
   return (
@@ -2441,11 +2657,94 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
-
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.1.1</Text>
+
+      {role === 0 && (
+        <>
+          <TouchableOpacity
+            onPress={() => {
+              setCustomerModalVisible(true);
+            }}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Export Customers</Text>
+          </TouchableOpacity>
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={customerModalVisible}
+            statusBarTranslucent={true}
+            onRequestClose={() => !isSaving && setCustomerModalVisible(false)}
+          >
+            <View style={styles.screenOverlay}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.keyboardContainer}
+              >
+                <ScrollView
+                  style={[styles.modalScrollWrapper, { overflow: "visible" }]}
+                  contentContainerStyle={[
+                    styles.modalScrollContent,
+                    { overflow: "visible" },
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.modalView}>
+                    <Text style={styles.modalTitle}>Export Customers</Text>
+                    <TouchableOpacity
+                      style={styles.selectUserButton}
+                      onPress={() => {
+                        setSelectUserModalVisible(true);
+                        //console.log(selectedUser);
+                      }}
+                    >
+                      <Text style={styles.buttonText}>
+                        {selectedUser === "" ? " Select User" : selectedUser}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.dialogButton, styles.cancelButton]}
+                        onPress={() => {
+                          setCustomerModalVisible(false);
+                          setSelectedUserId("");
+                          clearUserForm();
+                          setSelectedUser("");
+                        }}
+                        disabled={isSaving}
+                      >
+                        <Text style={styles.textStyle}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.dialogButton,
+                          styles.submitButton,
+                          (isSaving || selectedUser === "") && { opacity: 0.7 },
+                        ]}
+                        onPress={handleExport}
+                        disabled={isSaving || selectedUser === ""}
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.textStyle}>Download</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
+            </View>
+          </Modal>
+          {renderSelectUserModal()}
+        </>
+      )}
+      <Text style={styles.bottomScrollText}>v1.2</Text>
     </View>
   );
 }

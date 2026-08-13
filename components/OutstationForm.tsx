@@ -2759,6 +2759,7 @@ export default function OutstationExpenseForm() {
     setFormTripPurposes([]);
     setAllDays([]);
     setEditTripId("");
+    setEditingRequest(false);
     console.log("resetting all days");
   };
 

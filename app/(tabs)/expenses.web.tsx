@@ -980,11 +980,11 @@ export default function ExpensesWebScreen() {
     let reportCostCenter = user?.cost_center;
 
     if (!user) {
-      reportUsername = appliedUsername;
-      reportEssNo = appliedEssNo;
-      reportDepartment = appliedDepartment;
-      reportGrade = appliedGrade;
-      reportCostCenter = appliedCostCenter;
+      reportUsername = username;
+      reportEssNo = essNo;
+      reportDepartment = department;
+      reportGrade = grade;
+      reportCostCenter = costCenter;
     }
 
     const htmlContent = `
