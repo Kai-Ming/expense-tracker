@@ -311,6 +311,12 @@ export default function OutstationExpenseForm() {
     },
   ];
 
+  const noAddress = [
+    "Eydo0UoXD1fyyI7hr5pL8oCMhQ22",
+    "fh5YgOEdhmPcs0isuS505MwnB0K3",
+    "7vFkURLn0XXfgVuGgjS4qrQGC722",
+  ];
+
   useEffect(() => {
     const q = query(collection(db, "users"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1337,6 +1343,8 @@ export default function OutstationExpenseForm() {
   const handleNextDay = async () => {
     console.log("next day");
 
+    const isAddressRequired = !noAddress.includes(userId || "");
+
     const isCustomersFormValid =
       formCustomers.every(
         (customer) =>
@@ -1346,10 +1354,11 @@ export default function OutstationExpenseForm() {
           customer.number.trim() !== "" &&
           customer.time.trim() !== "",
       ) &&
-      (addedTrips.length === 0 ||
-        formCustomers.some(
-          (customer) => customer.address && customer.address.trim() !== "",
-        ));
+      (isAddressRequired
+        ? formCustomers.some(
+            (customer) => customer.address && customer.address.trim() !== "",
+          )
+        : true);
 
     const timeEmpty =
       (formTripDate === formDepartureDate && !formDepartureTime) ||

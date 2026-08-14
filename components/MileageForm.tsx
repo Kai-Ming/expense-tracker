@@ -162,6 +162,12 @@ export default function MileageForm() {
   const { width: screenWidth } = useWindowDimensions();
   const maxWidth = Math.min(screenWidth * 0.9, 1200);
 
+  const noAddress = [
+    "Eydo0UoXD1fyyI7hr5pL8oCMhQ22",
+    "fh5YgOEdhmPcs0isuS505MwnB0K3",
+    "7vFkURLn0XXfgVuGgjS4qrQGC722",
+  ];
+
   // Fetch all user trips
   useEffect(() => {
     if (!userId) return;
@@ -1138,6 +1144,8 @@ export default function MileageForm() {
     const otherExpensePurpose =
       parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
 
+    const isAddressRequired = !noAddress.includes(userId || "");
+
     const isCustomersFormValid =
       formCustomers.every(
         (customer) =>
@@ -1147,9 +1155,11 @@ export default function MileageForm() {
           customer.number.trim() !== "" &&
           customer.time.trim() !== "",
       ) &&
-      formCustomers.some(
-        (customer) => customer.address && customer.address.trim() !== "",
-      );
+      (isAddressRequired
+        ? formCustomers.some(
+            (customer) => customer.address && customer.address.trim() !== "",
+          )
+        : true);
 
     if (
       !formPurpose.trim() ||
