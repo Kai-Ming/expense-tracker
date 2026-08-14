@@ -808,32 +808,70 @@ export default function ExpensesWebScreen() {
   });
 
   const handleDelete = async (id: string) => {
-    const performDelete = async () => {
-      try {
-        await deleteDoc(doc(db, "expenses", id));
-      } catch (error) {
-        console.error("Error deleting expense:", error);
-        if (Platform.OS === "web") {
-          window.alert("Error deleting expense. Please try again.");
-        } else {
-          Alert.alert("Error", "Could not delete the expense.");
-        }
+    try {
+      await deleteDoc(doc(db, "expenses", id));
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      if (Platform.OS === "web") {
+        window.alert("Error deleting expense. Please try again.");
+      } else {
+        Alert.alert("Error", "Could not delete the expense.");
       }
-    };
+    }
+  };
 
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this expense?")) {
-        performDelete();
+  const handleMileageDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      handleDelete(id);
+    }
+  };
+
+  const handleGeneralDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      handleDelete(id);
+    }
+  };
+
+  const editRequest = async (id: string) => {
+    const docRef = doc(db, "travel_requests", id);
+    await updateDoc(docRef, {
+      locked: false,
+    });
+  };
+
+  const deleteRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "travel_requests", id));
+    } catch (error) {
+      console.error("Error deleting trip:", error);
+      if (Platform.OS === "web") {
+        window.alert("Error deleting expense. Please try again.");
+      } else {
+        alert("Could not delete the expense.");
       }
+    }
+  };
+
+  const deleteOutstation = async (trip: ExpenseGroup, editTrip: boolean) => {
+    const expenses = trip.data;
+
+    for (const e of expenses) {
+      await handleDelete(e.id);
+    }
+
+    if (editTrip) {
+      await editRequest(trip.request_id);
     } else {
-      Alert.alert(
-        "Delete Expense",
-        "Are you sure you want to delete this expense?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: performDelete },
-        ],
-      );
+      await deleteRequest(trip.request_id);
+    }
+  };
+
+  const handleDeleteOutstation = async (
+    trip: ExpenseGroup,
+    editTrip: boolean,
+  ) => {
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      deleteOutstation(trip, editTrip);
     }
   };
 
@@ -4062,7 +4100,7 @@ export default function ExpensesWebScreen() {
                     minWidth: 60,
                     alignItems: "center",
                   }}
-                  onPress={() => handleDelete(expense.id)}
+                  onPress={() => handleMileageDelete(expense.id)}
                 >
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>
                     Delete
@@ -4668,7 +4706,7 @@ export default function ExpensesWebScreen() {
                     minWidth: 60,
                     alignItems: "center",
                   }}
-                  onPress={() => handleDelete(expense.id)}
+                  onPress={() => handleGeneralDelete(expense.id)}
                 >
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>
                     Delete
@@ -5027,40 +5065,6 @@ export default function ExpensesWebScreen() {
     );
   };
 
-  const editRequest = async (id: string) => {
-    const docRef = doc(db, "travel_requests", id);
-    await updateDoc(docRef, {
-      locked: false,
-    });
-  };
-
-  const deleteRequest = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "travel_requests", id));
-    } catch (error) {
-      console.error("Error deleting trip:", error);
-      if (Platform.OS === "web") {
-        window.alert("Error deleting expense. Please try again.");
-      } else {
-        alert("Could not delete the expense.");
-      }
-    }
-  };
-
-  const deleteOutstation = async (trip: ExpenseGroup, editTrip: boolean) => {
-    const expenses = trip.data;
-
-    for (const e of expenses) {
-      await handleDelete(e.id);
-    }
-
-    if (editTrip) {
-      await editRequest(trip.request_id);
-    } else {
-      await deleteRequest(trip.request_id);
-    }
-  };
-
   const renderOutstationDetailView = (trip: ExpenseGroup) => {
     //const isEditing = editingId === expense.id;
     const isEditing = false;
@@ -5113,7 +5117,7 @@ export default function ExpensesWebScreen() {
                     }}
                     onPress={() => {
                       console.log(trip);
-                      deleteOutstation(trip, true);
+                      handleDeleteOutstation(trip, false);
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "bold" }}>
@@ -5131,7 +5135,7 @@ export default function ExpensesWebScreen() {
                     }}
                     onPress={() => {
                       console.log(trip);
-                      deleteOutstation(trip, false);
+                      handleDeleteOutstation(trip, true);
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "bold" }}>

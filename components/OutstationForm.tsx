@@ -4,9 +4,8 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
-  DocumentData,
-  DocumentReference,
   getDoc,
   onSnapshot,
   orderBy,
@@ -1135,27 +1134,32 @@ export default function OutstationExpenseForm() {
   };
 
   const handleDeleteRequest = async () => {
+    console.log(" edit request id");
+    console.log(editRequestId);
     const performDelete = async () => {
       try {
         await deleteDoc(doc(db, "travel_requests", editRequestId));
+        resetRequestForm();
       } catch (error) {
-        console.error("Error deleting expense:", error);
+        console.error("Error deleting request:", error);
         if (Platform.OS === "web") {
-          window.alert("Error deleting expense. Please try again.");
+          window.alert("Error deleting request. Please try again.");
         } else {
-          Alert.alert("Error", "Could not delete the expense.");
+          Alert.alert("Error", "Could not delete the request.");
         }
       }
     };
 
     if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this expense?")) {
+      if (
+        window.confirm("Are you sure you want to delete this trip request?")
+      ) {
         performDelete();
       }
     } else {
       Alert.alert(
-        "Delete Expense",
-        "Are you sure you want to delete this expense?",
+        "Delete Request",
+        "Are you sure you want to delete this request?",
         [
           { text: "Cancel", style: "cancel" },
           { text: "Delete", style: "destructive", onPress: performDelete },
@@ -5420,6 +5424,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-function deleteDoc(arg0: DocumentReference<DocumentData, DocumentData>) {
-  throw new Error("Function not implemented.");
-}
