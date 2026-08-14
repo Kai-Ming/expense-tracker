@@ -1387,6 +1387,7 @@ export default function OutstationExpenseForm() {
     } else if (formOwnAccSelect == "Duo") {
       ownAccExpense = ownAccExpense / 2;
     }
+    const encodedReport = formTripReport.replace(/\n/g, "\\n");
 
     const updatedAllDays = [
       ...allDays,
@@ -1422,7 +1423,7 @@ export default function OutstationExpenseForm() {
         lunch: formLunch,
         dinner: formDinner,
         meal: getMealCost(),
-        trip_report: formTripReport,
+        trip_report: encodedReport,
         customers: formCustomers,
         business_card_files: businessCardFiles,
       },
@@ -2957,6 +2958,7 @@ export default function OutstationExpenseForm() {
         businessCardUrls.push(url);
       }
       const docRef = doc(db, "expenses", editTripId);
+      const encodedReport = formTripReport.replace(/\n/g, "\\n");
       const expense = {
         user_id: userId,
         username: username,
@@ -2993,7 +2995,7 @@ export default function OutstationExpenseForm() {
         lunch: formLunch,
         dinner: formDinner,
         meal: getMealCost(),
-        trip_report: formTripReport,
+        trip_report: encodedReport,
         customers: formCustomers,
       } as any; // Type assertion
 

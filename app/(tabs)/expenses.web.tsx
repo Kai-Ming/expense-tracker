@@ -1947,7 +1947,6 @@ export default function ExpensesWebScreen() {
                       <div class="details" style="flex: 1; width: 100%;">
                         <div class="details-label">Customers: </div>
                         <div class="details-value trip-details-container">
-
                           ${!item.customers ? generateOldCustomer(item) : generateCustomerDetails(item.customers || [])}
                         </div>
                       </div>
@@ -1955,8 +1954,8 @@ export default function ExpensesWebScreen() {
 
                     <div class="details-row" style="margin-top: 10px;">
                       <div class="details">
-                        <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.trip_report}</div>
+                        <div class="details-label">Trip Report: </div>                        
+                        <div class="details-value" style="word-wrap: break-word; white-space: pre-wrap;">${item.trip_report?.replace(/\\n/g, "\n")}</div>
                       </div>
                     </div>
                     
@@ -2474,7 +2473,7 @@ export default function ExpensesWebScreen() {
                     <div class="details-row" style="margin-top: 10px;">
                       <div class="details">
                         <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.expense_report}</div>
+                        <div class="details-value" style="white-space: pre-wrap;">${item.expense_report?.replace(/\\n/g, "\n")}</div>
                       </div>
                     </div>
                   </div>
@@ -3096,8 +3095,8 @@ export default function ExpensesWebScreen() {
 
                     <div class="details-row" style="margin-top: 10px;">
                       <div class="details">
-                        <div class="details-label">Trip Report: </div>
-                        <div class="details-value">${item.trip_report}</div>
+                        <div class="details-label">Trip Report: </div>                       
+                        <div class="details-value" style="white-space: pre-wrap;">${item.trip_report?.replace(/\\n/g, "\n")}</div>
                       </div>
                     </div>
                   </div>
@@ -4546,7 +4545,7 @@ export default function ExpensesWebScreen() {
             />
           ) : (
             <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.trip_report || "N/A"}
+              {expense.trip_report?.replace(/\\n/g, "\n") || "N/A"}
             </Text>
           )}
 
@@ -4998,7 +4997,7 @@ export default function ExpensesWebScreen() {
             />
           ) : (
             <Text style={{ fontSize: 14, color: "#444" }}>
-              {expense.expense_report || "N/A"}
+              {expense.expense_report?.replace(/\\n/g, "\n") || "N/A"}
             </Text>
           )}
         </View>
@@ -6081,7 +6080,7 @@ export default function ExpensesWebScreen() {
                 />
               ) : (
                 <Text style={{ fontSize: 14, color: "#444" }}>
-                  {expense.trip_report || "N/A"}
+                  {expense.trip_report?.replace(/\\n/g, "\n") || "N/A"}
                 </Text>
               )}
             </View>

@@ -1185,6 +1185,7 @@ export default function MileageForm() {
       }
 
       const { fromTime, toTime } = getOverallTimes();
+      const encodedReport = formTripReport.replace(/\n/g, "\\n");
 
       await addDoc(collection(db, "expenses"), {
         user_id: userId,
@@ -1195,7 +1196,7 @@ export default function MileageForm() {
         to_time: toTime,
         duration: calculateDuration(),
         distance: dist,
-        trip_report: formTripReport,
+        trip_report: encodedReport,
         business_card_urls: businessCardUrls,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),
@@ -1272,6 +1273,7 @@ export default function MileageForm() {
       }
       const { fromTime, toTime } = getOverallTimes();
       const docRef = doc(db, "expenses", editMileageId);
+      const encodedReport = formTripReport.replace(/\n/g, "\\n");
       const expense = {
         date: formDate,
         purpose: formPurpose,
@@ -1279,7 +1281,7 @@ export default function MileageForm() {
         to_time: toTime,
         duration: calculateDuration(),
         distance: dist,
-        trip_report: formTripReport,
+        trip_report: encodedReport,
         business_card_urls: businessCardUrls,
         parking: parseFloat(formParking),
         toll: parseFloat(formToll),

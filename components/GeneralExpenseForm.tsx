@@ -164,6 +164,7 @@ export default function GeneralExpenseForm() {
       alert("Please ensure all required fields are filled.");
       return;
     }
+    const encodedReport = formExpenseReport.replace(/\n/g, "\\n");
     console.log("valid");
     try {
       await addDoc(collection(db, "expenses"), {
@@ -174,7 +175,7 @@ export default function GeneralExpenseForm() {
         amount: parseFloat(formAmount),
         customers: formCustomers,
         vendor: formVendor,
-        expense_report: formExpenseReport,
+        expense_report: encodedReport,
         type: 2, // 1 mileage, 2 general, 3 outstation
         approval_status: 0,
         created_at: serverTimestamp(),
@@ -215,6 +216,7 @@ export default function GeneralExpenseForm() {
       alert("Please ensure all required fields are filled.");
       return;
     }
+    const encodedReport = formExpenseReport.replace(/\n/g, "\\n");
 
     try {
       const docRef = doc(db, "expenses", editExpenseId);
@@ -224,7 +226,7 @@ export default function GeneralExpenseForm() {
         amount: parseFloat(formAmount),
         customers: formCustomers,
         vendor: formVendor,
-        expense_report: formExpenseReport,
+        expense_report: encodedReport,
       };
 
       await updateDoc(docRef, expense);
