@@ -157,7 +157,7 @@ export const exportCustomersToCSV = (
     });
 
     if (allCustomers.length === 0) {
-      Alert.alert("No Data", "No customers found to export");
+      alert("No customers found to export");
       return;
     }
 
@@ -165,7 +165,7 @@ export const exportCustomersToCSV = (
     const csvData = convertCustomersToCSV(allCustomers);
 
     if (!csvData) {
-      Alert.alert("Error", "Failed to generate CSV data");
+      alert("Failed to generate CSV data");
       return;
     }
 
@@ -178,7 +178,7 @@ export const exportCustomersToCSV = (
     );
   } catch (error) {
     console.error("Error exporting customers to CSV:", error);
-    Alert.alert("Error", "Failed to export customers to CSV");
+    alert("Failed to export customers to CSV");
   }
 };
 

@@ -1,3 +1,4 @@
+import { exportCustomersToCSV } from "@/components/CustomerExporter";
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import { useRouter } from "expo-router";
@@ -1325,11 +1326,11 @@ export default function settings() {
       return;
     }
     console.log("exporting");
-    /* await exportCustomersToCSV(
+    await exportCustomersToCSV(
       filteredMileage,
       filteredGeneral,
       filteredOutstation,
-    ); */
+    );
   };
 
   return (
@@ -2744,7 +2745,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.2</Text>
+      <Text style={styles.bottomScrollText}>v1.2.2.1</Text>
     </View>
   );
 }
