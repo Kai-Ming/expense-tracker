@@ -116,6 +116,8 @@ interface Customer {
   contactNumber?: string;
   company?: string;
   companyName?: string;
+  created_at?: any; // Added
+  expense_type?: string; // Added
   [key: string]: any;
 }
 
@@ -129,11 +131,59 @@ export const exportCustomersToCSV = (
     // Extract all customers
     const allCustomers: Customer[] = [];
 
+    // Helper to format date consistently
+    const formatDate = (date: any): string => {
+      if (!date) return "";
+
+      let dateObj: Date;
+
+      // Handle different date types
+      if (date.toDate) {
+        dateObj = date.toDate();
+      } else if (date instanceof Date) {
+        dateObj = date;
+      } else if (typeof date === "string") {
+        dateObj = new Date(date);
+      } else {
+        return String(date);
+      }
+
+      // Check if date is valid
+      if (isNaN(dateObj.getTime())) {
+        return String(date);
+      }
+
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const year = dateObj.getFullYear();
+      const hours = String(dateObj.getHours()).padStart(2, "0");
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const seconds = String(dateObj.getSeconds()).padStart(2, "0");
+
+      return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+    };
+
+    // Helper to check if customer has any valid values
+    const hasValidValues = (customer: Customer): boolean => {
+      return Object.values(customer).some((value) => {
+        if (typeof value === "string") {
+          return value.trim() !== "";
+        }
+        return value !== null && value !== undefined;
+      });
+    };
+
     // Extract from Mileage expenses
     allMileage.forEach((expense: Expense) => {
       if (expense.customers && expense.customers.length > 0) {
         expense.customers.forEach((customer: Customer) => {
-          allCustomers.push(customer);
+          if (hasValidValues(customer)) {
+            allCustomers.push({
+              ...customer,
+              created_at: formatDate(expense.created_at),
+              expense_type: "Mileage",
+            });
+          }
         });
       }
     });
@@ -142,7 +192,13 @@ export const exportCustomersToCSV = (
     allGeneral.forEach((expense: GeneralExpense) => {
       if (expense.customers && expense.customers.length > 0) {
         expense.customers.forEach((customer: Customer) => {
-          allCustomers.push(customer);
+          if (hasValidValues(customer)) {
+            allCustomers.push({
+              ...customer,
+              created_at: formatDate(expense.created_at),
+              expense_type: "General",
+            });
+          }
         });
       }
     });
@@ -151,7 +207,13 @@ export const exportCustomersToCSV = (
     allOutstation.forEach((expense: OutstationExpense) => {
       if (expense.customers && expense.customers.length > 0) {
         expense.customers.forEach((customer: Customer) => {
-          allCustomers.push(customer);
+          if (hasValidValues(customer)) {
+            allCustomers.push({
+              ...customer,
+              created_at: formatDate(expense.created_at),
+              expense_type: "Outstation",
+            });
+          }
         });
       }
     });
@@ -161,8 +223,18 @@ export const exportCustomersToCSV = (
       return;
     }
 
+    const filteredCustomers = allCustomers.filter((customer: Customer) => {
+      // Check if any value is truthy (not empty, not null, not undefined)
+      return Object.values(customer).some((value) => {
+        if (typeof value === "string") {
+          return value.trim() !== ""; // Also removes whitespace-only strings
+        }
+        return value != null && value !== undefined;
+      });
+    });
+
     // Convert customers to CSV
-    const csvData = convertCustomersToCSV(allCustomers);
+    const csvData = convertCustomersToCSV(filteredCustomers);
 
     if (!csvData) {
       alert("Failed to generate CSV data");
@@ -182,23 +254,34 @@ export const exportCustomersToCSV = (
   }
 };
 
-// Helper function to convert customers to CSV
 const convertCustomersToCSV = (customers: Customer[]): string | null => {
   if (!customers || customers.length === 0) {
     return null;
   }
 
-  // Get all unique keys from all customer objects
-  const allKeys = new Set<string>();
-  customers.forEach((customer: Customer) => {
-    Object.keys(customer).forEach((key: string) => {
-      allKeys.add(key);
-    });
-  });
+  // Convert display header back to snake_case for lookup
+  const getKeyFromHeader = (header: string): string => {
+    return header.toLowerCase().replace(/ /g, "_"); // Replace spaces with underscores
+  };
 
-  const headers = Array.from(allKeys);
+  const formatHeader = (header: string): string => {
+    return header
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
 
-  // Helper function to escape CSV fields
+  const headerKeys = [
+    "company",
+    "name",
+    "number",
+    "email",
+    "address",
+    "created_at",
+  ];
+
+  const headers = headerKeys.map(formatHeader);
+
   const escapeCSVField = (field: any): string => {
     if (field === null || field === undefined) return "";
     const stringField = String(field);
@@ -212,11 +295,11 @@ const convertCustomersToCSV = (customers: Customer[]): string | null => {
     return stringField;
   };
 
-  // Create CSV rows
   const rows: string[][] = customers.map((customer: Customer) => {
     return headers.map((header: string) => {
-      const value = customer[header];
-      // Handle objects and arrays
+      // Convert header back to snake_case for lookup
+      const key = getKeyFromHeader(header);
+      const value = customer[key];
       if (typeof value === "object") {
         return escapeCSVField(JSON.stringify(value));
       }
@@ -224,7 +307,6 @@ const convertCustomersToCSV = (customers: Customer[]): string | null => {
     });
   });
 
-  // Combine headers and rows
   const csvContent: string = [
     headers.join(","),
     ...rows.map((row) => row.join(",")),

@@ -1408,8 +1408,30 @@ export default function dashboard() {
           onPress={() => setShowUserModal(false)}
         >
           <View style={styles.userModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select a User</Text>
+            <View style={[styles.modalHeader, { marginBottom: 15 }]}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 15,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={[styles.modalTitle, { marginBottom: 0 }]}>
+                  Select a User
+                </Text>
+                {selectedUser && (
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() => {
+                      console.log("clear");
+                      setSelectedUser("");
+                      setShowUserModal(false);
+                    }}
+                  >
+                    <Text style={styles.buttonText}>Clear User</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity onPress={() => setShowUserModal(false)}>
                 <Text style={styles.modalCloseButton}>✕</Text>
               </TouchableOpacity>
