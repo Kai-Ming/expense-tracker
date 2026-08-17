@@ -1351,6 +1351,9 @@ export default function dashboard() {
       datasets: [
         {
           data: stateChartData.datasets[0].data,
+          barColors: stateChartData.datasets[0].data.map(
+            () => "rgba(0, 9, 0, 0.1)",
+          ),
         },
       ],
     };
@@ -1373,6 +1376,9 @@ export default function dashboard() {
             backgroundGradientTo: "#ffffff",
             color: (opacity = 1) => `rgba(0, 9, 0, ${opacity})`,
             labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            fillShadowGradientOpacity: 0.4,
+            fillShadowGradientFromOpacity: 0.4,
+            fillShadowGradientToOpacity: 0.4,
             style: {
               borderRadius: 16,
             },
@@ -1597,7 +1603,12 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total Expenses for - {selectedYear}/{selectedYear + 1}
+                    Total Expenses (RM{" "}
+                    {chartData.data.reduce(
+                      (total: number, num: number) => total + num,
+                      0,
+                    )}
+                    ) - {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1627,8 +1638,11 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total Distance Travelled for - {selectedYear}/
-                    {selectedYear + 1}
+                    Total Distance Travelled (
+                    {chartData.totalDistanceData
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}{" "}
+                    km) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1660,7 +1674,12 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    No. of Trips for - {selectedYear}/{selectedYear + 1}
+                    No. of Trips (
+                    {chartData.tripCountData.reduce(
+                      (total: number, num: number) => total + num,
+                      0,
+                    )}{" "}
+                    trips) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1700,8 +1719,11 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total Travel Duration for - {selectedYear}/
-                    {selectedYear + 1}
+                    Total Travel Duration (
+                    {chartData.totalDistanceData
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}{" "}
+                    km) for - {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1899,8 +1921,11 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total Mileage Expense for - {selectedYear}/
-                    {selectedYear + 1}
+                    Total Mileage Expense (RM
+                    {chartData.mileageData
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}
+                    ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1930,8 +1955,11 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total General Expense for - {selectedYear}/
-                    {selectedYear + 1}
+                    Total General Expense (RM
+                    {chartData.generalData
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}
+                    ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -1961,8 +1989,11 @@ export default function dashboard() {
               <>
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
-                    Total Outstation Expense for - {selectedYear}/
-                    {selectedYear + 1}
+                    Total Outstation Expense (RM
+                    {chartData.outstationData
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}
+                    ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 

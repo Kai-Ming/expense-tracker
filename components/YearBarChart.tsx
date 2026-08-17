@@ -149,6 +149,9 @@ const YearBarChart: React.FC<YearBarChartProps> = ({
           decimalPlaces: 0,
           color: (opacity = 1) => color.replace("1)", `${opacity})`),
           labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+          fillShadowGradientOpacity: 0.4,
+          fillShadowGradientFromOpacity: 0.4,
+          fillShadowGradientToOpacity: 0.4,
           style: { borderRadius: 16 },
           propsForLabels: {
             fontSize: 14,
