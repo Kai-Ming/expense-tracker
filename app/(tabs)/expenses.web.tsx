@@ -1345,7 +1345,7 @@ export default function ExpensesWebScreen() {
                         <div class="details-row" style="margin-top: 10px;">
                           <div class="details">
                             <div class="details-label">Visitation Plan: </div>
-                            <div class="details-value">${item.visitation_plan || "N/A"}</div>
+                            <div class="details-value" style="word-wrap: break-word; white-space: pre-wrap;">${item.visitation_plan?.replace(/\\n/g, "\n")}</div>
                           </div>
                         </div>
 

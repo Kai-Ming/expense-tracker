@@ -1205,6 +1205,8 @@ export default function OutstationExpenseForm() {
       if (editingRequest) {
         const docRef = doc(db, "travel_requests", editRequestId);
 
+        const encodedReport = formRequestVisitation.replace(/\n/g, "\\n");
+
         await updateDoc(docRef, {
           user_id: userId,
           user_name: username,
@@ -1221,10 +1223,11 @@ export default function OutstationExpenseForm() {
           room_sharing_name: selectedUser?.username || "",
           advance_allowance: parseFloat(formAdvance),
           advance_allowance_remark: formAdvanceRemark,
-          visitation_plan: formRequestVisitation,
+          visitation_plan: encodedReport,
           approval_status: 0,
         });
       } else {
+        const encodedReport = formRequestVisitation.replace(/\n/g, "\\n");
         await addDoc(collection(db, "travel_requests"), {
           user_id: userId,
           user_name: username,
@@ -1241,7 +1244,7 @@ export default function OutstationExpenseForm() {
           room_sharing_name: selectedUser?.username || "",
           advance_allowance: parseFloat(formAdvance),
           advance_allowance_remark: formAdvanceRemark,
-          visitation_plan: formRequestVisitation,
+          visitation_plan: encodedReport,
           approval_status: 0,
           created_at: serverTimestamp(),
         });
