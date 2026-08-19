@@ -1604,10 +1604,9 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Expenses (RM{" "}
-                    {chartData.data.reduce(
-                      (total: number, num: number) => total + num,
-                      0,
-                    )}
+                    {chartData.data
+                      .reduce((total: number, num: number) => total + num, 0)
+                      .toFixed(2)}
                     ) - {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
