@@ -182,6 +182,8 @@ export const exportCustomersToCSV = (
               ...customer,
               created_at: formatDate(expense.created_at),
               expense_type: "Mileage",
+              user_id: expense.user_id,
+              username: expense.user_name,
             });
           }
         });
@@ -197,6 +199,8 @@ export const exportCustomersToCSV = (
               ...customer,
               created_at: formatDate(expense.created_at),
               expense_type: "General",
+              user_id: expense.user_id,
+              username: expense.user_name,
             });
           }
         });
@@ -212,6 +216,8 @@ export const exportCustomersToCSV = (
               ...customer,
               created_at: formatDate(expense.created_at),
               expense_type: "Outstation",
+              user_id: expense.user_id,
+              username: expense.user_name,
             });
           }
         });
@@ -272,6 +278,7 @@ const convertCustomersToCSV = (customers: Customer[]): string | null => {
   };
 
   const headerKeys = [
+    "username",
     "company",
     "name",
     "number",
