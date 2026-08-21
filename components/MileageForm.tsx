@@ -761,23 +761,15 @@ export default function MileageForm() {
   };
 
   const handleUpdateHome = async (home: boolean) => {
-    console.log(home);
     setFormGoingHome(home);
     if (home) {
       if (homeCoords) {
-        console.log("home coords");
-        console.log(homeCoords);
-        console.log(homeCoords.lat);
-        console.log(homeCoords.lng);
         let homeAddress = await getAddressFromCoords(
           homeCoords.lat,
           homeCoords.lng,
         );
-        console.log(homeAddress);
         setToAddress(homeAddress);
         setDestCoord(homeCoords);
-        console.log(homeAddress);
-        console.log(destCoord);
       }
     } else {
       setToAddress("");
@@ -869,9 +861,6 @@ export default function MileageForm() {
           homeCoords.lat,
           homeCoords.lng,
         );
-        console.log("home address");
-        console.log(homeAddress);
-        console.log(homeCoords);
         setFromAddress(homeAddress);
         setOriginCoord(homeCoords);
       }
@@ -2587,7 +2576,7 @@ export default function MileageForm() {
                           onChangeText={(text) =>
                             handleCustomerChange(index, "address", text)
                           }
-                          style={[styles.webTextInput, { maxWidth: 150 }]}
+                          style={[styles.webTextInput, { maxWidth: 648 }]}
                           editable={false}
                         />
 

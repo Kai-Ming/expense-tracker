@@ -4208,9 +4208,8 @@ export default function OutstationExpenseForm() {
                     disabled={isSaving}
                   />
                 </View>
-
                 {addedTrips.length !== 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <>
                     <Text
                       style={[styles.fieldLabel, { width: 70, marginLeft: 10 }]}
                     >
@@ -4222,7 +4221,7 @@ export default function OutstationExpenseForm() {
                       onChangeText={(text) =>
                         handleCustomerChange(index, "address", text)
                       }
-                      style={[styles.webTextInput, { maxWidth: 150 }]}
+                      style={[styles.webTextInput, { maxWidth: 648 }]}
                       editable={false}
                     />
                     <TouchableOpacity
@@ -4241,7 +4240,7 @@ export default function OutstationExpenseForm() {
                         Select Address
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </>
                 )}
 
                 {renderTripAddressModal()}
