@@ -2387,7 +2387,7 @@ export default function settings() {
                   <View style={styles.modalView}>
                     <Text style={styles.modalTitle}>Create User</Text>
 
-                    <View style={styles.formGroup}>
+                    <View style={[styles.formGroup, { marginBottom: 0 }]}>
                       <Text style={styles.modalSubtitle}>Username:</Text>
                       <TextInput
                         style={styles.input}
@@ -2576,7 +2576,7 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
-                      {(formRole === "2" || formRole === "3" || role === 0) && (
+                      {(formRole === "2" || formRole === "3") && (
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>
                             Subordinates:
@@ -2612,25 +2612,6 @@ export default function settings() {
                           {renderSelectSubModal()}
                         </View>
                       )}
-
-                      <Text style={styles.modalSubtitle}>Home Address:</Text>
-                      <View
-                        style={{
-                          width: "100%",
-                          position: "relative",
-                          zIndex: 100,
-                          elevation: 10,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <PlacesInput
-                          value={homeAddress}
-                          placeholder="Search home..."
-                          onPlaceSelected={(address, location) => {
-                            setHomeAddress(address);
-                          }}
-                        />
-                      </View>
                       {/* <View style={styles.modalRow}>
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Role:</Text>
@@ -2649,6 +2630,25 @@ export default function settings() {
                           </select>
                         </View>
                       </View> */}
+                    </View>
+
+                    <Text style={styles.modalSubtitle}>Home Address:</Text>
+                    <View
+                      style={{
+                        width: "100%",
+                        position: "relative",
+                        zIndex: 100,
+                        elevation: 10,
+                        marginBottom: 20,
+                      }}
+                    >
+                      <PlacesInput
+                        value={homeAddress}
+                        placeholder="Search home..."
+                        onPlaceSelected={(address, location) => {
+                          setHomeAddress(address);
+                        }}
+                      />
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -2729,7 +2729,7 @@ export default function settings() {
                       <Text style={styles.buttonText}>Select User</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.formGroup}>
+                    <View style={[styles.formGroup, { marginBottom: 0 }]}>
                       <Text style={styles.modalSubtitle}>Username:</Text>
                       <TextInput
                         style={styles.input}
@@ -2867,7 +2867,7 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
-                      {(formRole === "2" || formRole === "3" || role === 0) && (
+                      {(formRole === "2" || formRole === "3") && (
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>
                             Subordinates:
@@ -2912,24 +2912,24 @@ export default function settings() {
                         value={formActive}
                         onValueChange={(newValue) => setFormActive(newValue)}
                       />
-                      <Text style={styles.modalSubtitle}>Home Address:</Text>
-                      <View
-                        style={{
-                          width: "100%",
-                          position: "relative",
-                          zIndex: 100,
-                          elevation: 10,
-                          marginBottom: 10,
+                    </View>
+                    <Text style={styles.modalSubtitle}>Home Address:</Text>
+                    <View
+                      style={{
+                        width: "100%",
+                        position: "relative",
+                        zIndex: 100,
+                        elevation: 10,
+                        marginBottom: 20,
+                      }}
+                    >
+                      <PlacesInput
+                        value={homeAddress}
+                        placeholder="Search home..."
+                        onPlaceSelected={(address, location) => {
+                          setHomeAddress(address);
                         }}
-                      >
-                        <PlacesInput
-                          value={homeAddress}
-                          placeholder="Search home..."
-                          onPlaceSelected={(address, location) => {
-                            setHomeAddress(address);
-                          }}
-                        />
-                      </View>
+                      />
                     </View>
 
                     <View style={styles.buttonRow}>

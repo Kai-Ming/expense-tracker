@@ -365,10 +365,11 @@ function PlacesInput({
           position: "relative",
           zIndex: isDropdownOpen ? 10000 : 1,
           flexDirection: "row",
+          width: "100%",
         },
       ]}
     >
-      <View style={{ flexDirection: "column" }}>
+      <View style={{ flexDirection: "column", flex: 1 }}>
         <View style={{ flexDirection: "row" }}>
           <View style={styles.inputContainer}>
             <TextInput
@@ -441,6 +442,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   input: {
     flex: 1,
