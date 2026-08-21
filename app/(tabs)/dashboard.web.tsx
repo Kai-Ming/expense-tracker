@@ -36,6 +36,7 @@ interface User {
     latitude: number;
     longitude: number;
   };
+  subordinates: string[];
 }
 
 interface Expense {
@@ -165,6 +166,7 @@ export default function dashboard() {
   const [userId, setUserId] = useState<string>("");
   const [username, setUsername] = useState<string>("");
   const [role, setRole] = useState<number | null>(null);
+  const [subordinates, setSubordinates] = useState<string[]>([]);
   const [grade, setGrade] = useState<string>("");
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
@@ -226,6 +228,7 @@ export default function dashboard() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setRole(userData.role);
+            setSubordinates(userData.subordinates || []);
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
@@ -256,8 +259,34 @@ export default function dashboard() {
   }, []);
 
   useEffect(() => {
-    if (role !== 0) return;
-    const q = query(collection(db, "users"));
+    if (!userId) return;
+    if (role == 1) {
+      return;
+    }
+
+    if (role == 0) {
+      const q = query(collection(db, "users"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const userData: User[] = [];
+        snapshot.forEach((doc) => {
+          userData.push({ id: doc.id, ...doc.data() } as User);
+        });
+        userData.sort((a, b) => a.username.localeCompare(b.username));
+        setAllUsers(userData);
+      });
+      return () => unsubscribe();
+    }
+
+    if (subordinates.length === 0) {
+      return;
+    }
+    const userIdsToFetch = [...subordinates, userId];
+
+    const q = query(
+      collection(db, "users"),
+      where("__name__", "in", userIdsToFetch),
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const userData: User[] = [];
       snapshot.forEach((doc) => {
@@ -267,7 +296,7 @@ export default function dashboard() {
       setAllUsers(userData);
     });
     return () => unsubscribe();
-  }, [role]);
+  }, [role, subordinates, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -303,11 +332,23 @@ export default function dashboard() {
     if (role === 0) {
       // Admin: fetch all expenses (no user_id filter)
       q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
-    } else {
+    } else if (role === 1) {
       // Regular user: fetch only their own expenses
       q = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    } else {
+      // Manager/Supervisor: fetch expenses from subordinates + self
+      if (subordinates.length === 0) {
+        return;
+      }
+      const userIdsToFetch = [...subordinates, userId];
+
+      q = query(
+        collection(db, "expenses"),
+        where("user_id", "in", userIdsToFetch),
         orderBy("created_at", "desc"),
       );
     }
@@ -2207,25 +2248,31 @@ export default function dashboard() {
             ))}
           </select>
         </View>
-        {role === 0 && (
+        {role !== 1 && (
           <View style={{ marginLeft: 10 }}>
             <Text>User:</Text>
             <TouchableOpacity
-              style={[styles.button, { minWidth: 100 }]}
+              style={[styles.input, { minWidth: 100 }]}
               onPress={() => {
                 setShowUserModal(true);
-                //testTripData();
-                //console.log(tripStats);
               }}
             >
-              <Text style={styles.buttonText}>
+              <Text
+                style={{
+                  color: !selectedUser ? "#999999" : "#000000",
+                  fontSize: 16,
+                  fontFamily: "System",
+                  fontWeight: "400",
+                  opacity: 0.7,
+                }}
+              >
                 {!selectedUser ? "Select User" : selectedUser}
               </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {role === 0 && (
+        {role !== 1 && (
           <View style={{ marginLeft: 10 }}>
             <Text>Department:</Text>
             <select
@@ -2459,6 +2506,16 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   buttonText: { color: "white", fontWeight: "bold" },
+  input: {
+    width: "100%",
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#eee",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    color: "#333",
+  },
   dashboardGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

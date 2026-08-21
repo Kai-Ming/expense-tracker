@@ -199,6 +199,7 @@ export default function ExpensesWebScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [role, setRole] = useState<number | null>(null);
+  const [subordinates, setSubordinates] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [usernameFilter, setUsernameFilter] = useState<string>("");
@@ -336,6 +337,7 @@ export default function ExpensesWebScreen() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setRole(userData.role);
+            setSubordinates(userData.subordinates || []);
             const displayName =
               userData.name || userData.username || user.displayName || "User";
             setUsername(displayName);
@@ -360,8 +362,34 @@ export default function ExpensesWebScreen() {
   }, []);
 
   useEffect(() => {
-    if (role !== 0) return;
-    const q = query(collection(db, "users"));
+    if (!userId) return;
+    if (role == 1) {
+      return;
+    }
+
+    if (role == 0) {
+      const q = query(collection(db, "users"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const userData: User[] = [];
+        snapshot.forEach((doc) => {
+          userData.push({ id: doc.id, ...doc.data() } as User);
+        });
+        userData.sort((a, b) => a.username.localeCompare(b.username));
+        setAllUsers(userData);
+      });
+      return () => unsubscribe();
+    }
+
+    if (subordinates.length === 0) {
+      return;
+    }
+    const userIdsToFetch = [...subordinates, userId];
+
+    const q = query(
+      collection(db, "users"),
+      where("__name__", "in", userIdsToFetch),
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const userData: User[] = [];
       snapshot.forEach((doc) => {
@@ -371,7 +399,7 @@ export default function ExpensesWebScreen() {
       setAllUsers(userData);
     });
     return () => unsubscribe();
-  }, [role]);
+  }, [role, subordinates, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -409,11 +437,23 @@ export default function ExpensesWebScreen() {
     if (role === 0) {
       // Admin: fetch all expenses (no user_id filter)
       q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
-    } else {
+    } else if (role === 1) {
       // Regular user: fetch only their own expenses
       q = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    } else {
+      // Manager/Supervisor: fetch expenses from subordinates + self
+      if (subordinates.length === 0) {
+        return;
+      }
+      const userIdsToFetch = [...subordinates, userId];
+
+      q = query(
+        collection(db, "expenses"),
+        where("user_id", "in", userIdsToFetch),
         orderBy("created_at", "desc"),
       );
     }
@@ -447,7 +487,7 @@ export default function ExpensesWebScreen() {
     });
 
     return () => unsubscribe();
-  }, [userId, role]);
+  }, [userId, role, subordinates]);
 
   // Fetch all trips once, filter client-side
   /* useEffect(() => {
@@ -1529,7 +1569,7 @@ export default function ExpensesWebScreen() {
           } else {
             return `
             <div style="font-size: 9px; color: #999; padding: 3px 0;">
-              Trip data not available (ID: ${tripId})
+              Trip data not available
             </div>
           `;
           }
@@ -3704,7 +3744,7 @@ export default function ExpensesWebScreen() {
 
                 {renderTripModal()}
 
-                {role == 0 && (
+                {role != 1 && (
                   <View
                     style={{
                       flex: 1,
@@ -3724,7 +3764,6 @@ export default function ExpensesWebScreen() {
                     </Text>
                     <TouchableOpacity
                       onPress={() => {
-                        console.log("aa");
                         setShowUserModal(true);
                       }}
                     >
@@ -4584,7 +4623,7 @@ export default function ExpensesWebScreen() {
                   </View>
                 ) : (
                   <Text key={tripId} style={styles.descriptionText}>
-                    Trip data not available {tripId}
+                    Trip data not available
                   </Text>
                 );
               })}
@@ -6044,7 +6083,7 @@ export default function ExpensesWebScreen() {
                     </View>
                   ) : (
                     <Text key={tripId} style={styles.descriptionText}>
-                      Trip data not available {tripId}
+                      Trip data not available
                     </Text>
                   );
                 })}

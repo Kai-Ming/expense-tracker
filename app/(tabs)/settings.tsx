@@ -59,6 +59,7 @@ interface User {
     latitude: number;
     longitude: number;
   };
+  subordinates: string[];
   home_address: string;
 }
 
@@ -235,6 +236,7 @@ export default function settings() {
   const [formCostCenter, setFormCostCenter] = useState<string>("");
   const [formRole, setFormRole] = useState<string>("");
   const [formOffice, setFormOffice] = useState<string>("");
+  const [formSubordinates, setFormSubordinates] = useState<string[]>([]);
   const [formActive, setFormActive] = useState(true);
 
   const [customerModalVisible, setCustomerModalVisible] = useState(false);
@@ -246,7 +248,9 @@ export default function settings() {
   const [editUserModalVisible, setEditUserModalVisible] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectUserModalVisible, setSelectUserModalVisible] = useState(false);
+  const [selectSubModalVIsible, selectSelectSubModalVisible] = useState(false);
   const [addedUsers, setAddedUsers] = useState<any[]>([]);
+  const [addedSub, setAddedSub] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
@@ -881,9 +885,10 @@ export default function settings() {
         home_address: homeAddress,
         active: true,
         permission: 0,
-        subordinates: [],
+        subordinates: formSubordinates,
       });
 
+      clearUserForm();
       setUserModalVisible(false);
     } catch (error) {
       const err = error as any;
@@ -919,6 +924,8 @@ export default function settings() {
     setFormActive(true);
     setFormOffice("");
     setHomeAddress("");
+    setFormSubordinates([]);
+    setAddedSub([]);
   };
 
   const getAddress = async (coords) => {
@@ -951,6 +958,7 @@ export default function settings() {
       setFormRole(userToAdd.role.toString() || "");
       setFormDepartment(userToAdd.department || "");
       setFormOffice(userToAdd.office?.toString() || "");
+      setFormSubordinates(userToAdd.subordinates || []);
       const homeCoord = userToAdd.home_coordinates;
 
       if (homeCoord) {
@@ -1045,6 +1053,7 @@ export default function settings() {
         active: formActive,
         home_coordinates: new GeoPoint(coordinates.lat, coordinates.lng),
         home_address: homeAddress,
+        subordinates: formSubordinates,
       });
 
       Alert.alert("Success", "User updated successfully!");
@@ -1271,6 +1280,234 @@ export default function settings() {
                     </TouchableOpacity>
                   );
                 })}
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
+  const renderSelectSubModal = () => {
+    return (
+      <Modal
+        visible={selectSubModalVIsible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => selectSelectSubModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => selectSelectSubModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { maxHeight: 900 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a User</Text>
+              <TouchableOpacity
+                onPress={() => selectSelectSubModalVisible(false)}
+              >
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tableContainer}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <View
+                  style={{ flex: 0.5, backgroundColor: "transparent" }}
+                ></View>
+                <View style={{ flex: 3, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Username</Text>
+                </View>
+                <View style={{ flex: 2, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Email</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Department</Text>
+                </View>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Grade</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Cost Center</Text>
+                </View>
+                <View style={{ flex: 0.5, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Office</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Role</Text>
+                </View>
+                <View style={{ flex: 2, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Home Address</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "transparent" }}>
+                  <Text style={styles.headerCell}>Active</Text>
+                </View>
+              </View>
+
+              {/* Table Body */}
+              <ScrollView style={styles.modalList}>
+                {allUsers
+                  .filter((user) => user.username !== formUsername)
+                  .map((user, index) => {
+                    const isAdded = addedSub.some(
+                      (added) => added.id === user.id,
+                    );
+
+                    return (
+                      <TouchableOpacity
+                        key={user.id}
+                        style={[
+                          styles.tableRow,
+                          isAdded && styles.disabledUserItem,
+                        ]}
+                        onPress={() => {
+                          if (!isAdded) {
+                            setFormSubordinates((prev) => [...prev, user.id]);
+                            setAddedSub((prev) => [...prev, user]);
+                          } else {
+                            setFormSubordinates((prev) =>
+                              prev.filter((id) => id !== user.id),
+                            );
+                            setAddedSub((prev) =>
+                              prev.filter((item) => item.id !== user.id),
+                            );
+                          }
+                        }}
+                      >
+                        <View style={{ flex: 0.5 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {index + 1}
+                          </Text>
+                        </View>
+                        {/* Username */}
+                        <View style={{ flex: 3 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.username}
+                          </Text>
+                        </View>
+
+                        {/* Email */}
+                        <View style={{ flex: 2 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.email}
+                          </Text>
+                        </View>
+
+                        {/* Department */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.department}
+                          </Text>
+                        </View>
+
+                        {/* Grade */}
+                        <View style={{ flex: 0.5 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.grade}
+                          </Text>
+                        </View>
+
+                        {/* Cost Center */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.cost_center}
+                          </Text>
+                        </View>
+
+                        {/* Office */}
+                        <View style={{ flex: 0.5 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {officeMap[user.office] || "N/A"}
+                          </Text>
+                        </View>
+
+                        {/* Role */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {roleMap[user.role] || "N/A"}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 2 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.home_address}
+                          </Text>
+                        </View>
+
+                        {/* Active */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              isAdded && styles.disabledText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {user.active === undefined
+                              ? "N/A"
+                              : user.active
+                                ? "True"
+                                : "False"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
             </View>
           </View>
@@ -2339,6 +2576,61 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
+                      {(formRole === "2" || formRole === "3" || role === 0) && (
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>
+                            Subordinates:
+                          </Text>
+                          <TouchableOpacity
+                            style={[styles.input, { width: "100%" }]}
+                            onPress={() => {
+                              selectSelectSubModalVisible(true);
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color:
+                                  formSubordinates.length === 0
+                                    ? "#999999"
+                                    : "#000000",
+                                fontSize: 16,
+                                fontFamily: "System",
+                                fontWeight: "400",
+                                opacity: 0.7,
+                              }}
+                            >
+                              {formSubordinates.length === 0
+                                ? "Select Subordinates"
+                                : allUsers
+                                    .filter((user) =>
+                                      formSubordinates.includes(user.id),
+                                    )
+                                    .map((user) => user.username)
+                                    .join(", ")}
+                            </Text>
+                          </TouchableOpacity>
+                          {renderSelectSubModal()}
+                        </View>
+                      )}
+
+                      <Text style={styles.modalSubtitle}>Home Address:</Text>
+                      <View
+                        style={{
+                          width: "100%",
+                          position: "relative",
+                          zIndex: 100,
+                          elevation: 10,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <PlacesInput
+                          value={homeAddress}
+                          placeholder="Search home..."
+                          onPlaceSelected={(address, location) => {
+                            setHomeAddress(address);
+                          }}
+                        />
+                      </View>
                       {/* <View style={styles.modalRow}>
                         <View style={styles.modalUser}>
                           <Text style={styles.modalSubtitle}>Role:</Text>
@@ -2357,25 +2649,6 @@ export default function settings() {
                           </select>
                         </View>
                       </View> */}
-                    </View>
-
-                    <Text style={styles.modalSubtitle}>Home Address:</Text>
-                    <View
-                      style={{
-                        width: "100%",
-                        position: "relative",
-                        zIndex: 100,
-                        elevation: 10,
-                        marginBottom: 10,
-                      }}
-                    >
-                      <PlacesInput
-                        value={homeAddress}
-                        placeholder="Search home..."
-                        onPlaceSelected={(address, location) => {
-                          setHomeAddress(address);
-                        }}
-                      />
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -2594,6 +2867,42 @@ export default function settings() {
                           </select>
                         </View>
                       </View>
+                      {(formRole === "2" || formRole === "3" || role === 0) && (
+                        <View style={styles.modalUser}>
+                          <Text style={styles.modalSubtitle}>
+                            Subordinates:
+                          </Text>
+                          <TouchableOpacity
+                            style={[styles.input, { width: "100%" }]}
+                            onPress={() => {
+                              selectSelectSubModalVisible(true);
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color:
+                                  formSubordinates.length === 0
+                                    ? "#999999"
+                                    : "#000000",
+                                fontSize: 16,
+                                fontFamily: "System",
+                                fontWeight: "400",
+                                opacity: 0.7,
+                              }}
+                            >
+                              {formSubordinates.length === 0
+                                ? "Select Subordinates"
+                                : allUsers
+                                    .filter((user) =>
+                                      formSubordinates.includes(user.id),
+                                    )
+                                    .map((user) => user.username)
+                                    .join(", ")}
+                            </Text>
+                          </TouchableOpacity>
+                          {renderSelectSubModal()}
+                        </View>
+                      )}
 
                       <Text style={styles.modalSubtitle}>Active:</Text>
                       <Switch
@@ -2603,25 +2912,24 @@ export default function settings() {
                         value={formActive}
                         onValueChange={(newValue) => setFormActive(newValue)}
                       />
-                    </View>
-
-                    <Text style={styles.modalSubtitle}>Home Address:</Text>
-                    <View
-                      style={{
-                        width: "100%",
-                        position: "relative",
-                        zIndex: 100,
-                        elevation: 10,
-                        marginBottom: 10,
-                      }}
-                    >
-                      <PlacesInput
-                        value={homeAddress}
-                        placeholder="Search home..."
-                        onPlaceSelected={(address, location) => {
-                          setHomeAddress(address);
+                      <Text style={styles.modalSubtitle}>Home Address:</Text>
+                      <View
+                        style={{
+                          width: "100%",
+                          position: "relative",
+                          zIndex: 100,
+                          elevation: 10,
+                          marginBottom: 10,
                         }}
-                      />
+                      >
+                        <PlacesInput
+                          value={homeAddress}
+                          placeholder="Search home..."
+                          onPlaceSelected={(address, location) => {
+                            setHomeAddress(address);
+                          }}
+                        />
+                      </View>
                     </View>
 
                     <View style={styles.buttonRow}>
@@ -2745,7 +3053,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.3</Text>
+      <Text style={styles.bottomScrollText}>v1.2.4</Text>
     </View>
   );
 }
@@ -2918,6 +3226,7 @@ const styles = StyleSheet.create({
   closeButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
   disabledText: {
     color: "#9e9e9e", // grey text
+    backgroundColor: "#e0e0e0",
   },
   modalList: { maxHeight: 400 },
   modalUserItem: { padding: 12, borderBottomWidth: 1, borderColor: "#f0f0f0" },
