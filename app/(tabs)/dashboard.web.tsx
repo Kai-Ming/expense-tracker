@@ -258,10 +258,60 @@ export default function dashboard() {
     setSelectedYear(currentYear);
   }, []);
 
-  useEffect(() => {
+  /* useEffect(() => {
     if (!userId) return;
     if (role == 1) {
       return;
+    }
+
+    if (role == 0) {
+      const q = query(collection(db, "users"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const userData: User[] = [];
+        snapshot.forEach((doc) => {
+          userData.push({ id: doc.id, ...doc.data() } as User);
+        });
+        userData.sort((a, b) => a.username.localeCompare(b.username));
+        setAllUsers(userData);
+      });
+      return () => unsubscribe();
+    }
+
+    if (subordinates.length === 0) {
+      return;
+    }
+    const userIdsToFetch = [...subordinates, userId];
+
+    const q = query(
+      collection(db, "users"),
+      where("__name__", "in", userIdsToFetch),
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userData: User[] = [];
+      snapshot.forEach((doc) => {
+        userData.push({ id: doc.id, ...doc.data() } as User);
+      });
+      userData.sort((a, b) => a.username.localeCompare(b.username));
+      setAllUsers(userData);
+    });
+    return () => unsubscribe();
+  }, [role, subordinates, userId]); */
+
+  useEffect(() => {
+    if (!userId) return;
+    if (role == 1) {
+      const q = query(collection(db, "users"), where("__name__", "==", userId));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const userData: User[] = [];
+        snapshot.forEach((doc) => {
+          userData.push({ id: doc.id, ...doc.data() } as User);
+        });
+        userData.sort((a, b) => a.username.localeCompare(b.username));
+        setAllUsers(userData);
+      });
+      return () => unsubscribe();
     }
 
     if (role == 0) {
@@ -302,12 +352,23 @@ export default function dashboard() {
     if (!userId) return;
     let q;
 
-    if (role === 0) {
-      q = query(collection(db, "trips"), orderBy("created_at", "desc"));
-    } else {
+    if (role === 1) {
       q = query(
         collection(db, "trips"),
         where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    } else if (role === 0) {
+      q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    } else {
+      if (subordinates.length === 0) {
+        return;
+      }
+      const userIdsToFetch = [...subordinates, userId];
+
+      q = query(
+        collection(db, "trips"),
+        where("user_id", "in", userIdsToFetch),
         orderBy("created_at", "desc"),
       );
     }
@@ -321,7 +382,7 @@ export default function dashboard() {
     });
 
     return () => unsubscribe();
-  }, [userId, role]);
+  }, [userId, role, subordinates]);
 
   useEffect(() => {
     if (!userId) return;
@@ -380,10 +441,14 @@ export default function dashboard() {
     });
 
     return () => unsubscribe();
-  }, [userId, role]);
+  }, [userId, role, subordinates]);
 
   const changeDashboard = (index: number) => {
-    setTabIndex(index);
+    console.log(allTrips);
+    console.log(allMileage);
+    console.log(filteredUserMileage);
+    console.log(filteredMileage);
+    //setTabIndex(index);
   };
 
   const filterByMonth = <T extends { date?: string }>(

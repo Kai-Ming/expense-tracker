@@ -958,7 +958,12 @@ export default function settings() {
       setFormRole(userToAdd.role.toString() || "");
       setFormDepartment(userToAdd.department || "");
       setFormOffice(userToAdd.office?.toString() || "");
-      setFormSubordinates(userToAdd.subordinates || []);
+      const subordinates = userToAdd.subordinates || [];
+      setFormSubordinates(subordinates);
+      const subordinateUsers = allUsers.filter((u) =>
+        subordinates.includes(u.id),
+      );
+      setAddedSub(subordinateUsers);
       const homeCoord = userToAdd.home_coordinates;
 
       if (homeCoord) {
@@ -1379,7 +1384,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1391,7 +1396,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1404,7 +1409,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1417,7 +1422,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1430,7 +1435,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1443,7 +1448,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1456,7 +1461,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1469,7 +1474,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1481,7 +1486,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -1494,7 +1499,7 @@ export default function settings() {
                           <Text
                             style={[
                               styles.tableCell,
-                              isAdded && styles.disabledText,
+                              isAdded && styles.selectedText,
                             ]}
                             numberOfLines={1}
                           >
@@ -3053,7 +3058,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.4</Text>
+      <Text style={styles.bottomScrollText}>v1.2.4.1</Text>
     </View>
   );
 }
@@ -3226,6 +3231,10 @@ const styles = StyleSheet.create({
   closeButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
   disabledText: {
     color: "#9e9e9e", // grey text
+    backgroundColor: "#e0e0e0",
+  },
+  selectedText: {
+    color: "#2196F3",
     backgroundColor: "#e0e0e0",
   },
   modalList: { maxHeight: 400 },
