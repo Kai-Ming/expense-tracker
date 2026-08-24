@@ -84,10 +84,15 @@ const YearBarChart: React.FC<YearBarChartProps> = ({
     const chartHeight = 220;
     const topPadding = 30;
 
+    // Use the same scaling as the BarChart
+    const currentMax = Math.max(...data);
+    const scaleFactor = currentMax > 0 ? maxValue / currentMax : 1;
+
     return data.map((value, index) => {
       const x = padding + index * barWidth + barWidth / 2;
-      const scaleFactor = maxValue / Math.max(...data);
-      const barHeight = (value / maxValue) * (chartHeight - topPadding);
+      // Apply the same scaling that BarChart uses internally
+      const scaledValue = value * scaleFactor;
+      const barHeight = (scaledValue / maxValue) * (chartHeight - topPadding);
       const y = chartHeight - barHeight - topPadding / 2;
 
       return { x, y, value };

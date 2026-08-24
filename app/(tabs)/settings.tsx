@@ -1562,17 +1562,21 @@ export default function settings() {
     return true;
   });
 
-  const handleExport = async () => {
-    if (selectedUser === "" || selectedUserId === "") {
+  const handleExport = async (allUsers = false) => {
+    if ((selectedUser === "" || selectedUserId === "") && !allUsers) {
       console.log("stop");
       return;
     }
     console.log("exporting");
-    await exportCustomersToCSV(
-      filteredMileage,
-      filteredGeneral,
-      filteredOutstation,
-    );
+    if (allUsers) {
+      await exportCustomersToCSV(allMileage, allGeneral, allOutstation);
+    } else {
+      await exportCustomersToCSV(
+        filteredMileage,
+        filteredGeneral,
+        filteredOutstation,
+      );
+    }
   };
 
   return (
@@ -3040,13 +3044,29 @@ export default function settings() {
                           styles.submitButton,
                           (isSaving || selectedUser === "") && { opacity: 0.7 },
                         ]}
-                        onPress={handleExport}
+                        onPress={() => handleExport(false)}
                         disabled={isSaving || selectedUser === ""}
                       >
                         {isSaving ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
                           <Text style={styles.textStyle}>Download</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.dialogButton,
+                          styles.submitButton,
+                          isSaving && { opacity: 0.7 },
+                        ]}
+                        onPress={() => handleExport(true)}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.textStyle}>Download All</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -3058,7 +3078,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.4.1</Text>
+      <Text style={styles.bottomScrollText}>v1.2.4.2</Text>
     </View>
   );
 }
