@@ -26,6 +26,7 @@ interface Expense {
   cost: number;
   user_id: string;
   user_name?: string;
+  username?: string;
   business_card_url?: string;
   route_image_url?: string;
   receipt_urls?: string[];
@@ -183,7 +184,8 @@ export const exportCustomersToCSV = (
               created_at: formatDate(expense.created_at),
               expense_type: "Mileage",
               user_id: expense.user_id,
-              username: expense.user_name,
+              username: expense.user_name || expense.username,
+              id: expense.id,
             });
           }
         });
@@ -201,6 +203,7 @@ export const exportCustomersToCSV = (
               expense_type: "General",
               user_id: expense.user_id,
               username: expense.user_name,
+              id: expense.id,
             });
           }
         });
@@ -216,8 +219,8 @@ export const exportCustomersToCSV = (
               ...customer,
               created_at: formatDate(expense.created_at),
               expense_type: "Outstation",
-              user_id: expense.user_id,
-              username: expense.user_name,
+              user_id: expense.user_id || expense.username,
+              id: expense.id,
             });
           }
         });
