@@ -48,6 +48,7 @@ interface GeneralExpense {
   contact_number?: string;
   user_id: string;
   user_name?: string;
+  username?: string;
   email?: string;
   expense_report?: string;
   type: number;
@@ -202,7 +203,7 @@ export const exportCustomersToCSV = (
               created_at: formatDate(expense.created_at),
               expense_type: "General",
               user_id: expense.user_id,
-              username: expense.user_name,
+              username: expense.user_name || expense.username,
               id: expense.id,
             });
           }
@@ -219,7 +220,8 @@ export const exportCustomersToCSV = (
               ...customer,
               created_at: formatDate(expense.created_at),
               expense_type: "Outstation",
-              user_id: expense.user_id || expense.username,
+              user_id: expense.user_id,
+              username: expense.user_name || expense.username,
               id: expense.id,
             });
           }
@@ -249,6 +251,10 @@ export const exportCustomersToCSV = (
       alert("Failed to generate CSV data");
       return;
     }
+
+    console.log(filteredCustomers.find((c) => c.id === "Qw0xeZanq1Igr3GmwElw"));
+
+    console.log(filteredCustomers.find((c) => c.id === "oZnLwWf7jYuBpy9Xu4dU"));
 
     // Download CSV on web
     downloadCSV(csvData);
