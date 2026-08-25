@@ -4090,6 +4090,59 @@ export default function ExpensesWebScreen() {
     );
   };
 
+  const renderTripDetailView = (tripId: string) => {
+    const trip = getTripById(tripId);
+    return trip ? (
+      <View key={tripId} style={styles.tripItem}>
+        <Text style={styles.tripDetail}>
+          <strong>Platform: </strong>
+          {trip.platform === 2 ? "Web" : "Mobile"}
+        </Text>
+        <Text style={styles.tripDetail}>
+          <strong>Remark: </strong>
+          {trip.remark}
+        </Text>
+        <Text style={styles.tripDetail}>
+          <strong>Trip: </strong>
+          {trip.from_address} →{"\n"}
+          {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
+        </Text>
+        <Text style={styles.tripDetail}>
+          <strong>From Home: </strong>
+          {trip.from_home ? "Yes" : "No"}
+        </Text>
+        <Text style={styles.tripDetail}>
+          <strong>To Home: </strong>
+          {trip.to_home === true ? "Yes" : "No"}
+        </Text>
+
+        {trip.route_image_url && (
+          <>
+            <Text style={styles.tripDetail}>
+              <strong>Route Map:</strong>
+            </Text>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedImage(trip.route_image_url || null);
+              }}
+            >
+              <Image
+                source={{ uri: trip.route_image_url }}
+                style={styles.businessCardImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    ) : (
+      <Text key={tripId} style={styles.descriptionText}>
+        Trip data not available
+      </Text>
+    );
+  };
+
   const renderMileageDetailView = (expense: Expense) => {
     const isEditing = editingId === expense.id;
 
@@ -4592,40 +4645,7 @@ export default function ExpensesWebScreen() {
             <View style={styles.section}>
               <Text style={styles.descriptionLabel}>Trips:</Text>
               {expense.trip_ids.map((tripId) => {
-                const trip = getTripById(tripId);
-                return trip ? (
-                  <View key={tripId} style={styles.tripItem}>
-                    <Text style={styles.descriptionText}>
-                      {trip.platform === 2 ? "Web" : "Mobile"}
-                    </Text>
-                    <Text style={styles.tripDetail}>
-                      <strong>Remark: </strong>
-                      {trip.remark}
-                    </Text>
-                    {/* <Text style={styles.tripDetail}>
-                      <strong>Time: </strong>
-                      {formatFirebaseTime(trip.from_time)} →{" "}
-                      {formatFirebaseTime(trip.to_time)}
-                    </Text> */}
-                    <Text style={styles.tripDetail}>
-                      <strong>Trip: </strong>
-                      {trip.from_address} →{"\n"}
-                      {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
-                    </Text>
-                    <Text style={styles.tripDetail}>
-                      <strong>From Home: </strong>
-                      {trip.from_home ? "Yes" : "No"}
-                    </Text>
-                    <Text style={styles.tripDetail}>
-                      <strong>To Home: </strong>
-                      {trip.to_home === true ? "Yes" : "No"}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text key={tripId} style={styles.descriptionText}>
-                    Trip data not available
-                  </Text>
-                );
+                return renderTripDetailView(tripId);
               })}
             </View>
           )}
@@ -6052,40 +6072,7 @@ export default function ExpensesWebScreen() {
               <View style={styles.section}>
                 <Text style={styles.descriptionLabel}>Trips:</Text>
                 {expense.trip_ids.map((tripId) => {
-                  const trip = getTripById(tripId);
-                  return trip ? (
-                    <View key={tripId} style={styles.tripItem}>
-                      <Text style={styles.descriptionText}>
-                        {trip.platform === 2 ? "Web" : "Mobile"}
-                      </Text>
-                      <Text style={styles.tripDetail}>
-                        <strong>Remark: </strong>
-                        {trip.remark}
-                      </Text>
-                      {/* <Text style={styles.tripDetail}>
-                      <strong>Time: </strong>
-                      {formatFirebaseTime(trip.from_time)} →{" "}
-                      {formatFirebaseTime(trip.to_time)}
-                    </Text> */}
-                      <Text style={styles.tripDetail}>
-                        <strong>Trip: </strong>
-                        {trip.from_address} →{"\n"}
-                        {trip.to_address} {"\n"}({trip.distance?.toFixed(2)} km)
-                      </Text>
-                      <Text style={styles.tripDetail}>
-                        <strong>From Home: </strong>
-                        {trip.from_home ? "Yes" : "No"}
-                      </Text>
-                      <Text style={styles.tripDetail}>
-                        <strong>To Home: </strong>
-                        {trip.to_home === true ? "Yes" : "No"}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text key={tripId} style={styles.descriptionText}>
-                      Trip data not available
-                    </Text>
-                  );
+                  return renderTripDetailView(tripId);
                 })}
               </View>
             )}
