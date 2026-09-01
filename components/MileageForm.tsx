@@ -1225,6 +1225,8 @@ export default function MileageForm() {
     const otherExpensePurpose =
       parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
 
+    const isAddressRequired = !noAddress.includes(userId || "");
+
     const isCustomersFormValid =
       formCustomers.every(
         (customer) =>
@@ -1234,9 +1236,11 @@ export default function MileageForm() {
           customer.number.trim() !== "" &&
           customer.time.trim() !== "",
       ) &&
-      formCustomers.some(
-        (customer) => customer.address && customer.address.trim() !== "",
-      );
+      (isAddressRequired
+        ? formCustomers.some(
+            (customer) => customer.address && customer.address.trim() !== "",
+          )
+        : true);
 
     if (
       !formPurpose.trim() ||
@@ -1297,6 +1301,7 @@ export default function MileageForm() {
   };
 
   const resetForm = () => {
+    setFormDate(new Date().toISOString().split("T")[0]);
     setFormPurpose("");
     setFormCompany("");
     setFormName("");
@@ -1349,6 +1354,10 @@ export default function MileageForm() {
         }
         return num.toFixed(2);
       };
+
+      setFormDate(
+        selectedMileage.date || new Date().toISOString().split("T")[0],
+      );
 
       setFormTripReport(selectedMileage.trip_report || "");
       setFormParking(formatCurrency(selectedMileage.parking));

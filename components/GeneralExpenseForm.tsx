@@ -270,6 +270,7 @@ export default function GeneralExpenseForm() {
   };
 
   const resetForm = () => {
+    setFormDate(new Date().toISOString().split("T")[0]);
     setFormExpenseType("");
     setFormPurpose("");
     setFormAmount("0.00");
@@ -326,6 +327,10 @@ export default function GeneralExpenseForm() {
         }
         return num.toFixed(2);
       };
+
+      setFormDate(
+        selectedExpense.date || new Date().toISOString().split("T")[0],
+      );
 
       setFormAmount(formatCurrency(selectedExpense.amount));
       setFormVendor(selectedExpense.vendor);
