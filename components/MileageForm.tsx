@@ -1359,6 +1359,14 @@ export default function MileageForm() {
         selectedMileage.date || new Date().toISOString().split("T")[0],
       );
 
+      const tripIds = selectedMileage.trip_ids || [];
+      const tripIdSet = new Set(tripIds);
+
+      const matchingTrips = allUserTrips.filter((trip) =>
+        tripIdSet.has(trip.id),
+      );
+      setAddedTrips(matchingTrips);
+
       setFormTripReport(selectedMileage.trip_report || "");
       setFormParking(formatCurrency(selectedMileage.parking));
       setFormToll(formatCurrency(selectedMileage.toll));
