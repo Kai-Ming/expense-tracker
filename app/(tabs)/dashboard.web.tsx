@@ -448,7 +448,7 @@ export default function dashboard() {
     console.log(allMileage);
     console.log(filteredUserMileage);
     console.log(filteredMileage);
-    //setTabIndex(index);
+    setTabIndex(index);
   };
 
   const filterByMonth = <T extends { date?: string }>(
