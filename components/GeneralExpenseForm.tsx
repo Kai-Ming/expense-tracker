@@ -160,10 +160,32 @@ export default function GeneralExpenseForm() {
       !formVendor ||
       expensePurposeValidation
     ) {
-      console.log("not valid");
-      alert("Please ensure all required fields are filled.");
+      // Individual validation checks
+      if (!formExpenseType) {
+        alert("Please select an Expense Type.");
+        console.log("Expense Type is missing");
+      } else if (!formDate) {
+        alert("Please select a Date.");
+        console.log("Date is missing");
+      } else if (parseFloat(formAmount) === 0) {
+        alert("Please enter an Amount greater than 0.");
+        console.log("Amount is 0 or invalid");
+      } else if (!formExpenseReport) {
+        alert("Please enter an Expense Report.");
+        console.log("Expense Report is missing");
+      } else if (!formVendor) {
+        alert("Please select a Vendor.");
+        console.log("Vendor is missing");
+      } else if (expensePurposeValidation) {
+        alert("Please fill in customers.");
+        console.log("Customer fields are incomplete for selected expense type");
+      }
       return;
     }
+
+    // If all validations pass
+    console.log("All validations passed");
+
     const encodedReport = formExpenseReport.replace(/\n/g, "\\n");
     console.log("valid");
     try {

@@ -1157,9 +1157,70 @@ export default function MileageForm() {
       !isCustomersFormValid ||
       otherExpenseValidation
     ) {
-      alert("Please ensure all required fields are filled.");
+      // Individual validation checks
+      if (!formPurpose.trim()) {
+        alert("Please select a Purpose.");
+        console.log("Purpose is missing");
+      } else if (!formDate) {
+        alert("Please select a Date.");
+        console.log("Date is missing");
+      } else if (!formTripReport) {
+        alert("Please enter Trip Report.");
+        console.log("Trip Report is missing");
+      } else if (!isCustomersFormValid) {
+        // Check which customer fields are missing
+        const invalidCustomers = formCustomers.filter(
+          (customer) =>
+            customer.name.trim() === "" ||
+            customer.company.trim() === "" ||
+            customer.email.trim() === "" ||
+            customer.number.trim() === "" ||
+            customer.time.trim() === "",
+        );
+
+        if (invalidCustomers.length > 0) {
+          alert(
+            "Please ensure all customer fields (Name, Company, Email, Number, Time) are filled for all customers.",
+          );
+          console.log("Customer fields are incomplete", invalidCustomers);
+        } else if (isAddressRequired) {
+          const customersMissingAddress = formCustomers.filter(
+            (customer) => !customer.address || customer.address.trim() === "",
+          );
+          if (customersMissingAddress.length > 0) {
+            alert("Please enter an address for a customers.");
+            console.log(
+              "Address is missing for some customers",
+              customersMissingAddress,
+            );
+          }
+        }
+      } else if (otherExpenseValidation) {
+        // Check other expense validation
+        const expenseAmount = parseFloat(formOtherExpense);
+        if (expenseAmount !== 0 && (!formOtherExpenseType || !formVendor)) {
+          alert(
+            "Please fill in both Other Expense Type and Vendor when Other Expense amount is entered.",
+          );
+          console.log("Other Expense fields are incomplete");
+        } else if (
+          expenseAmount === 0 &&
+          (formOtherExpenseType || formVendor)
+        ) {
+          alert(
+            "Please remove Other Expense Type and Vendor when Other Expense amount is 0.",
+          );
+          console.log("Other Expense fields should be empty when amount is 0");
+        } else {
+          alert("Please ensure Other Expense fields are correctly filled.");
+          console.log("Other Expense validation failed");
+        }
+      }
       return;
     }
+
+    // If all validations pass
+    console.log("All validations passed");
 
     try {
       const businessCardUrls: string[] = [];

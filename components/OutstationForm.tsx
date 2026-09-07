@@ -1191,9 +1191,44 @@ export default function OutstationExpenseForm() {
       formTravelPurposes.length === 0 ||
       !formTransportMode.trim()
     ) {
-      alert("Please ensure all required fields are filled.");
+      // Individual validation checks
+      if (!formStartDate.trim()) {
+        alert("Please enter a Start Date.");
+        console.log("Start Date is missing");
+      } else if (!formEndDate.trim()) {
+        alert("Please enter an End Date.");
+        console.log("End Date is missing");
+      } else if (!isPlacesFormValid) {
+        const invalidPlaces = formRequestPlaces.filter(
+          (place) =>
+            place.country.trim() === "" || place.location.trim() === "",
+        );
+
+        if (invalidPlaces.length > 0) {
+          alert(
+            "Please ensure all place fields (Country and Location) are filled for all places.",
+          );
+          console.log("Place fields are incomplete", invalidPlaces);
+        }
+      } else if (formTravelPurposes.length === 0) {
+        alert("Please select at least one Travel Purpose.");
+        console.log("Travel Purposes are missing");
+      } else if (!formTransportMode.trim()) {
+        alert("Please select a Transport Mode.");
+        console.log("Transport Mode is missing");
+      }
       return;
     }
+
+    // Optional: Check ownAccValid separately if needed
+    if (!ownAccValid) {
+      alert("Please select a Travelmate.");
+      console.log("Travelmate is missing");
+      return;
+    }
+
+    // If all validations pass
+    console.log("All validations passed");
 
     try {
       const dayCount = getDaysDifference(formStartDate, formEndDate);
@@ -1366,22 +1401,76 @@ export default function OutstationExpenseForm() {
     const timeEmpty =
       (formTripDate === formDepartureDate && !formDepartureTime) ||
       (formTripDate === formArrivalDate && !formArrivalTime);
-    if (
-      !selectedRequestId.trim() ||
-      !formTripReport.trim() ||
-      !formTripCountry.trim() ||
-      !formTripLocation.trim() ||
-      !isCustomersFormValid ||
-      timeEmpty
-    ) {
-      alert("Please ensure all required fields are filled.");
-      console.log("not valid");
-      console.log(selectedRequestId);
-      console.log(formTripReport);
-      console.log(isCustomersFormValid);
-      console.log(formCustomers);
+
+    // Individual validation checks
+    if (!selectedRequestId.trim()) {
+      alert("Please select a Request.");
+      console.log("Request is missing");
       return;
     }
+
+    if (!formTripReport.trim()) {
+      alert("Please enter Trip Report.");
+      console.log("Trip Report is missing");
+      return;
+    }
+
+    if (!formTripCountry.trim()) {
+      alert("Please select a Country.");
+      console.log("Trip Country is missing");
+      return;
+    }
+
+    if (!formTripLocation.trim()) {
+      alert("Please enter a Location.");
+      console.log("Trip Location is missing");
+      return;
+    }
+
+    if (!isCustomersFormValid) {
+      // Check which customer fields are missing
+      const invalidCustomers = formCustomers.filter(
+        (customer) =>
+          customer.name.trim() === "" ||
+          customer.company.trim() === "" ||
+          customer.email.trim() === "" ||
+          customer.number.trim() === "" ||
+          customer.time.trim() === "",
+      );
+
+      if (invalidCustomers.length > 0) {
+        alert(
+          "Please ensure all customer fields (Name, Company, Email, Number, Time) are filled for all customers.",
+        );
+        console.log("Customer fields are incomplete", invalidCustomers);
+      } else if (isAddressRequired) {
+        const customersMissingAddress = formCustomers.filter(
+          (customer) => !customer.address || customer.address.trim() === "",
+        );
+        if (customersMissingAddress.length > 0) {
+          alert("Please enter an address for customers.");
+          console.log(
+            "Address is missing for some customers",
+            customersMissingAddress,
+          );
+        }
+      }
+      return;
+    }
+
+    if (timeEmpty) {
+      if (formTripDate === formDepartureDate && !formDepartureTime) {
+        alert("Please enter a Departure Time.");
+        console.log("Departure Time is missing");
+      } else if (formTripDate === formArrivalDate && !formArrivalTime) {
+        alert("Please enter an Arrival Time.");
+        console.log("Arrival Time is missing");
+      }
+      return;
+    }
+
+    // If all validations pass
+    console.log("All validations passed");
 
     let ownAccExpense = ownAccCost;
 
