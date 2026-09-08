@@ -1301,6 +1301,13 @@ export default function dashboard() {
     return Math.ceil(maxValue / interval) * interval;
   };
 
+  const formatNumber = (num: number) => {
+    return num.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const renderTripBarChart = () => {
     // FIX: Correct the typo in the function
     const extractMalaysianState = (address: string): string => {
@@ -1710,9 +1717,12 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Expenses (RM{" "}
-                    {chartData.data
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}
+                    {formatNumber(
+                      chartData.data.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}
                     ) - {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
@@ -1724,7 +1734,7 @@ export default function dashboard() {
                     const num = Number(value);
                     return `$${Number(value).toFixed(0)}`;
                   }}
-                  formatTooltip={(value) => `RM${value.toFixed(2)}`}
+                  formatTooltip={(value) => `RM${formatNumber(value)}`}
                   color="rgba(134, 65, 244, 1)"
                   strokeColor="#6200ee"
                   segments={5}
@@ -1744,9 +1754,12 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Distance Travelled (
-                    {chartData.totalDistanceData
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}{" "}
+                    {formatNumber(
+                      chartData.totalDistanceData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}{" "}
                     km) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
@@ -1760,7 +1773,7 @@ export default function dashboard() {
                     if (num >= 1000) return `${(num / 1000).toFixed(0)}k km`;
                     return `${num.toString()} km`;
                   }}
-                  formatTooltip={(value) => `${value.toFixed(1)} km`}
+                  formatTooltip={(value) => `${formatNumber(value)} km`}
                   color="rgba(54, 162, 235, 1)"
                   strokeColor="#36A2EB"
                   segments={5}
@@ -1780,9 +1793,11 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     No. of Trips (
-                    {chartData.tripCountData.reduce(
-                      (total: number, num: number) => total + num,
-                      0,
+                    {formatNumber(
+                      chartData.tripCountData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
                     )}{" "}
                     trips) for {selectedYear}/{selectedYear + 1}
                   </Text>
@@ -1825,10 +1840,13 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Travel Duration (
-                    {chartData.totalDistanceData
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}{" "}
-                    km) for - {selectedYear}/{selectedYear + 1}
+                    {formatDuration(
+                      chartData.totalDurationData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}
+                    ) for - {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
 
@@ -2027,9 +2045,12 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Mileage Expense (RM
-                    {chartData.mileageData
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}
+                    {formatNumber(
+                      chartData.mileageData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}
                     ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
@@ -2041,7 +2062,7 @@ export default function dashboard() {
                     const num = Number(value);
                     return `$${Number(value).toFixed(0)}`;
                   }}
-                  formatTooltip={(value) => `RM${value.toFixed(2)}`}
+                  formatTooltip={(value) => `RM${formatNumber(value)}`}
                   color="rgba(134, 65, 244, 1)"
                   strokeColor="#6200ee"
                   segments={5}
@@ -2061,9 +2082,12 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total General Expense (RM
-                    {chartData.generalData
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}
+                    {formatNumber(
+                      chartData.generalData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}
                     ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
@@ -2075,7 +2099,7 @@ export default function dashboard() {
                     const num = Number(value);
                     return `$${Number(value).toFixed(0)}`;
                   }}
-                  formatTooltip={(value) => `RM${value.toFixed(2)}`}
+                  formatTooltip={(value) => `RM${formatNumber(value)}`}
                   color="rgba(54, 162, 235, 1)"
                   strokeColor="#36A2EB"
                   segments={5}
@@ -2095,9 +2119,12 @@ export default function dashboard() {
                 <View style={styles.titleContainer}>
                   <Text style={styles.titleText}>
                     Total Outstation Expense (RM
-                    {chartData.outstationData
-                      .reduce((total: number, num: number) => total + num, 0)
-                      .toFixed(2)}
+                    {formatNumber(
+                      chartData.outstationData.reduce(
+                        (total: number, num: number) => total + num,
+                        0,
+                      ),
+                    )}
                     ) for {selectedYear}/{selectedYear + 1}
                   </Text>
                 </View>
@@ -2109,7 +2136,7 @@ export default function dashboard() {
                     const num = Number(value);
                     return `$${Number(value).toFixed(0)}`;
                   }}
-                  formatTooltip={(value) => `RM${value.toFixed(2)}`}
+                  formatTooltip={(value) => `RM${formatNumber(value)}`}
                   color="rgba(255, 159, 67, 1)"
                   strokeColor="#FF9F43"
                 />
