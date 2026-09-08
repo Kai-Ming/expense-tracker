@@ -317,6 +317,8 @@ export default function OutstationExpenseForm() {
     "7vFkURLn0XXfgVuGgjS4qrQGC722",
   ];
 
+  //  "7vFkURLn0XXfgVuGgjS4qrQGC722",
+
   useEffect(() => {
     const q = query(collection(db, "users"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1381,7 +1383,8 @@ export default function OutstationExpenseForm() {
   const handleNextDay = async () => {
     console.log("next day");
 
-    const isAddressRequired = !noAddress.includes(userId || "");
+    const isAddressRequired =
+      !noAddress.includes(userId || "") && addedTrips.length != 0;
 
     const isCustomersFormValid =
       formCustomers.every(

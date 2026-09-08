@@ -1133,7 +1133,8 @@ export default function MileageForm() {
     const otherExpensePurpose =
       parseFloat(formOtherExpense) === 0 ? "" : formOtherExpenseType;
 
-    const isAddressRequired = !noAddress.includes(userId || "");
+    const isAddressRequired =
+      !noAddress.includes(userId || "") && addedTrips.length != 0;
 
     const isCustomersFormValid =
       formCustomers.every(
