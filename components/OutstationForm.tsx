@@ -46,6 +46,7 @@ type Grade =
   | "A3"
   | "A2"
   | "A1"
+  | "M4"
   | "M3"
   | "M2";
 
@@ -420,6 +421,7 @@ export default function OutstationExpenseForm() {
       A3: 70,
       A2: 75,
       A1: 80,
+      M4: 90,
       M3: 90,
       M2: 100,
     },
@@ -436,6 +438,7 @@ export default function OutstationExpenseForm() {
       A3: 84,
       A2: 90,
       A1: 96,
+      M4: 108,
       M3: 108,
       M2: 120,
     },
@@ -452,6 +455,7 @@ export default function OutstationExpenseForm() {
       A3: 238,
       A2: 255,
       A1: 272,
+      M4: 306,
       M3: 306,
       M2: 340,
     },
@@ -468,6 +472,7 @@ export default function OutstationExpenseForm() {
       A3: 210,
       A2: 225,
       A1: 240,
+      M4: 270,
       M3: 270,
       M2: 300,
     },
@@ -484,6 +489,7 @@ export default function OutstationExpenseForm() {
       A3: 182,
       A2: 195,
       A1: 208,
+      M4: 234,
       M3: 234,
       M2: 260,
     },
@@ -500,6 +506,7 @@ export default function OutstationExpenseForm() {
       A3: 168,
       A2: 180,
       A1: 192,
+      M4: 216,
       M3: 216,
       M2: 240,
     },
@@ -516,6 +523,7 @@ export default function OutstationExpenseForm() {
       A3: 168,
       A2: 180,
       A1: 192,
+      M4: 216,
       M3: 216,
       M2: 240,
     },
@@ -532,6 +540,7 @@ export default function OutstationExpenseForm() {
       A3: 168,
       A2: 180,
       A1: 192,
+      M4: 216,
       M3: 216,
       M2: 240,
     },
@@ -548,6 +557,7 @@ export default function OutstationExpenseForm() {
       A3: 140,
       A2: 150,
       A1: 160,
+      M4: 180,
       M3: 180,
       M2: 200,
     },
@@ -564,6 +574,7 @@ export default function OutstationExpenseForm() {
       A3: 140,
       A2: 150,
       A1: 160,
+      M4: 180,
       M3: 180,
       M2: 200,
     },
@@ -580,6 +591,7 @@ export default function OutstationExpenseForm() {
       A3: 392,
       A2: 420,
       A1: 448,
+      M4: 504,
       M3: 504,
       M2: 560,
     },
@@ -596,6 +608,7 @@ export default function OutstationExpenseForm() {
       A3: 308,
       A2: 330,
       A1: 352,
+      M4: 396,
       M3: 396,
       M2: 440,
     },
@@ -612,6 +625,7 @@ export default function OutstationExpenseForm() {
       A3: 350,
       A2: 375,
       A1: 400,
+      M4: 450,
       M3: 450,
       M2: 500,
     },
@@ -628,6 +642,7 @@ export default function OutstationExpenseForm() {
       A3: 350,
       A2: 375,
       A1: 400,
+      M4: 450,
       M3: 450,
       M2: 500,
     },
@@ -644,6 +659,7 @@ export default function OutstationExpenseForm() {
       A3: 280,
       A2: 300,
       A1: 320,
+      M4: 360,
       M3: 360,
       M2: 400,
     },
@@ -660,6 +676,7 @@ export default function OutstationExpenseForm() {
       A3: 210,
       A2: 225,
       A1: 240,
+      M4: 270,
       M3: 270,
       M2: 300,
     },
@@ -676,6 +693,7 @@ export default function OutstationExpenseForm() {
       A3: 210,
       A2: 225,
       A1: 240,
+      M4: 270,
       M3: 270,
       M2: 300,
     },
@@ -692,6 +710,7 @@ export default function OutstationExpenseForm() {
       A3: 490,
       A2: 525,
       A1: 560,
+      M4: 630,
       M3: 630,
       M2: 700,
     },
@@ -708,6 +727,7 @@ export default function OutstationExpenseForm() {
       A3: 378,
       A2: 405,
       A1: 432,
+      M4: 486,
       M3: 486,
       M2: 540,
     },
@@ -724,6 +744,7 @@ export default function OutstationExpenseForm() {
       A3: 504,
       A2: 540,
       A1: 576,
+      M4: 648,
       M3: 648,
       M2: 720,
     },
@@ -740,6 +761,7 @@ export default function OutstationExpenseForm() {
       A3: 490,
       A2: 525,
       A1: 560,
+      M4: 630,
       M3: 630,
       M2: 700,
     },
@@ -756,6 +778,7 @@ export default function OutstationExpenseForm() {
       A3: 350,
       A2: 375,
       A1: 400,
+      M4: 450,
       M3: 450,
       M2: 500,
     },
@@ -772,6 +795,7 @@ export default function OutstationExpenseForm() {
       A3: 308,
       A2: 330,
       A1: 352,
+      M4: 396,
       M3: 396,
       M2: 440,
     },
@@ -788,6 +812,7 @@ export default function OutstationExpenseForm() {
       A3: 280,
       A2: 300,
       A1: 320,
+      M4: 360,
       M3: 360,
       M2: 400,
     },
@@ -804,6 +829,7 @@ export default function OutstationExpenseForm() {
       A3: 280,
       A2: 300,
       A1: 320,
+      M4: 360,
       M3: 360,
       M2: 400,
     },
@@ -3772,12 +3798,13 @@ export default function OutstationExpenseForm() {
 
           <View style={[styles.dropdownInput, { marginLeft: 20 }]}>
             <TouchableOpacity
-              style={{ opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5 }}
+              style={[{ opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5 }]}
               onPress={() => {
                 setShowMileageModal(true);
 
                 console.log(addedTrips);
               }}
+              disabled={tripsForSelectedDate.length == 0}
             >
               <Text style={styles.buttonText}>
                 {selectedTripId
@@ -5112,7 +5139,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderWidth: 1,
     borderColor: "#ccc",
     justifyContent: "center",
     minHeight: 36,

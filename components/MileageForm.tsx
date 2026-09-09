@@ -1753,7 +1753,12 @@ export default function MileageForm() {
                   {/* <Text style={styles.fieldLabel}>Select Trips:</Text> */}
                   <View style={styles.dropdownInput}>
                     <TouchableOpacity
-                      style={styles.dropdownButton}
+                      style={[
+                        styles.dropdownButton,
+                        {
+                          opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5,
+                        },
+                      ]}
                       onPress={() => {
                         setIsDropdownOpen(true);
 
@@ -2483,7 +2488,7 @@ export default function MileageForm() {
                     keyboardType="numeric"
                     style={styles.webTextInput}
                   />
-                  <Text style={styles.fieldLabel}>Cost:</Text>
+                  <Text style={styles.fieldLabel}>Cost (RM):</Text>
                   <Text style={styles.fieldValue}>RM {calculateCost()}</Text>
                 </View>
                 <View style={[styles.inputRow, { marginTop: 10 }]}>
@@ -2847,7 +2852,7 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   fieldLabel: { fontSize: 14, fontWeight: "600", width: 120 },
   fieldLabelMandatory: { color: "#2196F3" },
-  fieldValue: { fontSize: 14, width: 120 },
+  fieldValue: { fontSize: 14, width: 120, paddingVertical: 10 },
   button: {
     backgroundColor: "#2196F3",
     padding: 12,
