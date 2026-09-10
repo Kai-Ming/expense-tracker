@@ -16,7 +16,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -118,6 +118,7 @@ export default function MileageForm() {
   const [selectedTripId, setSelectedTripId] = useState<string>("");
   const [addedTrips, setAddedTrips] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const skipDateResetRef = useRef(false);
 
   const [showTripModal, setShowTripModal] = useState(false);
   const [fromAddress, setFromAddress] = useState<string>("");
@@ -204,6 +205,10 @@ export default function MileageForm() {
 
   // Effect 2: When date changes, clear the added trips list (since they belong to a different day)
   useEffect(() => {
+    if (skipDateResetRef.current) {
+      skipDateResetRef.current = false;
+      return;
+    }
     setAddedTrips([]);
     setDistance("0.00");
   }, [formDate]);
@@ -1407,6 +1412,7 @@ export default function MileageForm() {
     const selectedMileage = allMileage.find((e) => e.id === id);
 
     if (selectedMileage) {
+      skipDateResetRef.current = true;
       const formatCurrency = (value: any): string => {
         // Handle null, undefined, or non-numeric values
         const num = typeof value === "number" ? value : parseFloat(value);
@@ -1424,9 +1430,18 @@ export default function MileageForm() {
       const tripIds = selectedMileage.trip_ids || [];
       const tripIdSet = new Set(tripIds);
 
-      const matchingTrips = allUserTrips.filter((trip) =>
-        tripIdSet.has(trip.id),
+      const seen = new Set();
+      const matchingTrips = allUserTrips.filter((trip) => {
+        if (!tripIdSet.has(trip.id) || seen.has(trip.id)) return false;
+        seen.add(trip.id);
+        return true;
+      });
+      console.log(
+        allUserTrips
+          .filter((t) => tripIdSet.has(t.id))
+          .map((t) => `${typeof t.id}: ${String(t.id)}`),
       );
+      console.log(matchingTrips);
       setAddedTrips(matchingTrips);
 
       setFormTripReport(selectedMileage.trip_report || "");
@@ -1453,7 +1468,7 @@ export default function MileageForm() {
               },
             ],
       );
-      addTripsByIds(selectedMileage.trip_ids || []);
+      //addTripsByIds(selectedMileage.trip_ids || []);
     }
   };
 
@@ -1784,7 +1799,10 @@ export default function MileageForm() {
                   {renderTripModal()}
 
                   <TouchableOpacity
-                    onPress={() => setShowTripModal(true)}
+                    onPress={() => {
+                      setShowTripModal(true);
+                      //console.log(addedTrips);
+                    }}
                     style={[styles.dropdownInput, { marginLeft: 10 }]}
                   >
                     <Text style={styles.buttonText}>Add Trip</Text>

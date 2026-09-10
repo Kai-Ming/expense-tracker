@@ -15,7 +15,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -300,6 +300,8 @@ export default function OutstationExpenseForm() {
     OutstationExpense[]
   >([]);
 
+  const skipDateResetRef = useRef(false);
+
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [tabIndex, setTabIndex] = useState<number>(1);
@@ -337,6 +339,10 @@ export default function OutstationExpenseForm() {
   }, [userId]);
 
   useEffect(() => {
+    if (skipDateResetRef.current) {
+      skipDateResetRef.current = false;
+      return;
+    }
     setAddedTrips([]);
     setDistance("0.00");
   }, [formTripDate]);
@@ -3147,6 +3153,7 @@ export default function OutstationExpenseForm() {
     const selectedTrip = outstationExpense.find((e) => e.id === id);
 
     if (selectedTrip) {
+      skipDateResetRef.current = true;
       // Helper to format currency
       // Helper to format currency - with proper type checking
       const formatCurrency = (value: any): string => {
@@ -3175,6 +3182,12 @@ export default function OutstationExpenseForm() {
       console.log(selectedTrip.dinner);
 
       // Basic trip information
+      const matchedRequest = allRequests.find(
+        (r) => r.id === selectedTrip.request_id,
+      );
+
+      setFormTripPlaces(matchedRequest.places || []);
+
       setFormDepartureDate(selectedTrip.start_date.trim() || "");
       setFormArrivalDate(selectedTrip.end_date.trim() || "");
       setFormTripDate(selectedTrip.date.trim() || "");
@@ -3796,32 +3809,35 @@ export default function OutstationExpenseForm() {
             RM {getTotalMileage().toFixed(2)}
           </Text>
 
-          <View style={[styles.dropdownInput, { marginLeft: 20 }]}>
-            <TouchableOpacity
-              style={[{ opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5 }]}
-              onPress={() => {
-                setShowMileageModal(true);
+          <TouchableOpacity
+            style={[
+              styles.dropdownInput,
+              {
+                opacity: selectedRequestId ? 1 : 0.5,
+              },
+            ]}
+            onPress={() => {
+              setShowMileageModal(true);
 
-                console.log(addedTrips);
-              }}
-              disabled={tripsForSelectedDate.length == 0}
-            >
-              <Text style={styles.buttonText}>
-                {selectedTripId
-                  ? (() => {
-                      const selected = tripsForSelectedDate.find(
-                        (t) => t.id === selectedTripId,
-                      );
-                      return selected
-                        ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
-                        : "Select Trips";
-                    })()
-                  : tripsForSelectedDate.length > 0
-                    ? "Select Trips"
-                    : "No Trips"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              console.log(addedTrips);
+            }}
+            disabled={tripsForSelectedDate.length == 0}
+          >
+            <Text style={styles.buttonText}>
+              {selectedTripId
+                ? (() => {
+                    const selected = tripsForSelectedDate.find(
+                      (t) => t.id === selectedTripId,
+                    );
+                    return selected
+                      ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
+                      : "Select Trips";
+                  })()
+                : tripsForSelectedDate.length > 0
+                  ? "Select Trips"
+                  : "No Trips"}
+            </Text>
+          </TouchableOpacity>
 
           {renderMileageModal()}
 
