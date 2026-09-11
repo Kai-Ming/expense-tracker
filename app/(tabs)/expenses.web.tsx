@@ -507,7 +507,30 @@ export default function ExpensesWebScreen() {
     // Wait until role is determined (not null)
     if (role === null) return;
 
-    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    const tripsRef = collection(db, "trips");
+    let q;
+
+    if (role === 0) {
+      q = query(tripsRef, orderBy("created_at", "desc"));
+    } else if (role === 1) {
+      q = query(
+        tripsRef,
+        where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+      );
+    } else {
+      if (subordinates.length === 0) {
+        return;
+      }
+      const userIdsToFetch = [...subordinates, userId];
+      q = query(
+        tripsRef,
+        where("user_id", "in", userIdsToFetch),
+        orderBy("created_at", "desc"),
+      );
+    }
+
+    //const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tripData: Trip[] = [];
@@ -3918,10 +3941,8 @@ export default function ExpensesWebScreen() {
                     setAppliedExpensePurpose(expensePurpose);
                     updateUserFilter(usernameFilter);
                     setAppliedRequestId(requestId);
-                    console.log(requestId);
-                    console.log(appliedRequestId);
-                    console.log(groupedExpenses);
-                    console.log(filteredOutstationExpense);
+                    console.log("all trips");
+                    console.log(allTrips);
                   }}
                 >
                   <Text
