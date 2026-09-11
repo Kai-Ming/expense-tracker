@@ -2648,6 +2648,51 @@ export default function ExpensesWebScreen() {
       return "N/A";
     };
 
+    const generateTripDetails = (tripIds) => {
+      if (!tripIds || !Array.isArray(tripIds) || tripIds.length === 0) {
+        return "";
+      }
+
+      return tripIds
+        .map((tripId) => {
+          const trip = getTripById(tripId);
+
+          if (trip) {
+            const distance = trip.distance?.toFixed(2) || "0.00";
+            const platform = trip.platform === 2 ? "Web" : "Mobile";
+            const goingHome = trip.to_home === true ? "Yes" : "No";
+            const fromHome = trip.from_home ? "Yes" : "No";
+
+            const fromTime = formatFirebaseTime(trip.from_time);
+            const toTime = formatFirebaseTime(trip.to_time);
+
+            return `
+            <div style="margin-bottom: 8px; padding: 5px 0; border-bottom: 1px solid #f0f0f0;">
+              <div style="font-size: 9px; color: #888;"><strong>Platform: </strong>${platform}</div>
+              ${trip.remark ? `<div style="font-size: 9px; color: #666;"><strong>Remark: </strong>${trip.remark}</div>` : ""}
+              <div style="font-size: 9px; color: #888;"><strong>Time: </strong>${fromTime} - ${toTime}</div>
+              <div style="font-size: 10px; color: #333; margin-bottom: 2px;">
+                <strong>Trip: </strong>${trip.from_address || "N/A"} → ${trip.to_address || "N/A"} (${distance} km)
+              </div>
+              
+              
+              <strong>From Home: </strong>${fromHome ? `<div style="font-size: 9px; color: #888;">${fromHome}</div>` : ""}
+              <strong>To Home: </strong>${goingHome ? `<div style="font-size: 9px; color: #888;">${goingHome}</div>` : ""}
+              
+              
+            </div>
+          `;
+          } else {
+            return `
+            <div style="font-size: 9px; color: #999; padding: 3px 0;">
+              Trip data not available
+            </div>
+          `;
+          }
+        })
+        .join("");
+    };
+
     const generateCustomerDetails = (customers: any[]) => {
       return customers.map((customer) => {
         return `
@@ -3137,6 +3182,15 @@ export default function ExpensesWebScreen() {
                       <div class="details">
                         <div class="details-label">Trip Report: </div>                       
                         <div class="details-value" style="white-space: pre-wrap;">${item.trip_report?.replace(/\\n/g, "\n")}</div>
+                      </div>
+                    </div>
+
+                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
+                      <div class="details" style="flex: 1; width: 100%;">
+                        <div class="details-label">Trip Details: </div>
+                        <div class="details-value trip-details-container">
+                          ${generateTripDetails(item.trip_ids || [])}
+                        </div>
                       </div>
                     </div>
                   </div>
