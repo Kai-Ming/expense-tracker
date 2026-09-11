@@ -3078,7 +3078,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.5.9</Text>
+      <Text style={styles.bottomScrollText}>v1.2.6</Text>
     </View>
   );
 }
