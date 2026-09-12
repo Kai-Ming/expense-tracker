@@ -1447,14 +1447,14 @@ export default function ExpensesWebScreen() {
       </html>
     `;
 
-    const safeUsername = (reportUsername || "User").replace(
+    /* const safeUsername = (reportUsername || "User").replace(
       /[^a-zA-Z0-9_-]/g,
       "_",
     );
     const filename = `Trip_Request_${safeUsername}_${getCurrentDateTime()}.html`;
-    downloadHtmlAsFile(htmlContent, filename);
+    downloadHtmlAsFile(htmlContent, filename); */
 
-    /* const iframe = document.createElement("iframe");
+    const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
@@ -1473,7 +1473,7 @@ export default function ExpensesWebScreen() {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
       document.body.removeChild(iframe);
-    }, 500); */
+    }, 500);
   };
 
   const exportMileageToPdf = () => {
@@ -2071,14 +2071,14 @@ export default function ExpensesWebScreen() {
       </html>
     `;
 
-    const safeUsername = (reportUsername || "User").replace(
+    /* const safeUsername = (reportUsername || "User").replace(
       /[^a-zA-Z0-9_-]/g,
       "_",
     );
     const filename = `Mileage_Claim_${safeUsername}_${getCurrentDateTime()}.html`;
-    downloadHtmlAsFile(htmlContent, filename);
+    downloadHtmlAsFile(htmlContent, filename); */
 
-    /* const iframe = document.createElement("iframe");
+    const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
@@ -2097,7 +2097,7 @@ export default function ExpensesWebScreen() {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
       document.body.removeChild(iframe);
-    }, 500); */
+    }, 500);
   };
 
   const exportGeneralToPdf = () => {
@@ -2587,14 +2587,14 @@ export default function ExpensesWebScreen() {
       </html>
     `;
 
-    const safeUsername = (reportUsername || "User").replace(
+    /* const safeUsername = (reportUsername || "User").replace(
       /[^a-zA-Z0-9_-]/g,
       "_",
     );
     const filename = `General_Claim_${safeUsername}_${getCurrentDateTime()}.html`;
-    downloadHtmlAsFile(htmlContent, filename);
+    downloadHtmlAsFile(htmlContent, filename); */
 
-    /* const iframe = document.createElement("iframe");
+    const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
@@ -2613,7 +2613,7 @@ export default function ExpensesWebScreen() {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
       document.body.removeChild(iframe);
-    }, 500); */
+    }, 500);
   };
 
   const exportOutstationToPdf = () => {
@@ -3272,15 +3272,15 @@ export default function ExpensesWebScreen() {
     `;
 
     // Auto-download the HTML file
-    const safeUsername = (reportUsername || "User").replace(
+    /* const safeUsername = (reportUsername || "User").replace(
       /[^a-zA-Z0-9_-]/g,
       "_",
     );
     const filename = `Outstation_Claim_${safeUsername}_${getCurrentDateTime()}.html`;
-    downloadHtmlAsFile(htmlContent, filename);
+    downloadHtmlAsFile(htmlContent, filename); */
 
     // Optional: still open print dialog too
-    /* const iframe = document.createElement("iframe");
+    const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
@@ -3301,7 +3301,7 @@ export default function ExpensesWebScreen() {
       setTimeout(() => {
         document.body.removeChild(iframe);
       }, 1000);
-    }, 500); */
+    }, 500);
   };
 
   const columns = [
