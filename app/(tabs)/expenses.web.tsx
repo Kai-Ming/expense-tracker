@@ -2053,14 +2053,19 @@ export default function ExpensesWebScreen() {
                       </div>
                     </div>
                     
-                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
-                      <div class="details" style="flex: 1; width: 100%;">
-                        <div class="details-label">Trip Details: </div>
-                        <div class="details-value trip-details-container">
-                          ${generateTripDetails(item.trip_ids || [])}
+                    ${
+                      item.trip_ids && item.trip_ids.length > 0
+                        ? `<div class="details-row" style="margin-top: 10px; flex-direction: column;">
+                        <div class="details" style="flex: 1; width: 100%;">
+                          <div class="details-label">Trip Details: </div>
+                          <div class="details-value trip-details-container">
+                            ${generateTripDetails(item.trip_ids || [])}
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </div>`
+                        : ""
+                    }
+                    
                   </div>
                 `,
                 )
@@ -3253,14 +3258,18 @@ export default function ExpensesWebScreen() {
                       </div>
                     </div>
 
-                    <div class="details-row" style="margin-top: 10px; flex-direction: column;">
-                      <div class="details" style="flex: 1; width: 100%;">
-                        <div class="details-label">Trip Details: </div>
-                        <div class="details-value trip-details-container">
-                          ${generateTripDetails(item.trip_ids || [])}
+                    ${
+                      item.trip_ids && item.trip_ids.length > 0
+                        ? `<div class="details-row" style="margin-top: 10px; flex-direction: column;">
+                        <div class="details" style="flex: 1; width: 100%;">
+                          <div class="details-label">Trip Details: </div>
+                          <div class="details-value trip-details-container">
+                            ${generateTripDetails(item.trip_ids || [])}
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </div>`
+                        : ""
+                    }
                   </div>
                 `,
                 )
