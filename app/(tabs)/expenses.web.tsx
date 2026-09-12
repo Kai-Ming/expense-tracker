@@ -190,7 +190,7 @@ export default function ExpensesWebScreen() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [generalExpense, setGeneralExpense] = useState<GeneralExpense[]>([]);
-  const [oustationExpense, setOutstationExpense] = useState<
+  const [outstationExpense, setOutstationExpense] = useState<
     OutstationExpense[]
   >([]);
 
@@ -750,7 +750,7 @@ export default function ExpensesWebScreen() {
     })
     .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
 
-  const filteredOutstationExpense = oustationExpense
+  const filteredOutstationExpense = outstationExpense
     .filter((e) => {
       // Start with all items
       let include = true;
@@ -842,6 +842,11 @@ export default function ExpensesWebScreen() {
   };
 
   const groupedExpenses = groupedExpense(filteredOutstationExpense);
+
+  const allGroupedExpenses = useMemo(
+    () => groupedExpense(outstationExpense), // unfiltered source
+    [outstationExpense],
+  );
 
   const sortExpensesByDate = (
     expenses: OutstationExpense[],
@@ -2065,7 +2070,7 @@ export default function ExpensesWebScreen() {
                       </div>`
                         : ""
                     }
-                    
+
                   </div>
                 `,
                 )
@@ -3423,7 +3428,7 @@ export default function ExpensesWebScreen() {
               </View>
 
               <ScrollView style={styles.modalList}>
-                {groupedExpense(oustationExpense)
+                {groupedExpense(outstationExpense)
                   .filter((trip) => {
                     if (!usernameFilter) return true;
                     return (
@@ -3854,7 +3859,7 @@ export default function ExpensesWebScreen() {
                         <Text ellipsizeMode="tail">
                           {requestId === ""
                             ? "Select a Trip"
-                            : groupedExpenses.find(
+                            : allGroupedExpenses.find(
                                 (group) => group.request_id === requestId,
                               )?.trip_title || "N/A"}
                         </Text>
