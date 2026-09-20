@@ -1126,11 +1126,6 @@ export default function MileageForm() {
       (!parseFloat(formOtherExpense) && !formOtherExpenseType && !formVendor)
     );
 
-    console.log(otherExpenseValidation);
-    console.log(parseFloat(formOtherExpense));
-    console.log(formOtherExpenseType);
-    console.log(formVendor);
-
     if (parseFloat(formOtherExpense) === 0) {
       setFormOtherExpenseType("");
     }
@@ -1766,36 +1761,35 @@ export default function MileageForm() {
                     style={htmlInputStyle}
                   />
                   {/* <Text style={styles.fieldLabel}>Select Trips:</Text> */}
-                  <View style={styles.dropdownInput}>
-                    <TouchableOpacity
-                      style={[
-                        styles.dropdownButton,
-                        {
-                          opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5,
-                        },
-                      ]}
-                      onPress={() => {
-                        setIsDropdownOpen(true);
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownInput,
+                      {
+                        opacity: tripsForSelectedDate.length > 0 ? 1 : 0.5,
+                      },
+                    ]}
+                    onPress={() => {
+                      setIsDropdownOpen(true);
 
-                        console.log(addedTrips);
-                      }}
-                    >
-                      <Text style={styles.buttonText}>
-                        {selectedTripId
-                          ? (() => {
-                              const selected = tripsForSelectedDate.find(
-                                (t) => t.id === selectedTripId,
-                              );
-                              return selected
-                                ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
-                                : "Select Trips";
-                            })()
-                          : tripsForSelectedDate.length > 0
-                            ? "Select Trips"
-                            : "No Trips"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                      console.log(addedTrips);
+                    }}
+                    disabled={tripsForSelectedDate.length === 0}
+                  >
+                    <Text style={styles.buttonText}>
+                      {selectedTripId
+                        ? (() => {
+                            const selected = tripsForSelectedDate.find(
+                              (t) => t.id === selectedTripId,
+                            );
+                            return selected
+                              ? `${selected.remark || "No Remark"} (${(parseFloat(selected.distance) || 0).toFixed(2)} km)`
+                              : "Select Trips";
+                          })()
+                        : tripsForSelectedDate.length > 0
+                          ? "Select Trips"
+                          : "No Trips"}
+                    </Text>
+                  </TouchableOpacity>
                   {renderTripModal()}
 
                   <TouchableOpacity

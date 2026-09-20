@@ -13,3 +13,4 @@ dist
 .idea
 android/
 google-services.json
+admin/

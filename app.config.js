@@ -62,6 +62,8 @@ export default {
       "expo-router",
       "expo-task-manager",
       "expo-background-fetch",
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin",
       [
         "expo-notifications",
         {
@@ -76,6 +78,12 @@ export default {
             "Allow $(PRODUCT_NAME) to use your location even in the background.",
           isAndroidBackgroundLocationEnabled: true,
           isAndroidForegroundServiceEnabled: true,
+        },
+      ],
+      [
+        "expo-document-picker",
+        {
+          iCloudContainerEnvironment: "Production",
         },
       ],
     ],

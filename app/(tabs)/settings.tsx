@@ -1,10 +1,11 @@
 import { exportCustomersToCSV } from "@/components/CustomerExporter";
 import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   EmailAuthProvider,
   getAuth,
+  multiFactor,
   onAuthStateChanged,
   reauthenticateWithCredential,
   updatePassword,
@@ -25,7 +26,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -178,6 +179,8 @@ export default function settings() {
   const [email, setEmail] = useState<string>("");
   const [role, setRole] = useState<number>(1);
   const [userHomeAddress, setUserHomeAddress] = useState<string>("");
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   const [password, setPassword] = useState("");
 
@@ -253,6 +256,11 @@ export default function settings() {
   const [addedSub, setAddedSub] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
+  const [disable2FAModalVisible, setDisabled2FAModalVisible] = useState(false);
+  const [reauthModalVisible, setReauthModalVisible] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthError, setReauthError] = useState("");
+
   const [isSaving, setIsSaving] = useState(false);
 
   const router = useRouter();
@@ -282,6 +290,9 @@ export default function settings() {
       if (user) {
         setUserId(user.uid);
 
+        const mfaUser = multiFactor(user);
+        setTwoFactorEnabled(mfaUser.enrolledFactors.length > 0);
+
         const q = query(collection(db, "users"), where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
 
@@ -309,6 +320,9 @@ export default function settings() {
 
           // FIX 2: Save the actual Firestore document auto-generated key name
           setFirestoreDocId(userDoc.id);
+
+          const mfaUser = multiFactor(user);
+          setTwoFactorEnabled(mfaUser.enrolledFactors.length > 0);
         } else {
           console.log("Still no document found with that UID field");
         }
@@ -432,6 +446,285 @@ export default function settings() {
 
     return () => unsubscribe();
   }, [userId, role]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user) {
+        const mfaUser = multiFactor(user);
+        setTwoFactorEnabled(mfaUser.enrolledFactors.length > 0);
+      }
+    }, []),
+  );
+
+  const handleEnable2FA = () => {
+    router.push("/(auth)/setup-2fa");
+  };
+
+  const test = () => {
+    console.log("aaaaaaaaaaaaaaaaaaaaaaaaa");
+  };
+
+  const promptDisable2FA = () => {
+    setReauthPassword("");
+    setReauthError("");
+    setReauthModalVisible(true);
+  };
+
+  const handleDisable2FA = async () => {
+    if (!reauthPassword) {
+      setReauthError("Please enter your password.");
+      return;
+    }
+
+    setMfaLoading(true);
+    setReauthError("");
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      console.log("a");
+      if (!user || !user.email) throw new Error("Not signed in");
+      console.log("b");
+
+      // 1. Re-authenticate first (this is still required)
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        reauthPassword,
+      );
+      console.log("c");
+      await reauthenticateWithCredential(user, credential);
+      console.log("d");
+
+      await user.reload(); // Fetches latest user data from server
+      const mfaUser = multiFactor(user);
+      console.log("Fresh factors:", mfaUser.enrolledFactors);
+      const factors = [...mfaUser.enrolledFactors];
+      let sessionBoundFactorSkipped = false;
+
+      for (const factor of factors) {
+        try {
+          await mfaUser.unenroll(factor.uid);
+        } catch (err: any) {
+          if (err.code === "auth/multi-factor-auth-required") {
+            // This is the factor tied to the current session.
+            // It cannot be removed until the user signs in again
+            // and verifies their OTHER factor.
+            sessionBoundFactorSkipped = true;
+            console.log(`Skipping session-bound factor: ${factor.uid}`);
+          } else {
+            throw err; // Real error, propagate it
+          }
+        }
+      }
+
+      // 3. If a session-bound factor remains, tell the user what to do
+      if (sessionBoundFactorSkipped) {
+        // Refresh the user object to get updated factors
+        await user.reload();
+        const remaining = multiFactor(user).enrolledFactors;
+
+        if (remaining.length > 0) {
+          setReauthError(
+            "One factor could not be removed. Please sign out and sign back in, " +
+              "then verify with your remaining factor to remove it.",
+          );
+          setMfaLoading(false);
+          return;
+        }
+      }
+
+      setTwoFactorEnabled(false);
+      setReauthModalVisible(false);
+      setDisabled2FAModalVisible(false);
+      setReauthPassword("");
+      Alert.alert("Success", "Two-factor authentication has been disabled.");
+    } catch (err: any) {
+      console.error("Disable 2FA error:", err);
+      let msg = "Failed to disable 2FA. Please try again.";
+      if (
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/invalid-credential"
+      ) {
+        msg = "Incorrect password. Please try again.";
+      } else if (err.code === "auth/multi-factor-auth-required") {
+        msg = "Your session requires MFA verification. Please try again.";
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setReauthError(msg);
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const renderReauthModal = () => {
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={reauthModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => !mfaLoading && setReauthModalVisible(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Confirm Your Password</Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.modalSubtitle}>
+                    For security, please enter your password to disable
+                    two-factor authentication.
+                  </Text>
+
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Password"
+                      placeholderTextColor="#999999"
+                      value={reauthPassword}
+                      onChangeText={(t) => {
+                        setReauthPassword(t);
+                        if (reauthError) setReauthError("");
+                      }}
+                      secureTextEntry={!showPassword}
+                      editable={!mfaLoading}
+                      autoCapitalize="none"
+                      autoFocus
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Icon
+                        name={showPassword ? "eye" : "eye-off"}
+                        size={24}
+                        color="#888"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {reauthError ? (
+                    <Text
+                      style={{
+                        color: "#f44336",
+                        marginTop: 8,
+                        fontSize: 14,
+                      }}
+                    >
+                      {reauthError}
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => {
+                      setReauthModalVisible(false);
+                      setReauthPassword("");
+                      setReauthError("");
+                    }}
+                    disabled={mfaLoading}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      mfaLoading && { opacity: 0.7 },
+                    ]}
+                    onPress={handleDisable2FA}
+                    disabled={mfaLoading}
+                  >
+                    {mfaLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Confirm</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderDisable2FAModal = () => {
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={disable2FAModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => !mfaLoading && setDisabled2FAModalVisible(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Disable Authentication</Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.modalSubtitle}>
+                    Disable Two-Factor Authentication?
+                  </Text>
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => {
+                      setDisabled2FAModalVisible(false);
+                    }}
+                    disabled={mfaLoading}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      mfaLoading && { opacity: 0.7 },
+                    ]}
+                    onPress={promptDisable2FA}
+                    disabled={mfaLoading}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Confirm</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    );
+  };
 
   const getAddressFromCoords = async (
     lat: number,
@@ -1671,7 +1964,7 @@ export default function settings() {
         style={styles.button}
       >
         <Text style={styles.buttonText}>Change Email</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -1734,7 +2027,11 @@ export default function settings() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.dialogButton, styles.submitButton, isSaving && { opacity: 0.7 }]}
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
                     onPress={changeEmail}
                     disabled={isSaving}
                   >
@@ -1749,7 +2046,36 @@ export default function settings() {
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
-      </Modal> */}
+      </Modal>
+
+      {!twoFactorEnabled && (
+        <TouchableOpacity
+          onPress={() => {
+            handleEnable2FA();
+            /* twoFactorEnabled
+              ? setDisabled2FAModalVisible(true)
+              : handleEnable2FA; */
+          }}
+          style={[
+            styles.button,
+            twoFactorEnabled && { backgroundColor: "#f44336" },
+            mfaLoading && { opacity: 0.7 },
+          ]}
+          disabled={mfaLoading}
+        >
+          {mfaLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {twoFactorEnabled
+                ? "Disable Two-Factor Authentication"
+                : "Enable Two-Factor Authentication"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+      {renderDisable2FAModal()}
+      {renderReauthModal()}
       <TouchableOpacity
         onPress={() => setPasswordModalVisible(true)}
         style={styles.button}
@@ -3078,7 +3404,7 @@ export default function settings() {
           {renderSelectUserModal()}
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.2.6.2</Text>
+      <Text style={styles.bottomScrollText}>v1.3</Text>
     </View>
   );
 }

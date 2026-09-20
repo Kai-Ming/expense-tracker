@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -35,9 +34,9 @@ function PlacesInput({
     lng: number;
   } | null>(null);
   const [selectedAddress, setSelectedAddress] = useState("");
-  const [mapKey, setMapKey] = useState(0); // Force re-render of map container
+  const [mapKey, setMapKey] = useState(0);
 
-  const timer = useRef(null);
+  const timer = useRef<any>(null);
   const googleMap = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
@@ -89,22 +88,14 @@ function PlacesInput({
   };
 
   const initMap = () => {
-    if (isMapInitializing.current) {
-      return;
-    }
+    if (isMapInitializing.current) return;
 
-    // Clean up any existing map
     cleanupMap();
 
     const mapElement = document.getElementById(mapContainerId.current);
-    if (!mapElement) {
-      console.log("Map element not found");
-      return;
-    }
+    if (!mapElement) return;
 
-    // Check if element is visible
     if (mapElement.offsetWidth === 0 || mapElement.offsetHeight === 0) {
-      console.log("Map element not visible, retrying in 100ms");
       setTimeout(initMap, 100);
       return;
     }
@@ -123,7 +114,6 @@ function PlacesInput({
         streetViewControl: false,
       });
 
-      // Add click listener to map
       googleMap.current.addListener("click", (e: any) => {
         const latLng = {
           lat: e.latLng.lat(),
@@ -163,7 +153,6 @@ function PlacesInput({
         });
       }
 
-      // Force map to render properly
       setTimeout(() => {
         if (googleMap.current) {
           google.maps.event.trigger(googleMap.current, "resize");
@@ -176,20 +165,15 @@ function PlacesInput({
     }
   };
 
-  // Handle modal open/close
   useEffect(() => {
     if (showMapModal) {
-      // Reset map key to force re-render of container
       setMapKey((prev) => prev + 1);
-
       const initializeMap = async () => {
         const loaded = await loadGoogleMapsScript();
         if (loaded) {
-          // Wait for the DOM to update with the new container
           setTimeout(initMap, 150);
         }
       };
-
       initializeMap();
     } else {
       cleanupMap();
@@ -275,89 +259,6 @@ function PlacesInput({
     setShowMapModal(false);
   };
 
-  const renderMapModal = () => {
-    if (Platform.OS !== "web") {
-      return (
-        <Modal
-          visible={showMapModal}
-          animationType="slide"
-          transparent={false}
-          onRequestClose={handleCloseModal}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={handleCloseModal}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Map not available</Text>
-              <View style={{ width: 50 }} />
-            </View>
-            <View style={styles.mapPlaceholder}>
-              <Text>Google Maps is only available on web platform</Text>
-            </View>
-          </View>
-        </Modal>
-      );
-    }
-
-    return (
-      <Modal
-        visible={showMapModal}
-        animationType="fade"
-        transparent={false}
-        onRequestClose={handleCloseModal}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={handleCloseModal}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Location on Map</Text>
-            <TouchableOpacity
-              onPress={handleConfirmLocation}
-              disabled={!selectedLocation}
-            >
-              <Text
-                style={[
-                  styles.confirmButton,
-                  !selectedLocation && styles.confirmButtonDisabled,
-                ]}
-              >
-                Confirm
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.mapWrapper}>
-            <div
-              key={mapKey} // This forces re-render when modal reopens
-              id={mapContainerId.current}
-              style={{
-                width: "100%",
-                height: "100%",
-                backgroundColor: "#e8e8e8",
-              }}
-            />
-          </View>
-
-          {selectedLocation && (
-            <View style={styles.selectedInfo}>
-              {/* <Text style={styles.selectedInfoText}>
-                📍 Lat: {selectedLocation.lat.toFixed(6)}, Lng:{" "}
-                {selectedLocation.lng.toFixed(6)}
-              </Text> */}
-              {selectedAddress && (
-                <Text style={styles.selectedAddressText}>
-                  {selectedAddress}
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
-      </Modal>
-    );
-  };
-
   return (
     <View
       style={[
@@ -433,7 +334,58 @@ function PlacesInput({
         </TouchableOpacity>
       )}
 
-      {renderMapModal()}
+      <Modal
+        visible={showMapModal}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={handleCloseModal}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Select Location on Map</Text>
+            <TouchableOpacity
+              onPress={handleConfirmLocation}
+              disabled={!selectedLocation}
+            >
+              <Text
+                style={[
+                  styles.confirmButton,
+                  !selectedLocation && styles.confirmButtonDisabled,
+                ]}
+              >
+                Confirm
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.mapWrapper}>
+            <div
+              key={mapKey}
+              id={mapContainerId.current}
+              style={{
+                width: "100%",
+                height: "100%",
+                backgroundColor: "#e8e8e8",
+              }}
+            />
+          </View>
+
+          {selectedLocation && (
+            <View style={styles.selectedInfo}>
+              {selectedAddress ? (
+                <Text style={styles.selectedAddressText}>
+                  {selectedAddress}
+                </Text>
+              ) : (
+                <Text style={styles.selectedInfoText}>Fetching address...</Text>
+              )}
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -516,12 +468,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
-  mapPlaceholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
-  },
   selectedInfo: {
     padding: 16,
     backgroundColor: "#f9f9f9",
@@ -530,8 +476,7 @@ const styles = StyleSheet.create({
   },
   selectedInfoText: {
     fontSize: 14,
-    color: "#333",
-    marginBottom: 4,
+    color: "#888",
   },
   selectedAddressText: {
     fontSize: 16,

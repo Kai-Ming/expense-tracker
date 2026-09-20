@@ -10,7 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { auth, db } from "../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 
 export default function SignupPage() {
   const [username, setUsername] = useState("");
