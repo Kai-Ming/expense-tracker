@@ -1,5 +1,4 @@
 import { Text, View } from "@/components/Themed"; // Assuming Themed components are available and desired
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import {
@@ -25,11 +24,6 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { auth } from "../../firebaseConfig";
 import { showAlert } from "../utils/alert";
 import { setPendingResolver } from "./verify-2fa";
-
-// Configure Google Sign-In (call this outside the component)
-GoogleSignin.configure({
-  webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com", // Your Web client ID from Google Cloud Console
-});
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -79,7 +73,7 @@ export default function LoginPage() {
 
       proceedAfterLogin(user);
     } catch (error: any) {
-      console.error("Login error:", error.code, error.message);
+      //console.error("Login error:", error.code, error.message);
 
       if (error.code === "auth/multi-factor-auth-required") {
         const resolver = getMultiFactorResolver(getAuth(), error);
@@ -159,7 +153,11 @@ export default function LoginPage() {
       console.log("setup 2fa");
       router.replace("/setup-2fa");
     } else {
-      router.replace("/dashboard");
+      if (Platform.OS === "web") {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/submit");
+      }
     }
   };
 
@@ -179,7 +177,7 @@ export default function LoginPage() {
       );
       setModalVisible(false);
     } catch (error: any) {
-      console.error("Reset error:", error.code, error.message);
+      //console.error("Reset error:", error.code, error.message);
       showAlert(
         "Error",
         "Could not send reset email. Please ensure the email is correct.",

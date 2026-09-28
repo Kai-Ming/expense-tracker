@@ -356,7 +356,11 @@ export default function GeneralExpenseForm() {
 
       setFormAmount(formatCurrency(selectedExpense.amount));
       setFormVendor(selectedExpense.vendor);
-      setFormExpenseReport(selectedExpense.expense_report || "");
+      setFormExpenseReport(
+        (selectedExpense.expense_report || "")
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, ""),
+      );
 
       const key = findKeyByValue(selectedExpense.expense_type);
       if (key) {

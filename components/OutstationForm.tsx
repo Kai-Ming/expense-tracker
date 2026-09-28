@@ -15,6 +15,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -321,6 +322,9 @@ export default function OutstationExpenseForm() {
   ];
 
   //  "7vFkURLn0XXfgVuGgjS4qrQGC722",
+
+  const BC_KEY = (requestId: string, date: string) =>
+    `businessCards:${requestId}:${date}`;
 
   useEffect(() => {
     const q = query(collection(db, "users"));
@@ -1149,7 +1153,7 @@ export default function OutstationExpenseForm() {
     });
   };
 
-  const handleSelectRequest = (requestId?: string) => {
+  /* const handleSelectRequest = (requestId?: string) => {
     const idToAdd = requestId || selectedRequestId;
     if (!idToAdd) {
       console.log(idToAdd);
@@ -1158,6 +1162,138 @@ export default function OutstationExpenseForm() {
     }
     const selectedRequest = allRequests.find((r) => r.id === idToAdd);
     setFormTripDate(selectedRequest.start_date);
+    setFormTripPlaces(selectedRequest.places || []);
+    setFormTripPurposes(selectedRequest.travel_purposes);
+    setFormDepartureDate(selectedRequest.start_date);
+    setFormArrivalDate(selectedRequest.end_date);
+    setSelectedTripTitle(selectedRequest.trip_title);
+  }; */
+
+  const handleSelectRequest = async (requestId?: string) => {
+    const idToAdd = requestId || selectedRequestId;
+    if (!idToAdd) {
+      console.log(idToAdd);
+      console.log("No Trip");
+      return;
+    }
+
+    const selectedRequest = allRequests.find((r) => r.id === idToAdd);
+    if (!selectedRequest) {
+      console.log("Request not found in allRequests");
+      return;
+    }
+
+    // Helpers (mirrored from setEditTrip)
+    const formatCurrency = (value: any): string => {
+      const num = typeof value === "number" ? value : parseFloat(value);
+      if (isNaN(num) || num === undefined || num === null) {
+        return "0.00";
+      }
+      return num.toFixed(2);
+    };
+
+    // ------------------------------------------------------------------
+    // Check localStorage for saved days under this requestId
+    // ------------------------------------------------------------------
+    const savedDays = loadExpenseFromLocalStorage(idToAdd);
+
+    if (savedDays && savedDays.length > 0) {
+      const latest = savedDays[savedDays.length - 1];
+      const completedDays = savedDays.slice(0, -1);
+
+      setAllDays(completedDays);
+
+      console.log("date: ", latest.date, selectedRequest.start_date);
+
+      // Basic trip information
+      if (latest.date) setFormTripDate(latest.date);
+      if (latest.places) setFormTripPlaces(latest.places);
+      if (latest.country) setFormTripCountry(latest.country);
+      if (latest.location) setFormTripLocation(latest.location);
+
+      // Financial fields
+      if (latest.airfare !== undefined)
+        setFormAirfare(formatCurrency(latest.airfare));
+      if (latest.airfare_remark !== undefined)
+        setFormAirfareRemark(latest.airfare_remark || "");
+      if (latest.toll !== undefined) setFormToll(formatCurrency(latest.toll));
+      if (latest.toll_remark !== undefined)
+        setFormTollRemark(latest.toll_remark || "");
+      if (latest.parking !== undefined)
+        setFormParking(formatCurrency(latest.parking));
+      if (latest.parking_remark !== undefined)
+        setFormParkingRemark(latest.parking_remark || "");
+      if (latest.transport !== undefined)
+        setFormTransport(formatCurrency(latest.transport));
+      if (latest.transport_remark !== undefined)
+        setFormTransportRemark(latest.transport_remark || "");
+      if (latest.hotel !== undefined)
+        setFormHotel(formatCurrency(latest.hotel));
+      if (latest.hotel_remark !== undefined)
+        setFormHotelRemark(latest.hotel_remark || "");
+      if (latest.own_acc !== undefined)
+        setFormOwnAcc(formatCurrency(latest.own_acc));
+      if (latest.own_acc_remark !== undefined)
+        setFormOwnAccRemark(latest.own_acc_remark || "");
+      if (latest.entertainment !== undefined)
+        setFormEntertainment(formatCurrency(latest.entertainment));
+      if (latest.entertainment_remark !== undefined)
+        setFormEntertainmentRemark(latest.entertainment_remark || "");
+      if (latest.laundry !== undefined)
+        setFormLaundry(formatCurrency(latest.laundry));
+      if (latest.laundry_remark !== undefined)
+        setFormLaundryRemark(latest.laundry_remark || "");
+      if (latest.others !== undefined)
+        setFormOthers(formatCurrency(latest.others));
+      if (latest.others_remark !== undefined)
+        setFormOthersRemark(latest.others_remark || "");
+
+      // Meal flags
+      if (latest.breakfast !== undefined)
+        setFormBreakfast(latest.breakfast || false);
+      if (latest.lunch !== undefined) setFormLunch(latest.lunch || false);
+      if (latest.dinner !== undefined) setFormDinner(latest.dinner || false);
+
+      // Trip report
+      if (latest.trip_report !== undefined) {
+        setFormTripReport(
+          (latest.trip_report || "").replace(/\\n/g, "\n").replace(/\\r/g, ""),
+        );
+      }
+
+      // Time fields
+      if (latest.arrival_time !== undefined)
+        setFormArrivalTime(convertTimestampToDate(latest.arrival_time));
+      if (latest.departure_time !== undefined)
+        setFormDepartureTime(convertTimestampToDate(latest.departure_time));
+
+      // Customers
+      if (latest.customers !== undefined) {
+        setFormCustomers(
+          latest.customers?.length > 0
+            ? latest.customers
+            : [
+                {
+                  name: "",
+                  company: "",
+                  email: "",
+                  number: "",
+                  time: "",
+                  address: "",
+                },
+              ],
+        );
+      }
+
+      const files = await loadBusinessCardsFromIDB(idToAdd, latest.date);
+      setBusinessCardFiles(files);
+
+      if (latest.trip_ids) addTripsByIds(latest.trip_ids || []);
+
+      console.log(`Loaded saved days for request "${idToAdd}"`, savedDays);
+    } else {
+      setFormTripDate(selectedRequest.start_date);
+    }
     setFormTripPlaces(selectedRequest.places || []);
     setFormTripPurposes(selectedRequest.travel_purposes);
     setFormDepartureDate(selectedRequest.start_date);
@@ -1414,6 +1550,7 @@ export default function OutstationExpenseForm() {
 
   const handleNextDay = async () => {
     console.log("next day");
+    console.log(formDepartureTime);
 
     const isAddressRequired =
       !noAddress.includes(userId || "") && addedTrips.length != 0;
@@ -1516,6 +1653,12 @@ export default function OutstationExpenseForm() {
     }
     const encodedReport = formTripReport.replace(/\n/g, "\\n");
 
+    await saveBusinessCardsToIDB(
+      selectedRequestId,
+      formTripDate,
+      businessCardFiles,
+    );
+
     const updatedAllDays = [
       ...allDays,
       {
@@ -1557,6 +1700,8 @@ export default function OutstationExpenseForm() {
     ];
 
     setAllDays(updatedAllDays);
+
+    saveExpenseToLocalStorage(selectedRequestId, updatedAllDays);
 
     resetNextDay();
     if (isFinalDay()) {
@@ -1646,8 +1791,9 @@ export default function OutstationExpenseForm() {
     setAddedTrips((prev) => [...prev, ...tripsToAdd]);
   };
 
-  const handlePreviousDay = () => {
+  const handlePreviousDay = async () => {
     const lastDay = removeLastDay();
+    console.log("last day");
     console.log(lastDay);
     console.log(allDays);
     resetNextDay();
@@ -1671,8 +1817,16 @@ export default function OutstationExpenseForm() {
       setFormOwnAcc(lastDay.own_acc || "0.00");
       setFormOwnAccSelect(lastDay.own_acc_sharing || "");
       setFormOwnAccRemark(lastDay.own_acc_remark || "");
-      setFormDepartureTime(lastDay.departure_time || null);
-      setFormArrivalTime(lastDay.arrival_time || null);
+      setFormDepartureTime(
+        lastDay.departure_time
+          ? convertTimestampToDate(lastDay.departure_time)
+          : null,
+      );
+      setFormArrivalTime(
+        lastDay.arrival_time
+          ? convertTimestampToDate(lastDay.arrival_time)
+          : null,
+      );
       setFormBreakfast(lastDay.breakfast || false);
       setFormLunch(lastDay.lunch || false);
       setFormDinner(lastDay.dinner || false);
@@ -1694,7 +1848,11 @@ export default function OutstationExpenseForm() {
           },
         ],
       );
-      setBusinessCardFiles(lastDay.business_card_files || []);
+      const files = await loadBusinessCardsFromIDB(
+        selectedRequestId,
+        lastDay.date,
+      );
+      setBusinessCardFiles(files);
       setFormTripReport(lastDay.trip_report || "");
     }
   };
@@ -2697,6 +2855,138 @@ export default function OutstationExpenseForm() {
     return (travelCost + parking + toll + expense).toFixed(2);
   }; */
 
+  const saveBusinessCardsToIDB = async (
+    requestId: string,
+    date: string,
+    files: File[],
+  ) => {
+    try {
+      if (!requestId || !date) return;
+      if (!files || files.length === 0) {
+        await idbDel(BC_KEY(requestId, date));
+        return;
+      }
+      await idbSet(BC_KEY(requestId, date), files);
+      console.log(
+        `Saved ${files.length} files to IDB for ${requestId}/${date}`,
+      );
+    } catch (err) {
+      console.error("Failed to save files to IDB:", err);
+    }
+  };
+
+  /** Load File[] from IndexedDB */
+  const loadBusinessCardsFromIDB = async (
+    requestId: string,
+    date: string,
+  ): Promise<File[]> => {
+    try {
+      if (!requestId || !date) return [];
+      const files = await idbGet(BC_KEY(requestId, date));
+      return Array.isArray(files) ? files : [];
+    } catch (err) {
+      console.error("Failed to load files from IDB:", err);
+      return [];
+    }
+  };
+
+  /** Remove all files for a request (all days) */
+  const removeBusinessCardsForRequest = async (requestId: string) => {
+    try {
+      // idb-keyval has no prefix-delete, so enumerate keys
+      const { keys, del } = await import("idb-keyval");
+      const allKeys = await keys();
+      const prefix = `businessCards:${requestId}:`;
+      await Promise.all(
+        allKeys
+          .filter(
+            (k): k is string => typeof k === "string" && k.startsWith(prefix),
+          )
+          .map((k) => del(k)),
+      );
+    } catch (err) {
+      console.error("Failed to clear IDB files for request:", err);
+    }
+  };
+
+  /** Metadata helper — turns File[] into JSON-safe objects */
+  const fileMeta = (files: File[]) =>
+    files.map((f) => ({
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      lastModified: f.lastModified,
+    }));
+
+  const saveExpenseToLocalStorage = (requestId: string, days: any[]) => {
+    try {
+      const storageKey = "outstationExpense";
+      const existing = localStorage.getItem(storageKey);
+      const allDaysMap = existing ? JSON.parse(existing) : {};
+
+      console.log("🔵 SAVE key:", requestId);
+      console.log("🔵 Incoming days.length:", days.length);
+      console.log("🔵 Previous days.length:", allDaysMap[requestId]?.length);
+
+      allDaysMap[requestId] = days;
+
+      console.log(
+        "🔵 After assign, days.length:",
+        allDaysMap[requestId].length,
+      );
+
+      localStorage.setItem(storageKey, JSON.stringify(allDaysMap));
+    } catch (err) {
+      console.error("Failed to save to localStorage:", err);
+    }
+  };
+
+  const loadExpenseFromLocalStorage = (requestId: string) => {
+    try {
+      const storageKey = "outstationExpense";
+      const existing = localStorage.getItem(storageKey);
+      if (!existing) return undefined;
+
+      const allDaysMap = JSON.parse(existing);
+      return allDaysMap[requestId];
+    } catch (err) {
+      console.error("Failed to load from localStorage:", err);
+      return undefined;
+    }
+  };
+
+  /**
+   * Removes the saved days entry for a given requestId from localStorage.
+   * If the map becomes empty after removal, the key itself is deleted.
+   */
+  const removeExpenseFromLocalStorage = (requestId: string) => {
+    try {
+      const storageKey = "outstationExpense";
+      const existing = localStorage.getItem(storageKey);
+      if (!existing) return;
+
+      const allDaysMap = JSON.parse(existing);
+
+      if (requestId in allDaysMap) {
+        delete allDaysMap[requestId];
+        console.log(`Removed saved days for request "${requestId}"`);
+      } else {
+        console.log(`No saved entry found for request "${requestId}"`);
+        return;
+      }
+
+      // If nothing left, clear the whole key
+      if (Object.keys(allDaysMap).length === 0) {
+        localStorage.removeItem(storageKey);
+        console.log("localStorage key cleared (no entries left)");
+      } else {
+        localStorage.setItem(storageKey, JSON.stringify(allDaysMap));
+      }
+    } catch (err) {
+      console.error("Failed to remove from localStorage:", err);
+    }
+  };
+
   const handleTripSubmit = async (tripDays: any[]) => {
     console.log("submitting trip");
     console.log(formCustomers);
@@ -2777,6 +3067,8 @@ export default function OutstationExpenseForm() {
 
         const docRef = await addDoc(collection(db, "expenses"), expense);
 
+        //removeExpenseFromLocalStorage(selectedRequestId);
+
         console.log("Document written with ID: ", docRef.id);
         console.log(expense);
       } catch (e) {
@@ -2795,6 +3087,10 @@ export default function OutstationExpenseForm() {
         locked: true,
       });
       console.log("Travel request locked successfully!");
+      if (selectedRequestId) {
+        removeExpenseFromLocalStorage(selectedRequestId);
+        await removeBusinessCardsForRequest(selectedRequestId);
+      }
     }
 
     /* try {
@@ -2921,7 +3217,7 @@ export default function OutstationExpenseForm() {
     setFormRequestVisitation("");
   };
 
-  const resetTripForm = () => {
+  const resetTripForm = async () => {
     resetNextDay();
     setSelectedRequestId("");
     setSelectedTripTitle("");
@@ -3225,7 +3521,11 @@ export default function OutstationExpenseForm() {
       }, 0);
 
       // Trip report
-      setFormTripReport(selectedTrip.trip_report || "");
+      setFormTripReport(
+        (selectedTrip.trip_report || "")
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, ""),
+      );
 
       // Business cards
       //setBusinessCardFiles(safeParseJSON(selectedTrip.business_card_urls));
@@ -3289,7 +3589,7 @@ export default function OutstationExpenseForm() {
       setOtherTravelPurpose(description);
     }
     setFormTransportMode(selectedRequest.transport_mode);
-    setFormRequestOwnAcc(selectedRequest.transport_mode);
+    setFormRequestOwnAcc(selectedRequest.own_acc);
 
     setFormAdvance(selectedRequest.advance_allowance);
     setFormAdvanceRemark(selectedRequest.advance_allowance_remark);
@@ -3297,7 +3597,12 @@ export default function OutstationExpenseForm() {
     setSelectedUser(
       allUsers.find((user) => user.id === selectedRequest.room_sharing) || null,
     );
-    setFormRequestVisitation(selectedRequest.visitation_plan);
+
+    setFormRequestVisitation(
+      (selectedRequest.visitation_plan || "")
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, ""),
+    );
 
     setEditingRequest(true);
   };
@@ -4431,16 +4736,38 @@ export default function OutstationExpenseForm() {
         <View style={{ flexDirection: "column" }}>
           <View style={[styles.inputRow, { marginTop: 10 }]}>
             <Text style={styles.fieldLabel}>Business Cards:</Text>
+            <label
+              htmlFor="business-card-upload"
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                border: "1px solid #2196F3",
+                borderRadius: 5,
+                backgroundColor: "#2196F3",
+                color: "#fff",
+                fontSize: "14px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                width: "fit-content",
+                whiteSpace: "nowrap",
+                marginRight: "10px",
+                fontFamily: "sans-serif",
+              }}
+            >
+              Select a file
+            </label>
             <input
+              id="business-card-upload"
               type="file"
-              accept="image/*"
+              accept="/*"
               multiple
               onChange={(e) => {
                 if (e.target.files) {
-                  Array.from(e.target.files);
+                  setBusinessCardFiles(Array.from(e.target.files));
+                  e.target.value = "";
                 }
               }}
-              style={htmlInputStyle}
+              style={{ display: "none" }}
             />
           </View>
           {businessCardFiles.length > 0 && (
@@ -5036,6 +5363,7 @@ const htmlInputStyle = {
   boxSizing: "border-box" as const,
   backgroundColor: "#fff",
   marginRight: "10px",
+  fontFamily: "sans-serif",
 };
 const htmlSelectStyle = { ...htmlInputStyle, height: "auto" };
 

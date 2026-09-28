@@ -8,8 +8,10 @@ import {
   collection,
   deleteDoc,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -436,13 +438,18 @@ export default function ExpensesWebScreen() {
     let q;
     if (role === 0) {
       // Admin: fetch all expenses (no user_id filter)
-      q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
+      q = query(
+        collection(db, "expenses"),
+        orderBy("created_at", "desc"),
+        limit(200),
+      );
     } else if (role === 1) {
       // Regular user: fetch only their own expenses
       q = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
+        limit(200),
       );
     } else {
       // Manager/Supervisor: fetch expenses from subordinates + self
@@ -503,45 +510,72 @@ export default function ExpensesWebScreen() {
   }, [userId, role]) */
 
   useEffect(() => {
-    if (!userId) return;
-    // Wait until role is determined (not null)
-    if (role === null) return;
+    if (!userId || role === null) return;
 
-    const tripsRef = collection(db, "trips");
-    let q;
-
+    // 1. Subscribe to expenses first
+    let expenseQ;
     if (role === 0) {
-      q = query(tripsRef, orderBy("created_at", "desc"));
-    } else if (role === 1) {
-      q = query(
-        tripsRef,
-        where("user_id", "==", userId),
+      expenseQ = query(
+        collection(db, "expenses"),
         orderBy("created_at", "desc"),
+        limit(200),
       );
     } else {
-      if (subordinates.length === 0) {
-        return;
-      }
-      const userIdsToFetch = [...subordinates, userId];
-      q = query(
-        tripsRef,
-        where("user_id", "in", userIdsToFetch),
+      expenseQ = query(
+        collection(db, "expenses"),
+        where("user_id", "==", userId),
         orderBy("created_at", "desc"),
+        limit(200),
       );
     }
 
-    //const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    const unsubExpenses = onSnapshot(expenseQ, async (snapshot) => {
+      const expensesData: Expense[] = [];
+      const generalExpenseData: GeneralExpense[] = [];
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const tripData: Trip[] = [];
-      querySnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
         const data = doc.data();
-        tripData.push({ id: doc.id, ...data } as Trip);
+        if (data.type === 1) {
+          expensesData.push({ id: doc.id, ...data } as Expense);
+        } else if (data.type === 2) {
+          generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
+        }
       });
-      setAllTrips(tripData);
+
+      setExpenses(expensesData);
+      setGeneralExpense(generalExpenseData);
+
+      // 2. Now fetch only the trips referenced by these expenses
+      const tripIds = [...new Set(expensesData.flatMap((e) => e.trip_ids))];
+
+      if (tripIds.length === 0) {
+        setAllTrips([]);
+        return;
+      }
+
+      const CHUNK = 30;
+      const chunks: string[][] = [];
+      for (let i = 0; i < tripIds.length; i += CHUNK) {
+        chunks.push(tripIds.slice(i, i + CHUNK));
+      }
+
+      const trips: Trip[] = [];
+      await Promise.all(
+        chunks.map(async (chunk) => {
+          const tripQ = query(
+            collection(db, "trips"),
+            where(documentId(), "in", chunk),
+          );
+          const tripSnap = await getDocs(tripQ);
+          tripSnap.forEach((d) =>
+            trips.push({ id: d.id, ...d.data() } as Trip),
+          );
+        }),
+      );
+      setAllTrips(trips);
     });
 
-    return () => unsubscribe();
+    return () => unsubExpenses();
   }, [userId, role]);
 
   const filteredTrips = useMemo(() => {
@@ -4560,6 +4594,23 @@ export default function ExpensesWebScreen() {
                       {format12Hour(item.time)}
                     </Text>
                   </View>
+                  {item.address ? (
+                    <View style={{ flexDirection: "column", marginRight: 20 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#999",
+                          fontWeight: "bold",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Address:
+                      </Text>
+                      <Text style={{ fontSize: 14, color: "#444" }}>
+                        {item.address}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             ))}
@@ -5062,7 +5113,10 @@ export default function ExpensesWebScreen() {
 
         <View style={{ marginBottom: 10 }}>
           {expense.customers?.map((item, index) => (
-            <View style={{ marginBottom: 10, flexDirection: "column" }}>
+            <View
+              style={{ marginBottom: 10, flexDirection: "column" }}
+              key={index}
+            >
               <Text
                 style={{
                   fontSize: 12,

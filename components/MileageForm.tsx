@@ -1439,7 +1439,11 @@ export default function MileageForm() {
       console.log(matchingTrips);
       setAddedTrips(matchingTrips);
 
-      setFormTripReport(selectedMileage.trip_report || "");
+      setFormTripReport(
+        (selectedMileage.trip_report || "")
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, ""),
+      );
       setFormParking(formatCurrency(selectedMileage.parking));
       setFormToll(formatCurrency(selectedMileage.toll));
       setFormOtherExpense(formatCurrency(selectedMileage.expense));
@@ -2753,16 +2757,38 @@ export default function MileageForm() {
                 </View>
                 <View style={[styles.inputRow, { marginTop: 10 }]}>
                   <Text style={styles.fieldLabel}>Business Cards:</Text>
+                  <label
+                    htmlFor="business-card-upload"
+                    style={{
+                      display: "inline-block",
+                      padding: "8px 16px",
+                      border: "1px solid #2196F3",
+                      borderRadius: 5,
+                      backgroundColor: "#2196F3",
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      width: "fit-content",
+                      whiteSpace: "nowrap",
+                      marginRight: "10px",
+                      fontFamily: "sans-serif",
+                    }}
+                  >
+                    Select a file
+                  </label>
                   <input
+                    id="business-card-upload"
                     type="file"
-                    accept="image/*"
+                    accept="/*"
                     multiple
                     onChange={(e) => {
                       if (e.target.files) {
                         setBusinessCardFiles(Array.from(e.target.files));
+                        e.target.value = "";
                       }
                     }}
-                    style={htmlInputStyle}
+                    style={{ display: "none" }}
                   />
                 </View>
                 {businessCardFiles.length > 0 && (
