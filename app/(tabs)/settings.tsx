@@ -1845,10 +1845,10 @@ export default function settings() {
   });
 
   const filteredOutstation = allOutstation.filter((e) => {
-    const user = userMap.get(e.user_name);
+    const user = userMap.get(e.username);
     if (!user) return false;
 
-    if (selectedUser && e.user_name !== selectedUser) {
+    if (selectedUser && e.username !== selectedUser) {
       return false;
     }
 
