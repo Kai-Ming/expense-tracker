@@ -3,6 +3,7 @@ import { Text, View } from "@/components/Themed";
 /* import {
   StyleSheet as PdfStyle
 } from "@react-pdf/renderer"; */
+import SelectUserModal from "@/components/SelectUserModal";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -15,7 +16,7 @@ import {
   orderBy,
   query,
   updateDoc,
-  where
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -4087,7 +4088,12 @@ export default function ExpensesWebScreen() {
                 </TouchableOpacity>
               )}
 
-              {renderSelectUserModal()}
+              <SelectUserModal
+                visible={showUserModal}
+                onClose={() => setShowUserModal(false)}
+                users={allUsers}
+                onSelectUser={(user) => setUsernameFilter(user.username)}
+              />
               {renderRequestModal()}
             </View>
           )}

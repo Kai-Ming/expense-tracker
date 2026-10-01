@@ -33,6 +33,7 @@ import {
 import { db, storage } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
 import PlacesInput from "./PlacesInput";
+import SelectTravelmateModal from "./SelectTravelmateModal";
 
 type Grade =
   | "S4"
@@ -5039,9 +5040,12 @@ export default function OutstationExpenseForm() {
             <Text style={[styles.fieldLabel, styles.fieldLabelMandatory]}>
               Room Sharing:
             </Text>
-            <Text>{selectedUser?.username}</Text>
+            {selectedUser?.username ?? (
+              <Text style={{ marginRight: 20 }}>{selectedUser?.username}</Text>
+            )}
+
             <TouchableOpacity
-              style={[styles.button, { marginLeft: 20 }]}
+              style={[styles.button, { marginRight: 20 }]}
               onPress={() => {
                 setShowUserModal(true);
               }}
@@ -5050,7 +5054,7 @@ export default function OutstationExpenseForm() {
             </TouchableOpacity>
             {selectedUser !== null && (
               <TouchableOpacity
-                style={[styles.button, { marginLeft: 20 }]}
+                style={[styles.button]}
                 onPress={() => {
                   setSelectedUser(null);
                 }}
@@ -5060,7 +5064,13 @@ export default function OutstationExpenseForm() {
             )}
           </View>
         </View>
-        {renderSelectUserModal()}
+        {/* {renderSelectUserModal()} */}
+        <SelectTravelmateModal
+          visible={showUserModal}
+          onClose={() => setShowUserModal(false)}
+          users={allUsers}
+          onSelectUser={(user) => setSelectedUser(user)}
+        />
 
         <View style={[styles.inputRow, { marginTop: 10 }]}>
           <Text style={[styles.fieldLabel]}>Travel Advance Allowance:</Text>

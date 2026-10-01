@@ -1,5 +1,6 @@
 import { exportCustomersToCSV } from "@/components/CustomerExporter";
 import PlacesInput from "@/components/PlacesInput";
+import SelectUserModal from "@/components/SelectUserModal";
 import { Text, View } from "@/components/Themed";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
@@ -1584,6 +1585,13 @@ export default function settings() {
         </TouchableOpacity>
       </Modal>
     );
+  };
+
+  const modalSelectUser = (user: User) => {
+    setSelectedUserId(user.id);
+    setSelectedUser(user.username);
+    setSelectUserModalVisible(false);
+    handleSelectUser(user.id);
   };
 
   const renderSelectSubModal = () => {
@@ -3274,6 +3282,7 @@ export default function settings() {
                           setEditUserModalVisible(false);
                           clearUserForm();
                           setSelectedUserId("");
+                          setSelectedUser("");
                         }}
                         disabled={isSaving}
                       >
@@ -3301,7 +3310,37 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
-          {renderSelectUserModal()}
+          {/* {renderSelectUserModal()} */}
+          <SelectUserModal
+            visible={selectUserModalVisible}
+            onClose={() => setSelectUserModalVisible(false)}
+            users={allUsers}
+            addedUsers={addedUsers}
+            showIndex
+            onSelectUser={modalSelectUser}
+            extraColumns={[
+              {
+                key: "office",
+                label: "Office",
+                flex: 0.5,
+                render: (u) => officeMap[u.office as any] || "N/A",
+              },
+              {
+                key: "role",
+                label: "Role",
+                flex: 1,
+                render: (u) => roleMap[u.role] || "N/A",
+              },
+              { key: "home_address", label: "Home Address", flex: 2 },
+              {
+                key: "active",
+                label: "Active",
+                flex: 1,
+                render: (u) =>
+                  u.active === undefined ? "N/A" : u.active ? "True" : "False",
+              },
+            ]}
+          />
         </>
       )}
 
@@ -3401,10 +3440,40 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
-          {renderSelectUserModal()}
+          {/* {renderSelectUserModal()} */}
+          <SelectUserModal
+            visible={selectUserModalVisible}
+            onClose={() => setSelectUserModalVisible(false)}
+            users={allUsers}
+            addedUsers={addedUsers}
+            showIndex
+            extraColumns={[
+              {
+                key: "office",
+                label: "Office",
+                flex: 0.5,
+                render: (u) => officeMap[u.office as any] || "N/A",
+              },
+              {
+                key: "role",
+                label: "Role",
+                flex: 1,
+                render: (u) => roleMap[u.role] || "N/A",
+              },
+              { key: "home_address", label: "Home Address", flex: 2 },
+              {
+                key: "active",
+                label: "Active",
+                flex: 1,
+                render: (u) =>
+                  u.active === undefined ? "N/A" : u.active ? "True" : "False",
+              },
+            ]}
+            onSelectUser={modalSelectUser}
+          />
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.3.2</Text>
+      <Text style={styles.bottomScrollText}>v1.3.3</Text>
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import SelectUserModal from "@/components/SelectUserModal";
 import { Text, View } from "@/components/Themed";
 import YearLineChart from "@/components/YearBarChart";
 import { db } from "@/firebaseConfig";
@@ -2390,7 +2391,15 @@ export default function dashboard() {
           </View>
         )}
 
-        {renderSelectUserModal()}
+        {/* {renderSelectUserModal()} */}
+        <SelectUserModal
+          visible={showUserModal}
+          onClose={() => setShowUserModal(false)}
+          users={filteredUsers}
+          selectedUser={selectedUser}
+          onSelectUser={(user) => setSelectedUser(user.username)}
+          onClearUser={() => setSelectedUser("")}
+        />
       </View>
       <View style={styles.tabRow}>
         <TouchableOpacity
