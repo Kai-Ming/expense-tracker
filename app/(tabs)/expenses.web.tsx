@@ -11,12 +11,11 @@ import {
   documentId,
   getDoc,
   getDocs,
-  limit,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
-  where,
+  where
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -438,18 +437,13 @@ export default function ExpensesWebScreen() {
     let q;
     if (role === 0) {
       // Admin: fetch all expenses (no user_id filter)
-      q = query(
-        collection(db, "expenses"),
-        orderBy("created_at", "desc"),
-        limit(200),
-      );
+      q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
     } else if (role === 1) {
       // Regular user: fetch only their own expenses
       q = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
-        limit(200),
       );
     } else {
       // Manager/Supervisor: fetch expenses from subordinates + self
@@ -518,14 +512,12 @@ export default function ExpensesWebScreen() {
       expenseQ = query(
         collection(db, "expenses"),
         orderBy("created_at", "desc"),
-        limit(200),
       );
     } else {
       expenseQ = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
-        limit(200),
       );
     }
 
