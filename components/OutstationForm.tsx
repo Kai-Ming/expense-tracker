@@ -360,6 +360,40 @@ export default function OutstationExpenseForm() {
     setDistance(totalDist.toFixed(2));
   }, [addedTrips]);
 
+  useEffect(() => {
+    if (formFromHome) {
+      return;
+    }
+    if (!originCoord) {
+      return;
+    }
+    if (!homeCoords) {
+      return;
+    }
+    const dist = getHaversineDistance(originCoord, homeCoords);
+    if (dist <= 1) {
+      selectDefault(3, 0);
+      alert("Address close to home, using home address");
+    }
+  }, [originCoord, homeCoords, formFromHome]);
+
+  useEffect(() => {
+    if (formGoingHome) {
+      return;
+    }
+    if (!destCoord) {
+      return;
+    }
+    if (!homeCoords) {
+      return;
+    }
+    const dist = getHaversineDistance(destCoord, homeCoords);
+    if (dist <= 1) {
+      selectDefault(3, 1);
+      alert("Address close to home, using home address");
+    }
+  }, [destCoord, homeCoords, formGoingHome]);
+
   const { width: screenWidth } = useWindowDimensions();
   const maxWidth = Math.min(screenWidth * 0.9, 1200);
 
@@ -1104,6 +1138,23 @@ export default function OutstationExpenseForm() {
     resetRequestForm();
     setTabIndex(index);
   };
+
+  function getHaversineDistance(
+    p1: { lat: number; lng: number },
+    p2: { lat: number; lng: number },
+  ) {
+    const R = 6371;
+    const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+    const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((p1.lat * Math.PI) / 180) *
+        Math.cos((p2.lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
 
   const handleSelectPurpose = (purpose: string) => {
     if (purpose === "Others") {
@@ -2082,6 +2133,7 @@ export default function OutstationExpenseForm() {
     setIsSaving(true);
 
     try {
+      let subFromAddress = fromAddress;
       let subToAddress = toAddress;
       const distanceResult = await getDrivingDistance(originCoord, destCoord);
       let subDistance = 0;
@@ -2154,7 +2206,7 @@ export default function OutstationExpenseForm() {
             officeCoords || { lat: 0, lng: 0 },
           );
           if (officeCoords) {
-            subToAddress = await getAddressFromCoords(
+            subFromAddress = await getAddressFromCoords(
               officeCoords.lat,
               officeCoords.lng,
             );
@@ -2198,7 +2250,7 @@ export default function OutstationExpenseForm() {
 
       const tripToSave = {
         user_id: userId,
-        from_address: fromAddress,
+        from_address: subFromAddress,
         to_address: subToAddress,
         distance: parseFloat(subDistance.toFixed(2)),
         mileage: parseFloat(mileage.toFixed(2)),
