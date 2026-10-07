@@ -35,10 +35,12 @@ interface SelectUserModalProps {
   selectedUser?: string;
   onSelectUser: (user: User) => void;
   onClearUser?: () => void;
+  onToggleUser?: (user: User) => void;
   title?: string;
-  addedUsers?: User[]; // 👈 rows to grey out / disable
-  showIndex?: boolean; // 👈 render a leading "#" column
-  extraColumns?: ExtraColumn[]; // 👈 additional columns (Office, Role, etc.)
+  addedUsers?: User[];
+  showIndex?: boolean;
+  extraColumns?: ExtraColumn[];
+  excludeUsername?: string;
 }
 
 interface ExtraColumn {
@@ -55,17 +57,23 @@ const SelectUserModal: React.FC<SelectUserModalProps> = ({
   selectedUser,
   onSelectUser,
   onClearUser,
+  onToggleUser,
   title = "Select a User",
   addedUsers = [],
   showIndex = false,
   extraColumns = [],
+  excludeUsername = "",
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+
+  const baseUsers = excludeUsername
+    ? users.filter((u) => u.username !== excludeUsername)
+    : users;
 
   const filteredUsers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return users;
-    return users.filter((u) => u.username?.toLowerCase().startsWith(term));
+    return baseUsers.filter((u) => u.username?.toLowerCase().startsWith(term));
   }, [users, searchTerm]);
 
   const handleClose = () => {
@@ -81,6 +89,16 @@ const SelectUserModal: React.FC<SelectUserModalProps> = ({
   const handleClear = () => {
     onClearUser?.();
     handleClose();
+  };
+
+  const isToggleMode = !!onToggleUser;
+
+  const handleRowPress = (user: User) => {
+    if (isToggleMode) {
+      onToggleUser!(user);
+    } else {
+      handleSelect(user); // existing behavior preserved
+    }
   };
 
   const alignStyle = showIndex ? styles.centerText : undefined;
@@ -183,8 +201,8 @@ const SelectUserModal: React.FC<SelectUserModalProps> = ({
                       styles.tableRow,
                       isAdded && styles.disabledUserItem,
                     ]}
-                    disabled={isAdded}
-                    onPress={() => handleSelect(user)}
+                    disabled={!isToggleMode && isAdded}
+                    onPress={() => handleRowPress(user)}
                   >
                     {showIndex && (
                       <View style={{ flex: 0.5 }}>

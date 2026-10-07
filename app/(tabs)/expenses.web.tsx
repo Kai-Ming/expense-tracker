@@ -460,7 +460,7 @@ export default function ExpensesWebScreen() {
       );
     }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
       const expensesData: Expense[] = [];
       const generalExpenseData: GeneralExpense[] = [];
       const outstationExpenseData: OutstationExpense[] = [];
@@ -482,64 +482,18 @@ export default function ExpensesWebScreen() {
       });
       setExpenses(expensesData);
       const allTripIds = expensesData.flatMap((item) => item.trip_ids);
-      setAllTripIds([...new Set(allTripIds)]);
+      //setAllTripIds([...new Set(allTripIds)]);
 
       setGeneralExpense(generalExpenseData);
       setOutstationExpense(outstationExpenseData);
-    });
 
-    return () => unsubscribe();
-  }, [userId, role, subordinates]);
-
-  // Fetch all trips once, filter client-side
-  /* useEffect(() => {
-    if (!userId) return;
-    if (role === null) return;
-    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
-    return onSnapshot(q, (snapshot) => {
-      const trips = snapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() }) as Trip,
-      );
-      setAllTrips(trips);
-    });
-  }, [userId, role]) */
-
-  useEffect(() => {
-    if (!userId || role === null) return;
-
-    // 1. Subscribe to expenses first
-    let expenseQ;
-    if (role === 0) {
-      expenseQ = query(
-        collection(db, "expenses"),
-        orderBy("created_at", "desc"),
-      );
-    } else {
-      expenseQ = query(
-        collection(db, "expenses"),
-        where("user_id", "==", userId),
-        orderBy("created_at", "desc"),
-      );
-    }
-
-    const unsubExpenses = onSnapshot(expenseQ, async (snapshot) => {
-      const expensesData: Expense[] = [];
-      const generalExpenseData: GeneralExpense[] = [];
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.type === 1) {
-          expensesData.push({ id: doc.id, ...data } as Expense);
-        } else if (data.type === 2) {
-          generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
-        }
-      });
-
-      setExpenses(expensesData);
-      setGeneralExpense(generalExpenseData);
-
-      // 2. Now fetch only the trips referenced by these expenses
-      const tripIds = [...new Set(expensesData.flatMap((e) => e.trip_ids))];
+      const tripIds = [
+        ...new Set([
+          ...expensesData.flatMap((e) => e.trip_ids ?? []),
+          ...outstationExpenseData.flatMap((e) => e.trip_ids ?? []),
+        ]),
+      ];
+      setAllTripIds([...tripIds]);
 
       if (tripIds.length === 0) {
         setAllTrips([]);
@@ -568,8 +522,21 @@ export default function ExpensesWebScreen() {
       setAllTrips(trips);
     });
 
-    return () => unsubExpenses();
-  }, [userId, role]);
+    return () => unsubscribe();
+  }, [userId, role, subordinates]);
+
+  // Fetch all trips once, filter client-side
+  /* useEffect(() => {
+    if (!userId) return;
+    if (role === null) return;
+    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      const trips = snapshot.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() }) as Trip,
+      );
+      setAllTrips(trips);
+    });
+  }, [userId, role]) */
 
   const filteredTrips = useMemo(() => {
     if (!allTripIds?.length) return [];

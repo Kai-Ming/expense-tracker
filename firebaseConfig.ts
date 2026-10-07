@@ -9,6 +9,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
@@ -52,6 +53,7 @@ if (__DEV__) {
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
 export const createNewUser = async (email: string, password: string) => {
   const secondaryAppName = "SecondaryAuthApp";

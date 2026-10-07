@@ -349,6 +349,40 @@ export default function MileageForm() {
     }
   };
 
+  useEffect(() => {
+    if (formFromHome) {
+      return;
+    }
+    if (!originCoord) {
+      return;
+    }
+    if (!homeCoords) {
+      return;
+    }
+    const dist = getHaversineDistance(originCoord, homeCoords);
+    if (dist <= 1) {
+      selectDefault(3, 0);
+      alert("Address close to home, using home address");
+    }
+  }, [originCoord, homeCoords, formFromHome]);
+
+  useEffect(() => {
+    if (formGoingHome) {
+      return;
+    }
+    if (!destCoord) {
+      return;
+    }
+    if (!homeCoords) {
+      return;
+    }
+    const dist = getHaversineDistance(destCoord, homeCoords);
+    if (dist <= 1) {
+      selectDefault(3, 1);
+      alert("Address close to home, using home address");
+    }
+  }, [destCoord, homeCoords, formGoingHome]);
+
   const handleRemoveTrip = (tripId: string) => {
     setAddedTrips((prev) => prev.filter((t) => t.id !== tripId));
   };
@@ -567,7 +601,7 @@ export default function MileageForm() {
     return staticMapUrl;
   }; */
 
-  /* function getHaversineDistance(
+  function getHaversineDistance(
     p1: { lat: number; lng: number },
     p2: { lat: number; lng: number },
   ) {
@@ -582,7 +616,7 @@ export default function MileageForm() {
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
-  } */
+  }
 
   const getAddressFromCoords = async (
     lat: number,
@@ -873,7 +907,7 @@ export default function MileageForm() {
       setFormGoingHome(false);
       if (selectedGoingIndex === index) {
         setSelectedGoingIndex(0);
-        clearAddress(0);
+        clearAddress(1);
       } else if (index === 1) {
         setSelectedGoingIndex(index);
         const location = locations[0];
@@ -929,6 +963,7 @@ export default function MileageForm() {
     setIsSaving(true);
 
     try {
+      let subFromAddress = fromAddress;
       let subToAddress = toAddress;
       const distanceResult = await getDrivingDistance(originCoord, destCoord);
       let subDistance = 0;
@@ -1001,7 +1036,7 @@ export default function MileageForm() {
             officeCoords || { lat: 0, lng: 0 },
           );
           if (officeCoords) {
-            subToAddress = await getAddressFromCoords(
+            subFromAddress = await getAddressFromCoords(
               officeCoords.lat,
               officeCoords.lng,
             );
@@ -1046,7 +1081,7 @@ export default function MileageForm() {
 
       const tripToSave = {
         user_id: userId,
-        from_address: fromAddress,
+        from_address: subFromAddress,
         to_address: subToAddress,
         distance: parseFloat(subDistance.toFixed(2)),
         mileage: parseFloat(mileage.toFixed(2)),
@@ -2158,7 +2193,12 @@ export default function MileageForm() {
                                   styles.submitButton,
                                   isSaving && { opacity: 0.7 },
                                 ]}
-                                onPress={saveTrip}
+                                onPress={() => {
+                                  //saveTrip();
+                                  console.log("home");
+                                  console.log(fromAddress);
+                                  console.log(originCoord);
+                                }}
                                 disabled={isSaving}
                               >
                                 {isSaving ? (

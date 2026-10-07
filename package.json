@@ -1,6 +1,6 @@
 {
   "name": "expense-calculator",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
@@ -18,6 +18,8 @@
     "@react-google-maps/api": "^2.20.8",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "^8.6.0",
+    "@react-native-firebase/app": "^26.4.0",
+    "@react-native-firebase/functions": "^26.4.0",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/drawer": "^7.10.2",

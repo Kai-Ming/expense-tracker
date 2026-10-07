@@ -17,6 +17,7 @@ import {
   collection,
   doc,
   GeoPoint,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -26,6 +27,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -42,7 +44,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-import { createNewUser, db, storage } from "../../firebaseConfig";
+import { createNewUser, db, functions, storage } from "../../firebaseConfig";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -1314,6 +1316,16 @@ export default function settings() {
     }
   };
 
+  const generateRandomString = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   const editUser = async () => {
     if (
       !formUsername.trim() ||
@@ -1339,10 +1351,43 @@ export default function settings() {
       }
 
       const userDocRef = doc(db, "users", selectedUserId);
+      const newEmail = formEmail.trim();
 
+      // 1. Fetch current doc to compare emails
+      const userSnap = await getDoc(userDocRef);
+      if (!userSnap.exists()) {
+        Alert.alert("Error", "User not found.");
+        setIsSaving(false);
+        return;
+      }
+
+      const currentEmail = userSnap.data().email;
+      const emailChanged = currentEmail !== newEmail;
+
+      // 2. If email changed, update Auth via Cloud Function
+      if (emailChanged) {
+        try {
+          const updateUserEmail = httpsCallable(functions, "updateUserEmail");
+          await updateUserEmail({
+            uid: selectedUserId,
+            newEmail: newEmail,
+            newPassword: generateRandomString(),
+          });
+        } catch (authError: any) {
+          console.error("Auth email update failed:", authError);
+          Alert.alert(
+            "Error",
+            authError.message || "Failed to update email in authentication.",
+          );
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // 3. Update Firestore doc
       await updateDoc(userDocRef, {
         username: formUsername.trim(),
-        email: formEmail.trim(),
+        email: newEmail,
         ess_no: formEssNo.trim(),
         department: formDepartment.trim(),
         grade: formGrade.trim(),
@@ -1355,7 +1400,12 @@ export default function settings() {
         subordinates: formSubordinates,
       });
 
-      Alert.alert("Success", "User updated successfully!");
+      Alert.alert(
+        "Success",
+        emailChanged
+          ? "User updated and email changed successfully."
+          : "User updated successfully!",
+      );
       setEditUserModalVisible(false);
       clearUserForm();
       setSelectedUserId("");
@@ -2952,7 +3002,67 @@ export default function settings() {
                                     .join(", ")}
                             </Text>
                           </TouchableOpacity>
-                          {renderSelectSubModal()}
+                          {/* {renderSelectSubModal()} */}
+                          <SelectUserModal
+                            visible={selectSubModalVIsible}
+                            onClose={() => selectSelectSubModalVisible(false)}
+                            users={allUsers}
+                            excludeUsername={formUsername} // 👈 was `.filter(u => u.username !== formUsername)`
+                            showIndex={true} // 👈 was the `{index + 1}` column
+                            addedUsers={addedSub} // 👈 greys out already-added rows
+                            onToggleUser={(user) => {
+                              // 👈 select OR deselect
+                              const isAdded = addedSub.some(
+                                (a) => a.id === user.id,
+                              );
+                              if (!isAdded) {
+                                setFormSubordinates((prev) => [
+                                  ...prev,
+                                  user.id,
+                                ]);
+                                setAddedSub((prev) => [...prev, user]);
+                              } else {
+                                setFormSubordinates((prev) =>
+                                  prev.filter((id) => id !== user.id),
+                                );
+                                setAddedSub((prev) =>
+                                  prev.filter((item) => item.id !== user.id),
+                                );
+                              }
+                            }}
+                            title="Select a User"
+                            extraColumns={[
+                              {
+                                key: "office",
+                                label: "Office",
+                                flex: 0.5,
+                                render: (u) => officeMap[u.office] || "N/A",
+                              },
+                              {
+                                key: "role",
+                                label: "Role",
+                                flex: 1,
+                                render: (u) => roleMap[u.role] || "N/A",
+                              },
+                              {
+                                key: "home_address",
+                                label: "Home Address",
+                                flex: 2,
+                                render: (u) => u.home_address,
+                              },
+                              {
+                                key: "active",
+                                label: "Active",
+                                flex: 1,
+                                render: (u) =>
+                                  u.active === undefined
+                                    ? "N/A"
+                                    : u.active
+                                      ? "True"
+                                      : "False",
+                              },
+                            ]}
+                          />
                         </View>
                       )}
                       {/* <View style={styles.modalRow}>
@@ -3243,7 +3353,67 @@ export default function settings() {
                                     .join(", ")}
                             </Text>
                           </TouchableOpacity>
-                          {renderSelectSubModal()}
+                          {/* {renderSelectSubModal()} */}
+                          <SelectUserModal
+                            visible={selectSubModalVIsible}
+                            onClose={() => selectSelectSubModalVisible(false)}
+                            users={allUsers}
+                            excludeUsername={formUsername} // 👈 was `.filter(u => u.username !== formUsername)`
+                            showIndex={true} // 👈 was the `{index + 1}` column
+                            addedUsers={addedSub} // 👈 greys out already-added rows
+                            onToggleUser={(user) => {
+                              // 👈 select OR deselect
+                              const isAdded = addedSub.some(
+                                (a) => a.id === user.id,
+                              );
+                              if (!isAdded) {
+                                setFormSubordinates((prev) => [
+                                  ...prev,
+                                  user.id,
+                                ]);
+                                setAddedSub((prev) => [...prev, user]);
+                              } else {
+                                setFormSubordinates((prev) =>
+                                  prev.filter((id) => id !== user.id),
+                                );
+                                setAddedSub((prev) =>
+                                  prev.filter((item) => item.id !== user.id),
+                                );
+                              }
+                            }}
+                            title="Select a User"
+                            extraColumns={[
+                              {
+                                key: "office",
+                                label: "Office",
+                                flex: 0.5,
+                                render: (u) => officeMap[u.office] || "N/A",
+                              },
+                              {
+                                key: "role",
+                                label: "Role",
+                                flex: 1,
+                                render: (u) => roleMap[u.role] || "N/A",
+                              },
+                              {
+                                key: "home_address",
+                                label: "Home Address",
+                                flex: 2,
+                                render: (u) => u.home_address,
+                              },
+                              {
+                                key: "active",
+                                label: "Active",
+                                flex: 1,
+                                render: (u) =>
+                                  u.active === undefined
+                                    ? "N/A"
+                                    : u.active
+                                      ? "True"
+                                      : "False",
+                              },
+                            ]}
+                          />
                         </View>
                       )}
 
@@ -3473,7 +3643,7 @@ export default function settings() {
           />
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.3.3</Text>
+      <Text style={styles.bottomScrollText}>v1.3.4</Text>
     </View>
   );
 }
