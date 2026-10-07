@@ -2194,10 +2194,7 @@ export default function MileageForm() {
                                   isSaving && { opacity: 0.7 },
                                 ]}
                                 onPress={() => {
-                                  //saveTrip();
-                                  console.log("home");
-                                  console.log(fromAddress);
-                                  console.log(originCoord);
+                                  saveTrip();
                                 }}
                                 disabled={isSaving}
                               >
