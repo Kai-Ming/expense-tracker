@@ -130,9 +130,18 @@ export default function TabLayout() {
         name="dashboard"
         options={{
           title: "Dashboard",
+          href: Platform.OS === "web" ? "dashboard" : null, // Only show on web
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="dashboard" color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="trip"
+        options={{
+          title: "Submit Trip",
+          href: Platform.OS === "web" ? null : "trip",
+          tabBarIcon: ({ color }) => <TabBarIcon name="road" color={color} />,
         }}
       />
       <Tabs.Screen

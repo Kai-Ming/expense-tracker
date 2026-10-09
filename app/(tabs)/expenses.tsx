@@ -1,4 +1,7 @@
 /* import MapDisplay from "@/components/MapDisplay"; */
+import GeneralCard from "@/components/GeneralCard.android";
+import MileageCard from "@/components/MileageCard.android";
+import OutstationCard from "@/components/OustationCard.android";
 import { Text, View } from "@/components/Themed";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
@@ -7,8 +10,10 @@ import {
   collection,
   deleteDoc,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -16,8 +21,15 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -96,6 +108,69 @@ interface Trip {
   created_at: any;
 }
 
+interface OutstationExpense {
+  id: string;
+  user_id: string;
+  username: string;
+  user_name: string;
+  request_id: string;
+  start_date: string;
+  end_date: string;
+  travel_purposes: string[];
+  trip_title: string;
+  date: string;
+  country: string;
+  location: string;
+  airfare: number;
+  airfare_remark: string;
+  mileage: number;
+  trip_ids: string[];
+  toll: number;
+  toll_remark: string;
+  parking: number;
+  parking_remark: string;
+  transport: number;
+  transport_remark: string;
+  hotel: number;
+  hotel_remark: string;
+  own_acc: number;
+  own_acc_sharing: string;
+  own_acc_remark: string;
+  entertainment: number;
+  entertainment_remark: string;
+  laundry: number;
+  laundry_remark: string;
+  others: number;
+  others_remark: string;
+  total: number;
+  departure_time: string;
+  arrival_time: string;
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+  meal: number;
+  trip_report: string;
+  customers: any[];
+  business_card_urls: string;
+  type: number;
+  approval_status: number;
+  created_at: any;
+}
+
+interface ExpenseGroup {
+  request_id: string;
+  user_id: string;
+  user_name: string;
+  trip_title: string;
+  start_date: string;
+  end_date: string;
+  travel_purposes: string[];
+  data: OutstationExpense[];
+  total_amount: number;
+  type: number;
+  created_at: any;
+}
+
 interface User {
   id: string;
   username: string;
@@ -111,6 +186,10 @@ interface User {
 export default function ExpensesScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [generalExpense, setGeneralExpense] = useState<GeneralExpense[]>([]);
+  const [outstationExpense, setOutstationExpense] = useState<
+    OutstationExpense[]
+  >([]);
+  const [allRequests, setAllRequest] = useState<any[]>([]);
   const [allTripIds, setAllTripIds] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -131,8 +210,12 @@ export default function ExpensesScreen() {
   const [appliedExpenseType, setAppliedExpenseType] = useState<string>("All");
   const [appliedExpensePurpose, setAppliedExpensePurpose] =
     useState<string>("");
+  const [appliedRequestId, setAppliedRequestId] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<Partial<Expense>>({});
+  // parent
+  const [editFormData, setEditFormData] = useState<
+    Partial<Expense & GeneralExpense>
+  >({});
   const [mileageRate, setMileageRate] = useState<number>(0.8);
   const [mileageRateOutstation, setMileageRateOutstation] =
     useState<number>(0.7);
@@ -149,6 +232,8 @@ export default function ExpensesScreen() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [addedUsers, setAddedUsers] = useState<any[]>([]);
+
+  const [expensesLoaded, setExpensesLoaded] = useState(false);
 
   const router = useRouter();
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -239,22 +324,30 @@ export default function ExpensesScreen() {
     // Wait until role is determined (not null)
     if (role === null) return;
 
+    setExpensesLoaded(false);
+
     let q;
     if (role === 0) {
       // Admin: fetch all expenses (no user_id filter)
-      q = query(collection(db, "expenses"), orderBy("created_at", "desc"));
+      q = query(
+        collection(db, "expenses"),
+        orderBy("created_at", "desc"),
+        limit(200),
+      );
     } else {
       // Regular user: fetch only their own expenses
       q = query(
         collection(db, "expenses"),
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
+        limit(200),
       );
     }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const expensesData: Expense[] = [];
       const generalExpenseData: GeneralExpense[] = [];
+      const outstationExpenseData: OutstationExpense[] = [];
       /* querySnapshot.forEach((doc) =>
         expensesData.push({ id: doc.id, ...doc.data() } as Expense),
       ); */
@@ -264,6 +357,11 @@ export default function ExpensesScreen() {
           expensesData.push({ id: doc.id, ...data } as Expense);
         } else if (data.type === 2) {
           generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
+        } else if (data.type === 3) {
+          outstationExpenseData.push({
+            id: doc.id,
+            ...data,
+          } as OutstationExpense);
         }
       });
       setExpenses(expensesData);
@@ -271,6 +369,8 @@ export default function ExpensesScreen() {
       setAllTripIds([...new Set(allTripIds)]);
 
       setGeneralExpense(generalExpenseData);
+      setOutstationExpense(outstationExpenseData);
+      setExpensesLoaded(true);
     });
 
     return () => unsubscribe();
@@ -290,40 +390,84 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, [role]);
 
-  /* useEffect(() => {
-    if (!userId) return;
-    const q = query(
-      collection(db, "trips"),
-      where("user_id", "==", userId),
-      orderBy("created_at", "desc"),
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tripsData: Trip[] = [];
-      snapshot.forEach((doc) => {
-        tripsData.push({ id: doc.id, ...doc.data() } as Trip);
-      });
-      setAllTrips(tripsData);
-    });
-    return () => unsubscribe();
-  }, [userId]); */
-
   useEffect(() => {
-    if (!userId) return;
-    // Wait until role is determined (not null)
-    if (role === null) return;
+    if (!userId || role === null) return;
 
-    const q = query(collection(db, "trips"), orderBy("created_at", "desc"));
+    // 1. Subscribe to expenses first
+    let expenseQ;
+    if (role === 0) {
+      expenseQ = query(
+        collection(db, "expenses"),
+        orderBy("created_at", "desc"),
+        limit(200),
+      );
+    } else {
+      expenseQ = query(
+        collection(db, "expenses"),
+        where("user_id", "==", userId),
+        orderBy("created_at", "desc"),
+        limit(200),
+      );
+    }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const tripData: Trip[] = [];
-      querySnapshot.forEach((doc) => {
+    const unsubExpenses = onSnapshot(expenseQ, async (snapshot) => {
+      const expensesData: Expense[] = [];
+      const generalExpenseData: GeneralExpense[] = [];
+      const outstationExpenseData: OutstationExpense[] = [];
+
+      snapshot.forEach((doc) => {
         const data = doc.data();
-        tripData.push({ id: doc.id, ...data } as Trip);
+        if (data.type === 1) {
+          expensesData.push({ id: doc.id, ...data } as Expense);
+        } else if (data.type === 2) {
+          generalExpenseData.push({ id: doc.id, ...data } as GeneralExpense);
+        } else if (data.type === 3) {
+          outstationExpenseData.push({
+            id: doc.id,
+            ...data,
+          } as OutstationExpense);
+        }
       });
-      setAllTrips(tripData);
+
+      setExpenses(expensesData);
+      setGeneralExpense(generalExpenseData);
+      setOutstationExpense(outstationExpenseData);
+
+      // 2. Now fetch only the trips referenced by these expenses
+      const tripIds = [
+        ...new Set([
+          ...expensesData.flatMap((e) => e.trip_ids ?? []),
+          ...outstationExpenseData.flatMap((e) => e.trip_ids ?? []),
+        ]),
+      ];
+      if (tripIds.length === 0) {
+        setAllTrips([]);
+        return;
+      }
+
+      const CHUNK = 30;
+      const chunks: string[][] = [];
+      for (let i = 0; i < tripIds.length; i += CHUNK) {
+        chunks.push(tripIds.slice(i, i + CHUNK));
+      }
+
+      const trips: Trip[] = [];
+      await Promise.all(
+        chunks.map(async (chunk) => {
+          const tripQ = query(
+            collection(db, "trips"),
+            where(documentId(), "in", chunk),
+          );
+          const tripSnap = await getDocs(tripQ);
+          tripSnap.forEach((d) =>
+            trips.push({ id: d.id, ...d.data() } as Trip),
+          );
+        }),
+      );
+      setAllTrips(trips);
     });
 
-    return () => unsubscribe();
+    return () => unsubExpenses();
   }, [userId, role]);
 
   useEffect(() => {
@@ -341,17 +485,18 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, []);
 
-  const getTripById = (tripId: string): Trip | undefined => {
+  /* const getTripById = (tripId: string): Trip | undefined => {
     return allTrips.find((trip) => trip.id === tripId);
-  };
+  }; */
 
   const test = () => {
     //console.log(allTrips);
     const tripIds = allTrips.map((trip) => trip.id);
-    console.log(tripIds);
+    //console.log(tripIds);
   };
 
   const handleApplyFilter = () => {
+    console.log("appliedRequestId before:", appliedRequestId);
     setAppliedStartDate(startDate);
     setAppliedEndDate(endDate);
     setAppliedExpenseType(expenseType);
@@ -378,6 +523,17 @@ export default function ExpensesScreen() {
     setUsenameFilter("");
   };
 
+  const tripsById = useMemo(() => {
+    const map = new Map<string, Trip>();
+    allTrips.forEach((t) => map.set(t.id, t));
+    return map;
+  }, [allTrips]);
+
+  const getTripById = useCallback(
+    (tripId: string) => tripsById.get(tripId),
+    [tripsById],
+  );
+
   const updateUserFilter = async (username: string) => {
     if (username === "") return;
     const q = query(collection(db, "users"), where("username", "==", username));
@@ -399,47 +555,169 @@ export default function ExpensesScreen() {
     setAppliedGrade(user.grade);
   };
 
-  const activeFilterCount = [
-    appliedStartDate || appliedEndDate,
-    filterStatus !== null,
-    filterSearch.trim() !== "",
-  ].filter(Boolean).length;
+  const activeFilterCount = useMemo(() => {
+    return [
+      appliedStartDate || appliedEndDate,
+      filterStatus !== null,
+      filterSearch.trim() !== "",
+    ].filter(Boolean).length;
+  }, [appliedStartDate, appliedEndDate, filterStatus, filterSearch]);
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (appliedExpenseType == "General") return false;
-    if (
-      !e.date ||
-      (!appliedStartDate &&
-        !appliedEndDate &&
-        !usernameFilter &&
-        (expenseType != "Mileage" || !appliedExpensePurpose))
-    )
-      return true;
-    return (
-      !(appliedStartDate && e.date < appliedStartDate) &&
-      !(appliedEndDate && e.date > appliedEndDate) &&
-      !(appliedUsername && e.user_name != appliedUsername) &&
-      !(appliedExpensePurpose && e.expense_purpose != appliedExpensePurpose)
-    );
-  });
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      if (
+        appliedExpenseType === "General" ||
+        appliedExpenseType === "Outstation"
+      )
+        return false;
+      if (
+        !e.date ||
+        (!appliedStartDate &&
+          !appliedEndDate &&
+          !appliedUsername &&
+          (expenseType !== "Mileage" || !appliedExpensePurpose))
+      )
+        return true;
+      return (
+        !(appliedStartDate && e.date < appliedStartDate) &&
+        !(appliedEndDate && e.date > appliedEndDate) &&
+        !(appliedUsername && e.user_name !== appliedUsername) &&
+        !(appliedExpensePurpose && e.expense_purpose !== appliedExpensePurpose)
+      );
+    });
+  }, [
+    expenses,
+    appliedExpenseType,
+    appliedStartDate,
+    appliedEndDate,
+    appliedUsername,
+    appliedExpensePurpose,
+    expenseType,
+  ]);
 
-  const filteredGeneralExpense = generalExpense.filter((e) => {
-    if (appliedExpenseType == "Mileage") return false;
-    if (
-      !e.date ||
-      (!appliedStartDate &&
-        !appliedEndDate &&
-        !usernameFilter &&
-        (expenseType != "General" || !appliedExpensePurpose))
-    )
-      return true;
-    return (
-      !(appliedStartDate && e.date < appliedStartDate) &&
-      !(appliedEndDate && e.date > appliedEndDate) &&
-      !(appliedUsername && e.user_name != appliedUsername) &&
-      !(appliedExpensePurpose && e.expense_type != appliedExpensePurpose)
-    );
-  });
+  const filteredGeneralExpenses = useMemo(() => {
+    return generalExpense.filter((e) => {
+      if (
+        appliedExpenseType === "Mileage" ||
+        appliedExpenseType === "Outstation"
+      )
+        return false;
+      if (
+        !e.date ||
+        (!appliedStartDate &&
+          !appliedEndDate &&
+          !appliedUsername &&
+          (expenseType !== "General" || !appliedExpensePurpose))
+      )
+        return true;
+      return (
+        !(appliedStartDate && e.date < appliedStartDate) &&
+        !(appliedEndDate && e.date > appliedEndDate) &&
+        !(appliedUsername && e.user_name !== appliedUsername) &&
+        !(appliedExpensePurpose && e.expense_type !== appliedExpensePurpose)
+      );
+    });
+  }, [
+    generalExpense,
+    appliedExpenseType,
+    appliedStartDate,
+    appliedEndDate,
+    appliedUsername,
+    appliedExpensePurpose,
+    expenseType,
+  ]);
+
+  const filteredOutstationExpenses = useMemo(() => {
+    return outstationExpense
+      .filter((e) => {
+        // Exclude Mileage and General
+        if (
+          appliedExpenseType === "Mileage" ||
+          appliedExpenseType === "General"
+        )
+          return false;
+
+        // Filter by request_id
+        if (appliedRequestId && e.request_id !== appliedRequestId) return false;
+
+        // Filter by start date
+        if (appliedStartDate && e.date < appliedStartDate) return false;
+
+        // Filter by end date
+        if (appliedEndDate && e.date > appliedEndDate) return false;
+
+        // Filter by username
+        if (
+          appliedUsername &&
+          e.user_name !== appliedUsername &&
+          e.username !== appliedUsername
+        )
+          return false;
+
+        return true;
+      })
+      .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
+  }, [
+    outstationExpense,
+    appliedExpenseType,
+    appliedRequestId,
+    appliedStartDate,
+    appliedEndDate,
+    appliedUsername,
+  ]);
+
+  const groupedExpense = useCallback(
+    (outstationExpense: OutstationExpense[]): ExpenseGroup[] => {
+      return outstationExpense.reduce<ExpenseGroup[]>((acc, expense) => {
+        const requestId =
+          expense.request_id || `temp_${Date.now()}_${Math.random()}`;
+        const existingGroup = acc.find(
+          (group) => group.request_id === requestId,
+        );
+
+        const tripTitle = expense.trip_title || "Untitled Trip";
+        const userId = expense.user_id || "";
+        const username = expense.user_name || expense.username || "";
+        const type = expense.type || 3;
+        const startDate = expense.start_date || "N/A";
+        const endDate = expense.end_date || "N/A";
+        const travelPurposes = expense.travel_purposes || [];
+        const createdAt = expense.created_at || null;
+
+        const expenseTotal =
+          typeof expense.total === "string"
+            ? parseFloat(expense.total) || 0
+            : Number(expense.total) || 0;
+
+        if (existingGroup) {
+          existingGroup.data.push(expense);
+          existingGroup.total_amount =
+            (Number(existingGroup.total_amount) || 0) + expenseTotal;
+        } else {
+          acc.push({
+            request_id: requestId,
+            user_id: userId,
+            user_name: username,
+            start_date: startDate,
+            end_date: endDate,
+            travel_purposes: travelPurposes,
+            trip_title: tripTitle,
+            data: [expense],
+            total_amount: expenseTotal,
+            type: type,
+            created_at: createdAt,
+          });
+        }
+        return acc;
+      }, []);
+    },
+    [],
+  );
+
+  const groupedExpenses = useMemo(
+    () => groupedExpense(filteredOutstationExpenses),
+    [filteredOutstationExpenses],
+  );
 
   const handleDelete = async (id: string) => {
     const performDelete = async () => {
@@ -543,6 +821,44 @@ export default function ExpensesScreen() {
     const hoursStr = hours12.toString().padStart(2, "0");
     const minutesStr = minutes.toString().padStart(2, "0");
     return `${hoursStr}:${minutesStr} ${period}`;
+  };
+
+  const formatDateDMY = (d?: any) => {
+    if (!d) return "N/A";
+
+    // If it's already a Date
+    if (d instanceof Date) {
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+
+    // Firebase Timestamp
+    if (typeof d === "object" && typeof d.toDate === "function") {
+      const date = d.toDate();
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+
+    // String: expected "YYYY-MM-DD" or "YYYY/MM/DD"
+    if (typeof d === "string") {
+      // Support "YYYY-MM-DD" and "YYYY/MM/DD"
+      const parts = d.split(/[-/]/);
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        // Zero-pad day/month if needed
+        const dd = day.padStart(2, "0");
+        const mm = month.padStart(2, "0");
+        return `${dd}/${mm}/${year}`;
+      }
+      // Fallback: return as-is if we can't parse
+      return d;
+    }
+
+    return "N/A";
   };
 
   const renderSelectUserModal = () => {
@@ -768,6 +1084,7 @@ export default function ExpensesScreen() {
               <Picker.Item label="All" value="All" />
               <Picker.Item label="Mileage Expense" value="Mileage" />
               <Picker.Item label="General Expense" value="General" />
+              <Picker.Item label="Outstation Expense" value="Outstation" />
             </Picker>
           </View>
         </View>
@@ -908,6 +1225,7 @@ export default function ExpensesScreen() {
           onPress={() => {
             handleApplyFilter();
             test();
+            console.log(filteredOutstationExpenses.length);
           }}
         >
           <Text style={filterStyles.applyBtnText}>Apply</Text>
@@ -933,6 +1251,14 @@ export default function ExpensesScreen() {
       )}
     </View>
   );
+
+  const handleToggle = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleImagePress = useCallback((url: string | null) => {
+    setSelectedImage(url);
+  }, []);
 
   const renderMileage = ({ item }: { item: Expense }) => {
     const isExpanded = expandedId === item.id;
@@ -1747,7 +2073,7 @@ export default function ExpensesScreen() {
                 )}
               </View>
               <Text style={filterStyles.toggleChevron}>
-                {isDashboardVisible ? "▲" : "▼"}
+                {isDashboardVisible ? "▲" : "▼"}  
               </Text>
             </TouchableOpacity>
 
@@ -1764,7 +2090,7 @@ export default function ExpensesScreen() {
         style={{
           borderRightWidth: 1,
           borderRightColor: "#e0e0e0",
-          backgroundColor: "#fafafa",
+          backgroundColor: "#fff",
         }}
       >
         <View style={{ padding: 16 }}>
@@ -1802,12 +2128,63 @@ export default function ExpensesScreen() {
 
             {isDashboardVisible && renderFilterPanel()}
           </View>
-          {filteredExpenses.map((item) => (
-            <View>{renderMileage({ item })}</View>
-          ))}
-          {filteredGeneralExpense.map((item) => (
-            <View>{renderGeneral({ item })}</View>
-          ))}
+          {!expensesLoaded ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2196F3" />
+              <Text style={styles.loadingText}>Loading expenses…</Text>
+            </View>
+          ) : filteredExpenses.length === 0 &&
+            filteredGeneralExpenses.length === 0 &&
+            filteredOutstationExpenses.length === 0 ? (
+            <Text style={styles.empty}>No expenses found.</Text>
+          ) : (
+            <>
+              {filteredExpenses.map((item) => (
+                <MileageCard
+                  key={item.id}
+                  item={item}
+                  isExpanded={expandedId === item.id}
+                  isEditing={editingId === item.id}
+                  editFormData={editFormData}
+                  setEditFormData={setEditFormData}
+                  getTripById={getTripById}
+                  purposeList={purposeList}
+                  showPurposeDropDown={showPurposeDropDown}
+                  setShowPurposeDropDown={setShowPurposeDropDown}
+                  onToggle={handleToggle}
+                  formatDate={formatDateDMY}
+                  onImagePress={handleImagePress}
+                  format12Hour={format12Hour}
+                />
+              ))}
+              {filteredGeneralExpenses.map((item) => (
+                <GeneralCard
+                  key={item.id}
+                  item={item}
+                  isExpanded={expandedId === item.id}
+                  isEditing={editingId === item.id}
+                  editFormData={editFormData}
+                  formatDate={formatDateDMY}
+                  setEditFormData={setEditFormData}
+                  onToggle={handleToggle}
+                />
+              ))}
+              {groupedExpenses.map((group) => (
+                <OutstationCard
+                  key={group.request_id}
+                  item={group}
+                  isExpanded={expandedId === group.request_id}
+                  isEditing={editingId === group.request_id}
+                  editFormData={editFormData}
+                  setEditFormData={setEditFormData}
+                  onToggle={handleToggle}
+                  formatDate={formatDateDMY}
+                  getTripById={getTripById}
+                  onImagePress={handleImagePress}
+                />
+              ))}
+            </>
+          )}
         </View>
       </ScrollView>
       <Modal
@@ -2257,9 +2634,7 @@ const styles = StyleSheet.create({
     alignItems: "center", // ← Add this
     padding: 20, // ← Add this
   },
-  tableContainer: {
-    maxHeight: "70%", // ← Add this or use a fixed height like 400
-  },
+  tableContainer: {},
   webTableContainer: {
     backgroundColor: "#fff",
     borderRadius: 8,
@@ -2286,14 +2661,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
     borderBottomWidth: 1,
     borderColor: "#ddd",
+    paddingBottom: 8,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 15,
   },
   tripItem: {
     marginBottom: 8,
@@ -2315,4 +2689,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   modalCloseButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    backgroundColor: "transparent",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#666",
+  },
 });

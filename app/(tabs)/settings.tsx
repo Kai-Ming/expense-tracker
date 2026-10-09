@@ -2434,7 +2434,7 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
             onPress={() => setMileageModalVisible(true)}
@@ -2582,7 +2582,7 @@ export default function settings() {
           </Modal>
         </>
       )}
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           {/*<TouchableOpacity
             onPress={() => setAddressModalVisible(true)}
@@ -2664,7 +2664,7 @@ export default function settings() {
           </Modal>
         </>
       )}
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
             onPress={() => setDistanceModalVisible(true)}
@@ -2742,7 +2742,7 @@ export default function settings() {
           </Modal>
         </>
       )}
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
             onPress={() => {
@@ -3140,7 +3140,7 @@ export default function settings() {
         </>
       )}
 
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
             onPress={() => {
@@ -3514,7 +3514,7 @@ export default function settings() {
         </>
       )}
 
-      {role === 0 && (
+      {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
             onPress={() => {
@@ -3643,7 +3643,7 @@ export default function settings() {
           />
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.3.4</Text>
+      <Text style={styles.bottomScrollText}>v1.4</Text>
     </View>
   );
 }

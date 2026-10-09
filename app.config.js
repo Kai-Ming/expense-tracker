@@ -45,6 +45,7 @@ export default {
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
       ],
       config: {

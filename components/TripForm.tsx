@@ -1,6 +1,4 @@
-import GeneralExpenseFormMobile from "@/components/GeneralExpenseFormMobile";
-import MileageFormMobile from "@/components/MileageFormMobile";
-import OutstationExpenseFormMobile from "@/components/OutstationFormMobile";
+import PlacesInput from "@/components/PlacesInput";
 import { Text, View } from "@/components/Themed";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
@@ -19,8 +17,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -28,30 +26,14 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { db } from "../../firebaseConfig";
-
-const LOCATION_TRACKING_TASK = "background-location-task";
-const BG_LOCATION_EVENT = "bg-location-update";
-
-TaskManager.defineTask(LOCATION_TRACKING_TASK, ({ data, error }: any) => {
-  if (error) {
-    console.error("Background Task Error:", error);
-    return;
-  }
-  if (data) {
-    const { locations } = data;
-    if (locations && locations.length > 0) {
-      const location = locations[0];
-      const latLng = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-
-      console.log("Background location captured:", latLng);
-      DeviceEventEmitter.emit(BG_LOCATION_EVENT, latLng);
-    }
-  }
-});
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { db } from "../firebaseConfig";
+import {
+  getTripState,
+  LOCATION_TRACKING_TASK,
+  setTripState,
+} from "../tasks/tripTask";
+import MapComponent from "./MapComponent";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -61,7 +43,89 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function SubmitExpenseScreen() {
+/* console.log("[notif] about to request permission");
+Notifications.requestPermissionsAsync()
+  .then((r) => console.log("[notif] result:", r.status, r.canAskAgain))
+  .catch((e) => console.log("[notif] request failed:", e)); */
+
+if (Platform.OS === "android") {
+  Notifications.setNotificationChannelAsync("default", {
+    name: "default",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "default",
+  }).catch(() => {});
+}
+
+let notifPermissionChecked = false;
+
+async function ensureNotificationPermission() {
+  if (notifPermissionChecked) return;
+  notifPermissionChecked = true;
+
+  const existing = await Notifications.getPermissionsAsync();
+  console.log("[notif] current status:", existing.status, existing.canAskAgain);
+
+  if (existing.status === "granted") return;
+
+  if (!existing.canAskAgain) {
+    Alert.alert(
+      "Notifications Disabled",
+      "Trip-saved notifications are turned off. Please enable them in your device Settings.",
+      [
+        { text: "Not Now", style: "cancel" },
+        { text: "Open Settings", onPress: () => Linking.openSettings() },
+      ],
+    );
+    return;
+  }
+
+  const result = await Notifications.requestPermissionsAsync();
+  console.log("[notif] after prompt:", result.status, result.canAskAgain);
+}
+
+function waitForBackgroundPermission(): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Check immediately in case the permission was already granted
+    // while the Settings page was open.
+    Location.getBackgroundPermissionsAsync().then(({ status }) => {
+      if (status === "granted") {
+        resolve(true);
+        return;
+      }
+
+      // Otherwise, subscribe to AppState and re-check when we resume.
+      let resolved = false;
+      const sub = AppState.addEventListener("change", async (nextState) => {
+        if (resolved) return;
+        if (nextState === "active") {
+          const { status: newStatus } =
+            await Location.getBackgroundPermissionsAsync();
+          if (newStatus === "granted") {
+            resolved = true;
+            sub.remove();
+            resolve(true);
+          } else {
+            // User returned but didn't grant. Give up after one resume
+            // cycle to avoid hanging forever.
+            resolved = true;
+            sub.remove();
+            resolve(false);
+          }
+        }
+      });
+
+      // Safety timeout so the promise never hangs forever.
+      setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        sub.remove();
+        resolve(false);
+      }, 60_000);
+    });
+  });
+}
+
+export default function TripForm() {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const mapRef = useRef<any>(null);
   const remarkRef = useRef("");
@@ -114,7 +178,7 @@ export default function SubmitExpenseScreen() {
 
   const [mileageRate, setMileageRate] = useState<number>(0);
   const [mileageRateOutstation, setMileageRateOutstation] = useState<number>(0);
-  const [outStationDistance, setOutstationDistance] = useState<number>(50);
+  const [outstationDistance, setOutstationDistance] = useState<number>(50);
   const [homeCoords, setHomeCoords] = useState<{
     lat: number;
     lng: number;
@@ -128,9 +192,6 @@ export default function SubmitExpenseScreen() {
   const [arrivalDistance, setArrivalDistance] = useState<number>(0.1);
   const [drivingDistance, setDrivingDistance] = useState<number>(0);
   const [toll, setToll] = useState<string>("");
-
-  const [tabIndex, setTabIndex] = useState<number>(1);
-
   const totalTraveledDistanceRef = useRef<number>(0);
   const toAddressRef = useRef<string>("");
   const routeCoordsRef = useRef<{ latitude: number; longitude: number }[]>([]);
@@ -232,13 +293,13 @@ export default function SubmitExpenseScreen() {
   }, [currentLocation]);
 
   useEffect(() => {
-    Notifications.requestPermissionsAsync();
+    ensureNotificationPermission().catch((e) =>
+      console.log("[notif] ensure failed:", e),
+    );
   }, []);
 
   useEffect(() => {
     async function setupNotifications() {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== "granted") return;
       if (Platform.OS === "android") {
         await Notifications.setNotificationChannelAsync("default", {
           name: "default",
@@ -250,13 +311,23 @@ export default function SubmitExpenseScreen() {
     setupNotifications();
   }, []);
 
-  const changeForm = (index: number) => {
-    setTabIndex(index);
-  };
+  useEffect(() => {
+    if (!tripActive) return;
+    const id = setInterval(async () => {
+      const s = await getTripState();
+      if (!s) {
+        // task submitted and cleared the state → trip is done
+        setTripActive(false);
+        resetForm();
+        return;
+      }
+      setTotalTraveledDistance(s.totalDistance);
+      setDistance(`${s.totalDistance.toFixed(2)} km`);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [tripActive]);
 
   const sendTripSavedNotification = async (distance: number, total: number) => {
-    await Notifications.requestPermissionsAsync();
-
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Trip Saved ✅",
@@ -298,6 +369,7 @@ export default function SubmitExpenseScreen() {
 
     locationSubscriptionRef.current?.remove();
     locationSubscriptionRef.current = null;
+    setTripState(null);
 
     fetchCurrentLocation();
   };
@@ -446,6 +518,7 @@ export default function SubmitExpenseScreen() {
   ) => {
     const currentLoc = currentLocationRef.current;
 
+    let subFromAddress = fromAddress;
     let subToAddress = finalToAddress;
     let subDistance = finalDistance;
     let finalTollAmount = finalToll;
@@ -478,6 +551,34 @@ export default function SubmitExpenseScreen() {
       } else {
         finalTollAmount = resultToCurrent.toll;
       }
+    } else if (fromHome && points && currentLocation) {
+      // Perform comparison if coming from home
+      const resultFromCurrent = await fetchRoadDistanceAndToll(
+        points,
+        currentLocation,
+      );
+
+      if (resultFromCurrent.distance * 1.2 > drivingDistance) {
+        resultFromCurrent.distance = drivingDistance;
+      }
+
+      const resultFromOffice = await fetchRoadDistanceAndToll(
+        officeCoords,
+        points,
+      );
+
+      if (resultFromOffice.distance < resultFromCurrent.distance) {
+        subDistance = resultFromOffice.distance;
+        if (officeCoords) {
+          subFromAddress = await getAddressFromCoords(
+            officeCoords.lat,
+            officeCoords.lng,
+          );
+          finalTollAmount = resultFromOffice.toll;
+        }
+      } else {
+        finalTollAmount = resultFromCurrent.toll;
+      }
     }
 
     // If toll wasn't calculated above and we have origin/destination
@@ -491,7 +592,7 @@ export default function SubmitExpenseScreen() {
 
     let mileageRateTemp = mileageRate;
 
-    if (subDistance > outStationDistance) {
+    if (subDistance > outstationDistance) {
       mileageRateTemp = mileageRateOutstation;
     }
 
@@ -501,7 +602,7 @@ export default function SubmitExpenseScreen() {
     try {
       await addDoc(collection(db, "trips"), {
         user_id: userId,
-        from_address: fromAddress,
+        from_address: subFromAddress,
         to_address: subToAddress,
         distance: subDistance,
         toll: parseFloat(finalTollAmount.toFixed(2)),
@@ -511,6 +612,7 @@ export default function SubmitExpenseScreen() {
         from_time: fromTimeRef.current || fromTime,
         to_time: finalEndTime,
         to_home: toHome,
+        from_home: fromHome,
         route_image_url: finalImageUrl,
         endTripReason: endTripReason,
         date: new Date().toISOString().split("T")[0],
@@ -530,19 +632,102 @@ export default function SubmitExpenseScreen() {
 
   const startTracking = async () => {
     await calculateDistance();
+
+    // ── Step 1: Foreground permission ────────────────────────────────
     const { status: fgStatus } =
       await Location.requestForegroundPermissionsAsync();
-    if (fgStatus !== "granted") return;
 
-    const { status: bgStatus } =
-      await Location.requestBackgroundPermissionsAsync();
-    if (bgStatus !== "granted") {
+    if (fgStatus !== "granted") {
       Alert.alert(
-        "Permission Required",
-        "Please set location permission to 'Allow all the time'.",
+        "Location Permission Required",
+        "This app needs location access to track your trip. Please enable it in Settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ],
       );
       return;
     }
+
+    // ── Step 2: Background permission ────────────────────────────────
+    // On Android 11+, this opens the Settings page directly (no dialog).
+    // On iOS, it may prompt or silently return "denied" depending on the
+    // foreground result.
+    let bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
+
+    if (bgStatus !== "granted") {
+      // Show the pre-permission explanation BEFORE triggering the system
+      // redirect. On Android this is the only chance to explain, because
+      // requestBackgroundPermissionsAsync jumps straight to Settings.
+      const proceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          "Background Location Required",
+          Platform.OS === "android"
+            ? "The next screen will open your app settings. Please select 'Allow all the time' under Location permissions so trips can be saved automatically."
+            : "Please go to Settings → Privacy → Location Services → [This App] and select 'Always' so trips can be saved automatically.",
+          [
+            { text: "Not Now", style: "cancel", onPress: () => resolve(false) },
+            {
+              text: "Open Settings",
+              onPress: () => resolve(true),
+            },
+          ],
+        );
+      });
+
+      if (!proceed) return;
+
+      // This call:
+      //   - Android 11+ → opens the app's Settings page
+      //   - Android ≤10  → shows the system permission dialog
+      //   - iOS          → shows the system dialog (or fails if "Allow Once")
+      await Location.requestBackgroundPermissionsAsync();
+
+      // Re-check after the user returns from Settings.
+      // Give the OS a moment to reflect the change after the app resumes.
+      bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
+
+      if (bgStatus !== "granted") {
+        // The user might still be in Settings, or they declined again.
+        // Wait for the app to come back to the foreground and re-check.
+        const granted = await waitForBackgroundPermission();
+        if (!granted) {
+          Alert.alert(
+            "Permission Still Denied",
+            "Background location is required for automatic trip submission. You can enable it later in Settings.",
+            [{ text: "OK" }],
+          );
+          return;
+        }
+      }
+    }
+
+    // ── Step 3: Seed state and start tracking ────────────────────────
+    const startPoint = currentLocationRef.current ?? points[0];
+    if (!startPoint || !destination) {
+      Alert.alert("Error", "Missing start location or destination.");
+      return;
+    }
+
+    await setTripState({
+      userId: userId ?? "",
+      fromAddress,
+      toAddress,
+      destination,
+      origin: startPoint,
+      lastCoords: startPoint,
+      totalDistance: 0,
+      routeCoords: [{ latitude: startPoint.lat, longitude: startPoint.lng }],
+      fromTime: new Date().toISOString(),
+      remark: formRemark,
+      toHome,
+      officeCoords,
+      arrivalDistance: arrivalDistance > 0 ? arrivalDistance : 0.1,
+      mileageRate,
+      mileageRateOutstation,
+      outstationDistance,
+      submitted: false,
+    });
 
     await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
       accuracy: Location.Accuracy.High,
@@ -553,7 +738,14 @@ export default function SubmitExpenseScreen() {
         notificationBody: "Tracking your location for the expense report.",
         notificationColor: "#2196F3",
       },
+      // iOS: don't let the OS pause updates when it thinks you're stationary
+      pausesUpdatesAutomatically: false,
     });
+
+    console.log(
+      "[tripTask] updates started, task registered:",
+      await TaskManager.isTaskRegisteredAsync(LOCATION_TRACKING_TASK),
+    );
 
     setTripActive(true);
   };
@@ -829,17 +1021,21 @@ export default function SubmitExpenseScreen() {
       setCurrentLocation(curr);
       currentLocationRef.current = curr;
 
-      // Calculate distance locally from previous point to map out incremental progress
+      // ✅ Append to route coords so the path is drawn
+      const newCoord = { latitude: lat, longitude: lng };
+      const updated = [...routeCoordsRef.current, newCoord];
+      routeCoordsRef.current = updated;
+      setRouteCoords(updated);
+
+      // Incremental distance for live display
       const prev = lastCoordsRef.current;
       if (prev) {
         const delta = getHaversineDistance(prev, curr);
         const newTotal = totalTraveledDistanceRef.current + delta;
-
         totalTraveledDistanceRef.current = newTotal;
         setTotalTraveledDistance(newTotal);
         setDistance(`${newTotal.toFixed(2)} km`);
 
-        // Check arrival status locally
         await checkAndAutoSubmitWithRoadDistance(curr, originCoords);
       }
 
@@ -885,20 +1081,29 @@ export default function SubmitExpenseScreen() {
       locationSubscriptionRef.current = subscription;
     })();
 
-    const backgroundSubscription = DeviceEventEmitter.addListener(
-      BG_LOCATION_EVENT,
-      (coords) => {
-        handleNewCoordinate(coords.latitude, coords.longitude);
-      },
-    );
-
     return () => {
       isMounted = false;
       locationSubscriptionRef.current?.remove();
       locationSubscriptionRef.current = null;
-      backgroundSubscription.remove();
     };
   }, [tripActive]);
+
+  useEffect(() => {
+    if (toHome) {
+      return;
+    }
+    if (!destination) {
+      return;
+    }
+    if (!homeCoords) {
+      return;
+    }
+    const dist = getHaversineDistance(destination, homeCoords);
+    if (dist <= 1) {
+      selectDefault(3);
+      Alert.alert("Note", "Address close to home, using home address");
+    }
+  }, [toHome, destination, homeCoords]);
 
   const selectDefault = async (index: number) => {
     console.log(tripActive);
@@ -1073,6 +1278,7 @@ export default function SubmitExpenseScreen() {
     try {
       let finalDistance = totalTraveledDistanceRef.current;
       let finalToAddress = toAddressRef.current;
+      let finalFromAddress = fromAddress;
       let finalToll = 0;
       let finalRouteCoords = routeCoordsRef.current;
 
@@ -1097,6 +1303,26 @@ export default function SubmitExpenseScreen() {
         } else {
           finalToll = resultToCurrent.toll;
         }
+      } else if (fromHome && startPoint && officeCoords) {
+        const resultFromCurrent = await fetchRoadDistanceAndToll(
+          startPoint,
+          currentLoc,
+        );
+        const resultFromOffice = await fetchRoadDistanceAndToll(
+          officeCoords,
+          startPoint,
+        );
+
+        if (resultFromOffice.distance < resultFromCurrent.distance) {
+          finalDistance = resultFromOffice.distance;
+          finalFromAddress = await getAddressFromCoords(
+            officeCoords.lat,
+            officeCoords.lng,
+          );
+          finalToll = resultFromOffice.toll;
+        } else {
+          finalToll = resultFromCurrent.toll;
+        }
       } else if (dest) {
         const result = await fetchRoadDistanceAndToll(currentLoc, dest);
         finalToll = result.toll;
@@ -1114,7 +1340,7 @@ export default function SubmitExpenseScreen() {
 
       await addDoc(collection(db, "trips"), {
         user_id: userId,
-        from_address: fromAddress,
+        from_address: finalFromAddress,
         to_address: finalToAddress,
         distance: parseFloat(finalDistance.toFixed(2)),
         toll: parseFloat(finalToll.toFixed(2)),
@@ -1124,6 +1350,7 @@ export default function SubmitExpenseScreen() {
         from_time: fromTimeRef.current || fromTime,
         to_time: new Date(),
         to_home: toHome,
+        from_home: fromHome,
         route_image_url: await uploadRouteImage(
           finalRouteCoords,
           `trip_${Date.now()}`,
@@ -1143,12 +1370,13 @@ export default function SubmitExpenseScreen() {
         trigger: null,
       });
     } finally {
-      await stopTracking();
       totalTraveledDistanceRef.current = 0;
       routeCoordsRef.current = [];
       toAddressRef.current = "";
       roadDistanceRef.current = 0;
       hasReachedDestinationRef.current = false;
+
+      await resetForm();
     }
   };
 
@@ -1194,6 +1422,8 @@ export default function SubmitExpenseScreen() {
         routeImageUrl ?? "",
         endTripReason,
       );
+      await setTripState(null);
+      await stopTracking();
     } catch (error) {
       console.error("Submission error:", error);
       Alert.alert("Error", "Failed to save the trip.");
@@ -1304,96 +1534,223 @@ export default function SubmitExpenseScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabRow}>
-        <TouchableOpacity
-          onPress={() => changeForm(1)}
-          style={[
-            styles.tabButton,
-            tabIndex === 1 ? styles.activeTabButton : styles.inactiveTabButton,
-          ]}
-        >
-          <Text
-            style={
-              tabIndex === 1
-                ? styles.activeButtonText
-                : styles.inactiveButtonText
-            }
-          >
-            Mileage Expense
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => changeForm(2)}
-          style={[
-            styles.tabButton,
-            tabIndex === 2 ? styles.activeTabButton : styles.inactiveTabButton,
-          ]}
-        >
-          <Text
-            style={
-              tabIndex === 2
-                ? styles.activeButtonText
-                : styles.inactiveButtonText
-            }
-          >
-            General Expense
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => changeForm(3)}
-          style={[
-            styles.tabButton,
-            tabIndex === 3 ? styles.activeTabButton : styles.inactiveTabButton,
-          ]}
-        >
-          <Text
-            style={
-              tabIndex === 3
-                ? styles.activeButtonText
-                : styles.inactiveButtonText
-            }
-          >
-            Outstation Expense
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <View style={{ flex: 1 }}>
+      <KeyboardAwareScrollView
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
+        enableOnAndroid={true}
+        extraScrollHeight={64}
+      >
+        <MapComponent
+          ref={mapRef}
+          points={points}
+          fromAddress={fromAddress}
+          toAddress={toAddress}
+          routeCoords={routeCoords}
+          defaultRegion={defaultRegion}
+          styles={styles}
+        />
 
-      {tabIndex === 1 && <MileageFormMobile />}
-      {tabIndex === 2 && <GeneralExpenseFormMobile />}
-      {tabIndex === 3 && <OutstationExpenseFormMobile />}
+        <View style={styles.inputPanel}>
+          <Text style={styles.title}>Submit Trip</Text>
+
+          <Text style={styles.label}>From (Current Location):</Text>
+          <TouchableOpacity onPress={fetchCurrentLocation}>
+            <View
+              style={[
+                styles.input,
+                { backgroundColor: "#f0f7ff", borderColor: "#b3d4f7" },
+              ]}
+            >
+              <Text style={{ color: "#444", fontSize: 15 }} numberOfLines={2}>
+                📍{" "}
+                {locationLoading
+                  ? "Fetching your location..."
+                  : fromAddress || "Finding address..."}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <Text style={styles.label}>To (Destination):</Text>
+          <PlacesInput
+            value={toAddress}
+            placeholder="Search destination…"
+            onPlaceSelected={(address, location) => {
+              setToAddress(address);
+              updateDestination(location);
+            }}
+            disabled={selectedGoingIndex !== 0}
+          />
+          <View style={[{ flexDirection: "row", marginTop: 5 }]}>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 1
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 0 },
+              ]}
+              onPress={() => {
+                selectDefault(1);
+              }}
+              disabled={tripActive}
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 1
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                HQ
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 2
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 15 },
+              ]}
+              onPress={() => {
+                selectDefault(2);
+              }}
+              disabled={tripActive}
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 2
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                Penang
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dialogButton,
+                selectedGoingIndex === 3
+                  ? styles.submitButtonActive
+                  : styles.submitButton,
+                { marginLeft: 15 },
+              ]}
+              onPress={() => {
+                selectDefault(3);
+              }}
+              disabled={tripActive}
+            >
+              <Text
+                style={[
+                  selectedGoingIndex === 3
+                    ? styles.textStyleActive
+                    : styles.textStyle,
+                  { fontWeight: "normal" },
+                ]}
+              >
+                Home
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* <View style={{ flex: 1, justifyContent: "center", padding: 20 }}>
+            <TestNotification />
+          </View> */}
+
+          <Text style={styles.label}>Remark:</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+            placeholder="Trip Remark..."
+            placeholderTextColor="#999"
+            value={formRemark}
+            onChangeText={setFormRemark}
+            multiline
+            numberOfLines={3}
+          />
+
+          {distance && (
+            <View style={styles.distanceBadge}>
+              <Text style={styles.distanceText}>📏 Distance: {distance}</Text>
+              <Text style={styles.addressPreview} numberOfLines={1}>
+                {fromAddress} → {toAddress}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { marginTop: 16 },
+              (!currentLocation ||
+                !destination ||
+                locationLoading ||
+                !formRemark) &&
+                styles.buttonDisabled,
+              tripActive && { backgroundColor: "#f44336" },
+            ]}
+            onPress={async () => {
+              if (tripActive) {
+                Alert.alert(
+                  "Reset Trip",
+                  "Are you sure you want to cancel the current trip?",
+                  [
+                    { text: "No", style: "cancel" },
+                    {
+                      text: "Yes",
+                      onPress: async () => {
+                        await stopTracking();
+                        resetForm();
+                      },
+                    },
+                  ],
+                );
+              } else {
+                const startTime = new Date();
+                setFromTime(startTime);
+                setTripActive(true);
+                await startTracking();
+                Alert.alert(
+                  "Trip Started",
+                  `Start time: ${startTime.toLocaleTimeString()}`,
+                );
+              }
+            }}
+            disabled={
+              !currentLocation || !destination || locationLoading || !formRemark
+            }
+          >
+            <Text style={styles.buttonText}>
+              {tripActive ? "Cancel Trip" : "Confirm Location"}
+            </Text>
+          </TouchableOpacity>
+
+          {tripActive && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { backgroundColor: "#f44336", marginTop: 10 },
+                (!currentLocation || locationLoading || !formRemark) &&
+                  styles.buttonDisabled,
+              ]}
+              onPress={() => setShowEndTripModal(true)}
+              disabled={!currentLocation || locationLoading}
+            >
+              <Text style={styles.buttonText}>End Trip Early</Text>
+            </TouchableOpacity>
+          )}
+
+          {renderEndTripModal()}
+        </View>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  tabRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginVertical: 10,
-    marginHorizontal: 20,
-  },
-  tabButton: {
-    borderRadius: 5,
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    justifyContent: "center",
-    minHeight: 36,
-    maxWidth: 200,
-    alignItems: "center",
-  },
-  inactiveTabButton: {
-    backgroundColor: "#2196F3",
-  },
-  activeTabButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#2196F3",
-  },
-  inactiveButtonText: { color: "white", fontWeight: "bold" },
-  activeButtonText: { color: "#2196F3", fontWeight: "bold" },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

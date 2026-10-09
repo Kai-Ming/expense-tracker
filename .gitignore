@@ -14,3 +14,4 @@ dist
 android/
 google-services.json
 admin/
+.firebaserc
