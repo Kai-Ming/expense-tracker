@@ -65,6 +65,7 @@ export default {
       "expo-background-fetch",
       "expo-web-browser",
       "@react-native-google-signin/google-signin",
+      "./plugins/withCleartextTraffic",
       [
         "expo-notifications",
         {
