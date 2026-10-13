@@ -5,7 +5,7 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "expensecalculator",
+    scheme: "kabexexpense",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     extra: {
@@ -36,7 +36,7 @@ export default {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      package: "com.anonymous.expensecalculator",
+      package: "com.kabex.kabexexpense",
       useNextNotificationsApi: true,
       permissions: [
         "ACCESS_FINE_LOCATION",
