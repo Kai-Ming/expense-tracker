@@ -38,7 +38,7 @@ export default function LoginPage() {
   const [stage, setStage] = useState<LoginStage>("credentials");
   const router = useRouter();
 
-  const skip = "7vFkURLn0XXfgVuGgjS4qrQGC722";
+  const skip = ["7vFkURLn0XXfgVuGgjS4qrQGC722", "YNxGl658oFTmWIuWgZLipIGrC9V2"];
 
   useEffect(() => {
     console.log("Redirect URI:", AuthSession.makeRedirectUri());
@@ -64,7 +64,7 @@ export default function LoginPage() {
 
       console.log("id", user.uid);
 
-      if (!user.emailVerified && user.uid !== skip) {
+      if (!user.emailVerified && !skip.includes(user.uid)) {
         // Pivot to the verify step *within* the same screen
         await sendEmailVerification(user);
         setStage("verifyEmail");
@@ -149,7 +149,7 @@ export default function LoginPage() {
 
   const proceedAfterLogin = (user: any) => {
     const mfaUser = multiFactor(user);
-    if (mfaUser.enrolledFactors.length === 0 && user.uid !== skip) {
+    if (mfaUser.enrolledFactors.length === 0 && !skip.includes(user.uid)) {
       console.log("setup 2fa");
       router.replace("/setup-2fa");
     } else {
