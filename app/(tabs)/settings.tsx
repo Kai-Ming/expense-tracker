@@ -3643,7 +3643,7 @@ export default function settings() {
           />
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.4.1</Text>
+      <Text style={styles.bottomScrollText}>v1.4.2</Text>
     </View>
   );
 }

@@ -60,3 +60,20 @@ exports.updateUserEmail = onCall(async (request) => {
     throw new HttpsError("internal", error.message);
   }
 });
+
+exports.checkUserExists = onCall(async (request) => {
+  const email = request.data && request.data.email;
+
+  if (typeof email !== "string" || !email.includes("@")) {
+    throw new HttpsError("invalid-argument", "Valid email required.");
+  }
+
+  const db = getFirestore();
+  const snap = await db
+      .collection("users")
+      .where("email", "==", email.trim().toLowerCase())
+      .limit(1)
+      .get();
+
+  return {exists: !snap.empty};
+});

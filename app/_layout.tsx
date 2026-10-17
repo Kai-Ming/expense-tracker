@@ -56,12 +56,16 @@ function RootLayoutNav() {
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
         <Stack.Screen
           name="privacy-policy"
           options={{ title: "Privacy Policy", headerShown: false }}
         />
+        <Stack.Screen
+          name="delete-account"
+          options={{ title: "Delete Account", headerShown: false }}
+        />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       </Stack>
     </ThemeProvider>
   );

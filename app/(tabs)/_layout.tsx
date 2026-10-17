@@ -1,5 +1,5 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,6 +32,7 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const segments = useSegments();
   const headerShown = useClientOnlyValue(false, true);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -62,13 +63,18 @@ export default function TabLayout() {
         syncConfig();
       } else {
         setIsAuthenticated(false);
-        router.replace("/login");
+
+        // ✅ Only redirect to /login if the user is actually inside the (tabs) group
+        const inTabsGroup = segments[0] === "(tabs)";
+        if (inTabsGroup) {
+          router.replace("/login");
+        }
       }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [segments]);
 
   const handleSignOut = () => {
     if (Platform.OS === "web") {
@@ -94,7 +100,9 @@ export default function TabLayout() {
     );
   }
 
-  if (!isAuthenticated) {
+  // ✅ Only block rendering when the user is actually inside the (tabs) group.
+  // This lets public routes like /privacy-policy render even when logged out.
+  if (!isAuthenticated && segments[0] === "(tabs)") {
     return null;
   }
 
@@ -160,31 +168,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="history" color={color} />
           ),
-          /* headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ), */
         }}
       />
-      {/* <Tabs.Screen
-        name="trips"
-        options={{
-          title: "View Trips",
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="compass" color={color} />
-          ),
-        }}
-      /> */}
       <Tabs.Screen
         name="trips"
         options={{
