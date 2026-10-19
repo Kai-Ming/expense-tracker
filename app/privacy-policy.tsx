@@ -677,9 +677,9 @@ const PrivacyPolicyPage = () => {
           • By email:{" "}
           <Text
             style={styles.link}
-            onPress={() => Linking.openURL("mailto:kaimingtey@gmail.com")}
+            onPress={() => Linking.openURL("mailto:hrd1@kabex.com.my")}
           >
-            kaimingtey@gmail.com
+            hrd1@kabex.com.my
           </Text>
         </Text>
       </View>
