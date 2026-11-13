@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -2421,6 +2421,7 @@ export default function OutstationExpenseForm() {
                       setOriginCoord(location);
                     }}
                     disabled={selectedFromIndex !== 0}
+                    history={recentTrips.map((trip) => trip.from_address)}
                   />
                   <View style={[{ flexDirection: "row", marginTop: 5 }]}>
                     <TouchableOpacity
@@ -2510,6 +2511,7 @@ export default function OutstationExpenseForm() {
                       setDestCoord(location);
                     }}
                     disabled={selectedGoingIndex !== 0}
+                    history={recentTrips.map((trip) => trip.to_address)}
                   />
                   <View style={[{ flexDirection: "row", marginTop: 5 }]}>
                     <TouchableOpacity
@@ -3352,6 +3354,20 @@ export default function OutstationExpenseForm() {
     updatedCustomers[index][field] = value;
     setFormCustomers(updatedCustomers);
   };
+
+  const recentTrips = useMemo(() => {
+    return [...allUserTrips]
+      .sort((a, b) => {
+        const aTime = a.created_at;
+        const bTime = b.created_at;
+        if (!aTime || !bTime) return 0;
+        if (bTime.seconds !== aTime.seconds) {
+          return bTime.seconds - aTime.seconds;
+        }
+        return bTime.nanoseconds - aTime.nanoseconds;
+      })
+      .slice(0, 5);
+  }, [allUserTrips]);
 
   // Helper to convert Firestore Timestamp to Date
   const convertTimestampToDate = (timestamp: any): Date | null => {

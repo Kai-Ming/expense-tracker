@@ -16,7 +16,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -61,6 +61,24 @@ interface Expense {
   approval_status: number;
   type: number;
   created_at: any;
+}
+
+interface Customer {
+  id?: string;
+  _id?: string;
+  name?: string;
+  fullName?: string;
+  customerName?: string;
+  email?: string;
+  emailId?: string;
+  phone?: string;
+  mobile?: string;
+  contactNumber?: string;
+  company?: string;
+  companyName?: string;
+  created_at?: any; // Added
+  expense_type?: string; // Added
+  [key: string]: any;
 }
 
 export default function MileageForm() {
@@ -382,6 +400,24 @@ export default function MileageForm() {
       alert("Address close to home, using home address");
     }
   }, [destCoord, homeCoords, formGoingHome]);
+
+  const recentTrips = useMemo(() => {
+    return [...allUserTrips]
+      .sort((a, b) => {
+        const aTime = a.created_at;
+        const bTime = b.created_at;
+        if (!aTime || !bTime) return 0;
+        if (bTime.seconds !== aTime.seconds) {
+          return bTime.seconds - aTime.seconds;
+        }
+        return bTime.nanoseconds - aTime.nanoseconds;
+      })
+      .slice(0, 5);
+  }, [allUserTrips]);
+
+  /* const allCustomers: Customer[] = extractAllCustomers({
+    allMileage
+  }); */
 
   const handleRemoveTrip = (tripId: string) => {
     setAddedTrips((prev) => prev.filter((t) => t.id !== tripId));
@@ -1769,6 +1805,8 @@ export default function MileageForm() {
                   <TouchableOpacity
                     onPress={() => {
                       setShowEditModal(true);
+                      console.log(allUserTrips);
+                      console.log(recentTrips);
                     }}
                     style={[styles.button, { backgroundColor: "#FFA500" }]}
                     disabled={isSaving}
@@ -1878,6 +1916,9 @@ export default function MileageForm() {
                                   setOriginCoord(location);
                                 }}
                                 disabled={selectedFromIndex !== 0}
+                                history={recentTrips.map(
+                                  (trip) => trip.from_address,
+                                )}
                               />
                               <View
                                 style={[{ flexDirection: "row", marginTop: 5 }]}
@@ -1969,6 +2010,9 @@ export default function MileageForm() {
                                   setDestCoord(location);
                                 }}
                                 disabled={selectedGoingIndex !== 0}
+                                history={recentTrips.map(
+                                  (trip) => trip.to_address,
+                                )}
                               />
                               <View
                                 style={[{ flexDirection: "row", marginTop: 5 }]}

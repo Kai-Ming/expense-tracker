@@ -16,6 +16,7 @@ function PlacesInput({
   onPlaceSelected,
   value,
   disabled = false,
+  history = [],
 }: {
   placeholder: string;
   onPlaceSelected: (
@@ -24,6 +25,7 @@ function PlacesInput({
   ) => void;
   value: string;
   disabled?: boolean;
+  history?: string[];
 }) {
   const [query, setQuery] = useState("");
   const [predictions, setPredictions] = useState([]);
@@ -60,6 +62,13 @@ function PlacesInput({
       cleanupMap();
     };
   }, []);
+
+  useEffect(() => {
+    if (isDropdownOpen) {
+      console.log("history");
+      console.log(filteredHistory);
+    }
+  }, [isDropdownOpen]);
 
   const cleanupMap = () => {
     if (googleMap.current) {
@@ -180,6 +189,30 @@ function PlacesInput({
     }
   }, [showMapModal]);
 
+  const historyPredictions = (history as string[]).map((address) => ({
+    __isHistory: true as const,
+    placePrediction: {
+      placeId: `history:${address}`,
+      text: { text: address },
+      structuredFormat: {
+        mainText: { text: address },
+        secondaryText: { text: "Recent" },
+      },
+    },
+  }));
+
+  const trimmed = query.trim();
+
+  const filteredHistory = trimmed
+    ? historyPredictions.filter((h) =>
+        h.placePrediction.text.text
+          .toLowerCase()
+          .includes(trimmed.toLowerCase()),
+      )
+    : historyPredictions;
+
+  const dropdownData = trimmed.length < 2 ? filteredHistory : predictions;
+
   const fetchPredictions = async (text: string) => {
     if (text.length < 2) return setPredictions([]);
     try {
@@ -199,6 +232,7 @@ function PlacesInput({
       );
 
       const data = await res.json();
+      console.log(data.suggestions);
       setPredictions(data.suggestions || []);
     } catch (e) {
       console.log("ERROR:", e);
@@ -213,7 +247,37 @@ function PlacesInput({
   };
 
   const handleSelect = async (item: any) => {
+    console.log("SELECTED ITEM:", JSON.stringify(item, null, 2));
     if (disabled) return;
+    if (item.__isHistory) {
+      const address = item.placePrediction.text.text;
+
+      setQuery(address);
+      setPredictions([]);
+      setIsDropdownOpen(false);
+
+      const loaded = await loadGoogleMapsScript();
+      if (!loaded) return;
+
+      if (!geocoder.current) {
+        geocoder.current = new google.maps.Geocoder();
+      }
+
+      geocoder.current.geocode({ address }, (results, status) => {
+        if (status === "OK" && results?.[0]?.geometry?.location) {
+          const loc = results[0].geometry.location;
+          const location = { lat: loc.lat(), lng: loc.lng() };
+          setSelectedLocation(location);
+          setSelectedAddress(address);
+          onPlaceSelected(address, location);
+        } else {
+          console.warn("Geocode failed:", status, address);
+        }
+      });
+
+      return;
+    }
+
     const placeId = item.placePrediction.placeId;
     const description = item.placePrediction.text.text;
     setQuery(description);
@@ -291,38 +355,40 @@ function PlacesInput({
           </View>
         </View>
 
-        {!disabled && isDropdownOpen && predictions.length > 0 && (
-          <FlatList
-            data={predictions}
-            keyExtractor={(item: any) => item.placePrediction.placeId}
-            style={[
-              styles.list,
-              {
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                maxHeight: 200,
-                zIndex: 1000,
-                elevation: 1000,
-              },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }: any) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => handleSelect(item)}
-              >
-                <Text style={styles.mainText}>
-                  {item.placePrediction.structuredFormat.mainText.text}
-                </Text>
-                <Text style={styles.secondaryText}>
-                  {item.placePrediction.structuredFormat.secondaryText?.text}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        )}
+        {!disabled &&
+          isDropdownOpen &&
+          (predictions.length > 0 || filteredHistory.length > 0) && (
+            <FlatList
+              data={dropdownData}
+              keyExtractor={(item: any) => item.placePrediction.placeId}
+              style={[
+                styles.list,
+                {
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  maxHeight: 200,
+                  zIndex: 1000,
+                  elevation: 1000,
+                },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }: any) => (
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => handleSelect(item)}
+                >
+                  <Text style={styles.mainText}>
+                    {item.placePrediction.structuredFormat.mainText.text}
+                  </Text>
+                  <Text style={styles.secondaryText}>
+                    {item.placePrediction.structuredFormat.secondaryText?.text}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
       </View>
 
       {!disabled && (
