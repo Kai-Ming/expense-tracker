@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -633,75 +634,6 @@ export default function TripForm() {
   const startTracking = async () => {
     await calculateDistance();
 
-    // ── Step 1: Foreground permission ────────────────────────────────
-    const { status: fgStatus } =
-      await Location.requestForegroundPermissionsAsync();
-
-    if (fgStatus !== "granted") {
-      Alert.alert(
-        "Location Permission Required",
-        "This app needs location access to track your trip. Please enable it in Settings.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
-        ],
-      );
-      return;
-    }
-
-    // ── Step 2: Background permission ────────────────────────────────
-    // On Android 11+, this opens the Settings page directly (no dialog).
-    // On iOS, it may prompt or silently return "denied" depending on the
-    // foreground result.
-    let bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
-
-    if (bgStatus !== "granted") {
-      // Show the pre-permission explanation BEFORE triggering the system
-      // redirect. On Android this is the only chance to explain, because
-      // requestBackgroundPermissionsAsync jumps straight to Settings.
-      const proceed = await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          "Background Location Required",
-          Platform.OS === "android"
-            ? "The next screen will open your app settings. Please select 'Allow all the time' under Location permissions so trips can be saved automatically."
-            : "Please go to Settings → Privacy → Location Services → [This App] and select 'Always' so trips can be saved automatically.",
-          [
-            { text: "Not Now", style: "cancel", onPress: () => resolve(false) },
-            {
-              text: "Open Settings",
-              onPress: () => resolve(true),
-            },
-          ],
-        );
-      });
-
-      if (!proceed) return;
-
-      // This call:
-      //   - Android 11+ → opens the app's Settings page
-      //   - Android ≤10  → shows the system permission dialog
-      //   - iOS          → shows the system dialog (or fails if "Allow Once")
-      await Location.requestBackgroundPermissionsAsync();
-
-      // Re-check after the user returns from Settings.
-      // Give the OS a moment to reflect the change after the app resumes.
-      bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
-
-      if (bgStatus !== "granted") {
-        // The user might still be in Settings, or they declined again.
-        // Wait for the app to come back to the foreground and re-check.
-        const granted = await waitForBackgroundPermission();
-        if (!granted) {
-          Alert.alert(
-            "Permission Still Denied",
-            "Background location is required for automatic trip submission. You can enable it later in Settings.",
-            [{ text: "OK" }],
-          );
-          return;
-        }
-      }
-    }
-
     // ── Step 3: Seed state and start tracking ────────────────────────
     const startPoint = currentLocationRef.current ?? points[0];
     if (!startPoint || !destination) {
@@ -927,12 +859,7 @@ export default function TripForm() {
   const fetchCurrentLocation = async () => {
     setLocationLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setFromAddress("Permission Denied");
-        setLocationLoading(false);
-        return;
-      }
+      await requestLocationPermission();
 
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -1013,6 +940,10 @@ export default function TripForm() {
 
     let isMounted = true;
     let originCoords = currentLocationRef.current;
+
+    async () => {
+      await requestLocationPermission();
+    };
 
     const handleNewCoordinate = async (lat: number, lng: number) => {
       if (!tripActiveRef.current) return;
@@ -1104,6 +1035,77 @@ export default function TripForm() {
       Alert.alert("Note", "Address close to home, using home address");
     }
   }, [toHome, destination, homeCoords]);
+
+  const requestLocationPermission = async () => {
+    // ── Step 1: Foreground permission ────────────────────────────────
+    const { status: fgStatus } =
+      await Location.requestForegroundPermissionsAsync();
+
+    if (fgStatus !== "granted") {
+      Alert.alert(
+        "Location Permission Required",
+        "This app needs location access to track your trip. Please enable it in Settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+
+    // ── Step 2: Background permission ────────────────────────────────
+    // On Android 11+, this opens the Settings page directly (no dialog).
+    // On iOS, it may prompt or silently return "denied" depending on the
+    // foreground result.
+    let bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
+
+    if (bgStatus !== "granted") {
+      // Show the pre-permission explanation BEFORE triggering the system
+      // redirect. On Android this is the only chance to explain, because
+      // requestBackgroundPermissionsAsync jumps straight to Settings.
+      const proceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          "Background Location Required",
+          Platform.OS === "android"
+            ? "The next screen will open your app settings. Please select 'Allow all the time' under Location permissions so the path of the trip can be tracked accurately for mileage calculation."
+            : "Please go to Settings → Privacy → Location Services → [This App] and select 'Always' so trips can be saved automatically.",
+          [
+            { text: "Not Now", style: "cancel", onPress: () => resolve(false) },
+            {
+              text: "Open Settings",
+              onPress: () => resolve(true),
+            },
+          ],
+        );
+      });
+
+      if (!proceed) return;
+
+      // This call:
+      //   - Android 11+ → opens the app's Settings page
+      //   - Android ≤10  → shows the system permission dialog
+      //   - iOS          → shows the system dialog (or fails if "Allow Once")
+      await Location.requestBackgroundPermissionsAsync();
+
+      // Re-check after the user returns from Settings.
+      // Give the OS a moment to reflect the change after the app resumes.
+      bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
+
+      if (bgStatus !== "granted") {
+        // The user might still be in Settings, or they declined again.
+        // Wait for the app to come back to the foreground and re-check.
+        const granted = await waitForBackgroundPermission();
+        if (!granted) {
+          Alert.alert(
+            "Permission Still Denied",
+            "Background location is required for automatic trip submission. You can enable it later in Settings.",
+            [{ text: "OK" }],
+          );
+          return;
+        }
+      }
+    }
+  };
 
   const selectDefault = async (index: number) => {
     console.log(tripActive);

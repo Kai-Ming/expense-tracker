@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import { db, storage } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
+import FavouritesPicker, { Favourite } from "./FavouritesPicker";
 
 interface Expense {
   id: string;
@@ -162,6 +163,9 @@ export default function MileageForm() {
 
   const [allMileage, setAllMileage] = useState<Expense[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  const [showFromFavModal, setShowFromFavModal] = useState(false);
+  const [showToFavModal, setShowToFavModal] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [editingMileage, setEditingMileage] = useState(false);
@@ -1551,6 +1555,20 @@ export default function MileageForm() {
     setAddedTrips((prev) => [...prev, ...tripsToAdd]);
   };
 
+  const handleSelectFromFav = (fav: Favourite) => {
+    setFromAddress(fav.address);
+    setOriginCoord(fav.coords ?? null);
+
+    setShowFromFavModal(false);
+  };
+
+  const handleSelectToFav = (fav: Favourite) => {
+    setToAddress(fav.address);
+    setDestCoord(fav.coords ?? null);
+
+    setShowToFavModal(false);
+  };
+
   const renderTripModal = () => (
     <Modal
       visible={isDropdownOpen}
@@ -1992,7 +2010,35 @@ export default function MileageForm() {
                                     Home
                                   </Text>
                                 </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    console.log("open favourite list");
+                                    setShowFromFavModal(true);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.textStyle,
+                                      {
+                                        fontWeight: "normal",
+                                        paddingHorizontal: 15,
+                                      },
+                                    ]}
+                                  >
+                                    Favourites
+                                  </Text>
+                                </TouchableOpacity>
                               </View>
+                              <FavouritesPicker
+                                visible={showFromFavModal}
+                                onClose={() => setShowFromFavModal(false)}
+                                onSelect={handleSelectFromFav}
+                              />
                               <Text
                                 style={[
                                   styles.modalSubtitle,
@@ -2086,7 +2132,36 @@ export default function MileageForm() {
                                     Home
                                   </Text>
                                 </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={[
+                                    styles.dialogButton,
+                                    styles.submitButton,
+                                    { marginLeft: 15 },
+                                  ]}
+                                  onPress={() => {
+                                    console.log("open favourite list");
+                                    setShowToFavModal(true);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.textStyle,
+                                      {
+                                        fontWeight: "normal",
+                                        paddingHorizontal: 15,
+                                      },
+                                    ]}
+                                  >
+                                    Favourites
+                                  </Text>
+                                </TouchableOpacity>
                               </View>
+                              <FavouritesPicker
+                                visible={showToFavModal}
+                                onClose={() => setShowToFavModal(false)}
+                                onSelect={handleSelectToFav}
+                              />
                               <Text
                                 style={[
                                   styles.modalSubtitle,

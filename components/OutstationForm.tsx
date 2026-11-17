@@ -32,6 +32,7 @@ import {
 } from "react-native";
 import { db, storage } from "../firebaseConfig";
 import { useGoogleMapsDistance } from "./DistanceCalculator";
+import FavouritesPicker, { Favourite } from "./FavouritesPicker";
 import PlacesInput from "./PlacesInput";
 import SelectTravelmateModal from "./SelectTravelmateModal";
 
@@ -297,6 +298,9 @@ export default function OutstationExpenseForm() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEditTripModal, setShowEditTripModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+
+  const [showFromFavModal, setShowFromFavModal] = useState(false);
+  const [showToFavModal, setShowToFavModal] = useState(false);
 
   const [outstationExpense, setOutstationExpense] = useState<
     OutstationExpense[]
@@ -2374,6 +2378,20 @@ export default function OutstationExpenseForm() {
     }
   };
 
+  const handleSelectFromFav = (fav: Favourite) => {
+    setFromAddress(fav.address);
+    setOriginCoord(fav.coords ?? null);
+
+    setShowFromFavModal(false);
+  };
+
+  const handleSelectToFav = (fav: Favourite) => {
+    setToAddress(fav.address);
+    setDestCoord(fav.coords ?? null);
+
+    setShowToFavModal(false);
+  };
+
   const clearAddress = (direction: number) => {
     if (direction === 0) {
       setFromAddress("");
@@ -2493,7 +2511,35 @@ export default function OutstationExpenseForm() {
                         Home
                       </Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        console.log("open favourite list");
+                        setShowFromFavModal(true);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.textStyle,
+                          {
+                            fontWeight: "normal",
+                            paddingHorizontal: 15,
+                          },
+                        ]}
+                      >
+                        Favourites
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+                  <FavouritesPicker
+                    visible={showFromFavModal}
+                    onClose={() => setShowFromFavModal(false)}
+                    onSelect={handleSelectFromFav}
+                  />
                   <Text
                     style={[
                       styles.modalSubtitle,
@@ -2583,7 +2629,35 @@ export default function OutstationExpenseForm() {
                         Home
                       </Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.dialogButton,
+                        styles.submitButton,
+                        { marginLeft: 15 },
+                      ]}
+                      onPress={() => {
+                        console.log("open favourite list");
+                        setShowToFavModal(true);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.textStyle,
+                          {
+                            fontWeight: "normal",
+                            paddingHorizontal: 15,
+                          },
+                        ]}
+                      >
+                        Favourites
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+                  <FavouritesPicker
+                    visible={showToFavModal}
+                    onClose={() => setShowToFavModal(false)}
+                    onSelect={handleSelectToFav}
+                  />
 
                   <Text
                     style={[

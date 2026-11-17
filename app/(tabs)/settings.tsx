@@ -26,10 +26,17 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -177,6 +184,17 @@ interface Customers {
   address: string;
 }
 
+interface FavouriteDraft {
+  id: string;
+  name: string;
+  address: string;
+  coords?: {
+    lat: number;
+    lng: number;
+  } | null;
+  isNew?: boolean;
+}
+
 export default function settings() {
   const [username, setUsername] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -204,6 +222,22 @@ export default function settings() {
 
   const [homeModalVisible, setHomeModalVisible] = useState(false);
   const [homeAddress, setHomeAddress] = useState<string>("");
+
+  const [favouritesModalVisible, setFavouritesModalVisible] = useState(false);
+  const [favourites, setFavourites] = useState<any[]>([]);
+  const [draftFavourites, setDraftFavourites] = useState<FavouriteDraft[]>([]);
+  const [loadingFavourites, setLoadingFavourites] = useState(false);
+  const draftSeededRef = useRef(false);
+  const newIdCounter = useRef(0);
+  const favouritesScrollRef = useRef<ScrollView>(null);
+
+  const [addLocationModalVisible, setAddLocationModalVisible] = useState(false);
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newLocationAddress, setNewLocationAddress] = useState("");
+  const [newLocationCoord, setNewLocationCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const [documentModalVisible, setDocumentModalVisible] = useState(false);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
@@ -335,6 +369,44 @@ export default function settings() {
   }, []);
 
   useEffect(() => {
+    if (!favouritesModalVisible || !firestoreDocId) return;
+
+    setLoadingFavourites(true);
+
+    const locationsRef = collection(
+      db,
+      "users",
+      firestoreDocId,
+      "favourite_locations",
+    );
+
+    const unsubscribe = onSnapshot(
+      locationsRef,
+      (snapshot) => {
+        setFavourites(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoadingFavourites(false);
+      },
+      (error) => {
+        console.warn("favourite_locations listener failed:", error);
+        setLoadingFavourites(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [favouritesModalVisible, firestoreDocId]);
+
+  useEffect(() => {
+    if (!favouritesModalVisible) {
+      draftSeededRef.current = false;
+      return;
+    }
+    if (!draftSeededRef.current && !loadingFavourites) {
+      setDraftFavourites(favourites.map((f) => ({ ...f })));
+      draftSeededRef.current = true;
+    }
+  }, [favouritesModalVisible, loadingFavourites, favourites]);
+
+  useEffect(() => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
     if (!configId) {
       console.error("No Config ID found in environment variables");
@@ -463,10 +535,6 @@ export default function settings() {
 
   const handleEnable2FA = () => {
     router.push("/(auth)/setup-2fa");
-  };
-
-  const test = () => {
-    console.log("aaaaaaaaaaaaaaaaaaaaaaaaa");
   };
 
   const promptDisable2FA = () => {
@@ -1007,6 +1075,162 @@ export default function settings() {
     }
   };
 
+  const makeTempId = () => `new-${Date.now()}-${newIdCounter.current++}`;
+
+  const openAddLocationModal = () => {
+    setNewLocationName("");
+    setNewLocationAddress("");
+    setNewLocationCoord(null);
+    setAddLocationModalVisible(true);
+  };
+
+  const confirmAddLocation = () => {
+    const name = newLocationName.trim();
+    const address = newLocationAddress.trim();
+
+    if (!name && !address) {
+      Alert.alert("Missing info", "Please enter a name or an address.");
+      return;
+    }
+
+    setDraftFavourites((prev) => [
+      ...prev,
+      {
+        id: makeTempId(),
+        name,
+        address,
+        coords: newLocationCoord,
+        isNew: true,
+      },
+    ]);
+
+    setAddLocationModalVisible(false);
+
+    // scroll to the new row once it renders
+    requestAnimationFrame(() => {
+      favouritesScrollRef.current?.scrollToEnd({ animated: true });
+    });
+  };
+
+  const coordsEqual = (
+    a?: { lat: number; lng: number } | null,
+    b?: { lat: number; lng: number } | null,
+  ) => {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    return a.lat === b.lat && a.lng === b.lng;
+  };
+
+  const updateFavourites = async () => {
+    if (!firestoreDocId) return;
+
+    // Block empty rows so we don't create junk docs
+    const hasBlank = draftFavourites.some(
+      (f) => !f.name.trim() && !f.address.trim(),
+    );
+    if (hasBlank) {
+      Alert.alert(
+        "Incomplete row",
+        "Please fill in a name or address for every entry (or remove it).",
+      );
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const locationsRef = collection(
+        db,
+        "users",
+        firestoreDocId,
+        "favourite_locations",
+      );
+      const batch = writeBatch(db);
+
+      // deletions: in server list, gone from draft
+      const draftIds = new Set(draftFavourites.map((f) => f.id));
+      favourites.forEach((f) => {
+        if (!draftIds.has(f.id)) batch.delete(doc(locationsRef, f.id));
+      });
+
+      // updates + creates
+      // updates + creates
+      const originalById = new Map(favourites.map((f) => [f.id, f]));
+      draftFavourites.forEach((f) => {
+        const original = originalById.get(f.id);
+        const name = (f.name || "").trim();
+        const address = (f.address || "").trim();
+        const coords = f.coords ?? null;
+
+        if (!original) {
+          // New entry → let Firestore generate the doc id
+          const newRef = doc(locationsRef);
+          batch.set(newRef, {
+            name,
+            address,
+            coords, // null or { lat, lng }
+            created_at: serverTimestamp(),
+          });
+          return;
+        }
+
+        if (
+          original.name !== f.name ||
+          original.address !== f.address ||
+          !coordsEqual(original.coords ?? null, coords)
+        ) {
+          batch.update(doc(locationsRef, f.id), {
+            name: f.name,
+            address: f.address,
+            coords,
+          });
+        }
+      });
+
+      await batch.commit();
+
+      setDraftFavourites([]);
+      draftSeededRef.current = false;
+      setFavouritesModalVisible(false);
+    } catch (err) {
+      console.warn("Failed to update favourites:", err);
+      Alert.alert("Couldn't save changes", "Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setAddLocationModalVisible(false);
+    setNewLocationName("");
+    setNewLocationAddress("");
+    setDraftFavourites([]);
+    draftSeededRef.current = false;
+    setFavouritesModalVisible(false);
+  };
+
+  const stageRemove = (id: string) => {
+    setDraftFavourites((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const stageRename = (id: string, name: string) => {
+    setDraftFavourites((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, name } : f)),
+    );
+  };
+
+  const stageAddress = (id: string, address: string) => {
+    setDraftFavourites((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, address } : f)),
+    );
+  };
+
+  const stageCoord = (id: string, coords: { lat: number; lng: number }) => {
+    setDraftFavourites((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, coords } : f)),
+    );
+  };
+
   const updateMileageRate = async () => {
     const configId = process.env.EXPO_PUBLIC_FIREBASE_CONFIG_ID;
     if (!configId) {
@@ -1073,15 +1297,6 @@ export default function settings() {
       console.log("Coordinates found:", lat, lng);
 
       // 5. Update Firebase with the address AND coordinates
-      /* const docRef = doc(db, "config", configId);
-      await updateDoc(docRef, {
-        office_address: officeAddress,
-        office_location: {
-          latitude: lat,
-          longitude: lng,
-        },
-      }); */
-
       const docRef = doc(db, "config", configId);
       await updateDoc(docRef, {
         office_coordinates: new GeoPoint(lat, lng),
@@ -1148,11 +1363,6 @@ export default function settings() {
     setIsSaving(true);
     try {
       // createUserWithEmailAndPassword automatically signs the user in
-      /* const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formEmail.trim(),
-        formPassword,
-      ); */
       const coordinates = await getCoordinatesFromAddress(homeAddress);
       if (!coordinates) {
         alert(
@@ -1224,7 +1434,7 @@ export default function settings() {
     setAddedSub([]);
   };
 
-  const getAddress = async (coords) => {
+  const getAddress = async (coords: any) => {
     try {
       const address = await getAddressFromCoords(
         coords.latitude,
@@ -1667,7 +1877,6 @@ export default function settings() {
               </TouchableOpacity>
             </View>
             <View style={styles.tableContainer}>
-              {/* Table Header */}
               <View style={styles.tableHeader}>
                 <View
                   style={{ flex: 0.5, backgroundColor: "transparent" }}
@@ -1701,7 +1910,6 @@ export default function settings() {
                 </View>
               </View>
 
-              {/* Table Body */}
               <ScrollView style={styles.modalList}>
                 {allUsers
                   .filter((user) => user.username !== formUsername)
@@ -1742,7 +1950,6 @@ export default function settings() {
                             {index + 1}
                           </Text>
                         </View>
-                        {/* Username */}
                         <View style={{ flex: 3 }}>
                           <Text
                             style={[
@@ -1754,8 +1961,6 @@ export default function settings() {
                             {user.username}
                           </Text>
                         </View>
-
-                        {/* Email */}
                         <View style={{ flex: 2 }}>
                           <Text
                             style={[
@@ -1767,8 +1972,6 @@ export default function settings() {
                             {user.email}
                           </Text>
                         </View>
-
-                        {/* Department */}
                         <View style={{ flex: 1 }}>
                           <Text
                             style={[
@@ -1780,8 +1983,6 @@ export default function settings() {
                             {user.department}
                           </Text>
                         </View>
-
-                        {/* Grade */}
                         <View style={{ flex: 0.5 }}>
                           <Text
                             style={[
@@ -1793,8 +1994,6 @@ export default function settings() {
                             {user.grade}
                           </Text>
                         </View>
-
-                        {/* Cost Center */}
                         <View style={{ flex: 1 }}>
                           <Text
                             style={[
@@ -1806,8 +2005,6 @@ export default function settings() {
                             {user.cost_center}
                           </Text>
                         </View>
-
-                        {/* Office */}
                         <View style={{ flex: 0.5 }}>
                           <Text
                             style={[
@@ -1819,8 +2016,6 @@ export default function settings() {
                             {officeMap[user.office] || "N/A"}
                           </Text>
                         </View>
-
-                        {/* Role */}
                         <View style={{ flex: 1 }}>
                           <Text
                             style={[
@@ -1832,7 +2027,6 @@ export default function settings() {
                             {roleMap[user.role] || "N/A"}
                           </Text>
                         </View>
-
                         <View style={{ flex: 2 }}>
                           <Text
                             style={[
@@ -1844,8 +2038,6 @@ export default function settings() {
                             {user.home_address}
                           </Text>
                         </View>
-
-                        {/* Active */}
                         <View style={{ flex: 1 }}>
                           <Text
                             style={[
@@ -1883,33 +2075,21 @@ export default function settings() {
   const filteredMileage = allMileage.filter((e) => {
     const user = userMap.get(e.user_name);
     if (!user) return false;
-
-    if (selectedUser && e.user_name !== selectedUser) {
-      return false;
-    }
-
+    if (selectedUser && e.user_name !== selectedUser) return false;
     return true;
   });
 
   const filteredGeneral = allGeneral.filter((e) => {
     const user = userMap.get(e.user_name);
     if (!user) return false;
-
-    if (selectedUser && e.user_name !== selectedUser) {
-      return false;
-    }
-
+    if (selectedUser && e.user_name !== selectedUser) return false;
     return true;
   });
 
   const filteredOutstation = allOutstation.filter((e) => {
     const user = userMap.get(e.username);
     if (!user) return false;
-
-    if (selectedUser && e.username !== selectedUser) {
-      return false;
-    }
-
+    if (selectedUser && e.username !== selectedUser) return false;
     return true;
   });
 
@@ -1946,12 +2126,7 @@ export default function settings() {
           {userHomeAddress || "Fetching home address..."}
         </Text>
       </Text>
-      {/* <TouchableOpacity
-        onPress={() => setUsernameModalVisible(true)}
-        style={styles.button}
-      >
-        <Text style={styles.buttonText}>Change Username</Text>
-      </TouchableOpacity> */}
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -2016,13 +2191,7 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      {/* Change Email */}
-      {/* <TouchableOpacity
-        onPress={() => setEmailModalVisible(true)}
-        style={styles.button}
-      >
-        <Text style={styles.buttonText}>Change Email</Text>
-      </TouchableOpacity> */}
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -2067,7 +2236,7 @@ export default function settings() {
                     value={password}
                     onChangeText={setPassword}
                     editable={!isSaving}
-                    secureTextEntry={true} // Hides the password
+                    secureTextEntry={true}
                     autoCapitalize="none"
                   />
                 </View>
@@ -2077,7 +2246,7 @@ export default function settings() {
                     style={[styles.dialogButton, styles.cancelButton]}
                     onPress={() => {
                       setEmailModalVisible(false);
-                      setPassword(""); // Clear password on cancel
+                      setPassword("");
                     }}
                     disabled={isSaving}
                   >
@@ -2110,9 +2279,6 @@ export default function settings() {
         <TouchableOpacity
           onPress={() => {
             handleEnable2FA();
-            /* twoFactorEnabled
-              ? setDisabled2FAModalVisible(true)
-              : handleEnable2FA; */
           }}
           style={[
             styles.button,
@@ -2134,12 +2300,14 @@ export default function settings() {
       )}
       {renderDisable2FAModal()}
       {renderReauthModal()}
+
       <TouchableOpacity
         onPress={() => setPasswordModalVisible(true)}
         style={styles.button}
       >
         <Text style={styles.buttonText}>Change Password</Text>
       </TouchableOpacity>
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -2273,12 +2441,7 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      {/* <TouchableOpacity
-        onPress={() => setHomeModalVisible(true)}
-        style={styles.button}
-      >
-        <Text style={styles.buttonText}>Set Home Address</Text>
-      </TouchableOpacity> */}
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -2351,12 +2514,7 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-      {/* <TouchableOpacity
-        onPress={() => setDocumentModalVisible(true)}
-        style={styles.button}
-      >
-        <Text style={styles.buttonText}>Add Documents</Text>
-      </TouchableOpacity> */}
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -2434,6 +2592,231 @@ export default function settings() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <TouchableOpacity
+        onPress={() => setFavouritesModalVisible(true)}
+        style={styles.button}
+      >
+        <Text style={styles.buttonText}>Manage Favourite Locations</Text>
+      </TouchableOpacity>
+
+      {/* ---------- 1. Favourites list modal (parent) ---------- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={favouritesModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => {
+          if (isSaving) return;
+          if (addLocationModalVisible) {
+            setAddLocationModalVisible(false);
+            return;
+          }
+          setFavouritesModalVisible(false);
+        }}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              ref={favouritesScrollRef}
+              style={styles.modalScrollWrapper}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Manage Favourites</Text>
+
+                {loadingFavourites ? (
+                  <ActivityIndicator
+                    color="#2196F3"
+                    size="small"
+                    style={{ marginVertical: 24 }}
+                  />
+                ) : (
+                  <>
+                    {draftFavourites.length === 0 && (
+                      <Text style={styles.emptyText}>
+                        No favourites yet. Tap “Add location” below to create
+                        one.
+                      </Text>
+                    )}
+
+                    {draftFavourites.map((item) => (
+                      <View key={item.id} style={styles.locationRow}>
+                        <View style={styles.locationTextWrapper}>
+                          <TextInput
+                            style={styles.locationName}
+                            value={item.name}
+                            onChangeText={(t) => stageRename(item.id, t)}
+                            placeholder="Name"
+                            placeholderTextColor="#999999"
+                            editable={!isSaving}
+                          />
+                          {/* <TextInput
+                            style={styles.locationAddress}
+                            value={item.address}
+                            onChangeText={(t) => stageAddress(item.id, t)}
+                            placeholder="Address"
+                            placeholderTextColor="#999999"
+                            editable={!isSaving}
+                            multiline
+                          /> */}
+                          <PlacesInput
+                            value={item.address}
+                            placeholder="Select Address"
+                            onPlaceSelected={(address, location) => {
+                              stageAddress(item.id, address);
+                              stageCoord(item.id, location);
+                            }}
+                          />
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.removeButton}
+                          onPress={() => stageRemove(item.id)}
+                          disabled={isSaving}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.removeText}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={openAddLocationModal}
+                      disabled={isSaving}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.addButtonText}>+ Add location</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={handleCancel}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      isSaving && { opacity: 0.7 },
+                    ]}
+                    onPress={updateFavourites}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.textStyle}>Update</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ---------- 2. Add Location sub-modal (child) ---------- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={addLocationModalVisible}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isSaving && setAddLocationModalVisible(false)}
+      >
+        <View style={styles.screenOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView
+              style={[styles.modalScrollWrapper, { overflow: "visible" }]}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                { overflow: "visible" },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Add Location</Text>
+
+                {/* Name — plain TextInput, keeps formGroup */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.modalSubtitle}>Name:</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Name"
+                    placeholderTextColor="#999999"
+                    value={newLocationName}
+                    onChangeText={setNewLocationName}
+                    editable={!isSaving}
+                    autoFocus
+                  />
+                </View>
+
+                {/* Address — label + wrapper directly in the card, exactly like Edit User */}
+                <Text style={styles.modalSubtitle}>Address:</Text>
+                <View
+                  style={{
+                    width: "100%",
+                    position: "relative",
+                    zIndex: 100,
+                    elevation: 10,
+                    marginBottom: 20,
+                  }}
+                >
+                  <PlacesInput
+                    value={newLocationAddress}
+                    placeholder="Select Address"
+                    onPlaceSelected={(address, location) => {
+                      setNewLocationAddress(address);
+                      setNewLocationCoord(location);
+                    }}
+                  />
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.dialogButton, styles.cancelButton]}
+                    onPress={() => setAddLocationModalVisible(false)}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.textStyle}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogButton,
+                      styles.submitButton,
+                      !newLocationName.trim() &&
+                        !newLocationAddress.trim() && { opacity: 0.5 },
+                    ]}
+                    onPress={confirmAddLocation}
+                    disabled={
+                      !newLocationName.trim() && !newLocationAddress.trim()
+                    }
+                  >
+                    <Text style={styles.textStyle}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
       {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
@@ -2582,14 +2965,9 @@ export default function settings() {
           </Modal>
         </>
       )}
+
       {role === 0 && Platform.OS === "web" && (
         <>
-          {/*<TouchableOpacity
-            onPress={() => setAddressModalVisible(true)}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>Set Office Address</Text>
-          </TouchableOpacity>*/}
           <Modal
             animationType="fade"
             transparent={true}
@@ -2664,6 +3042,7 @@ export default function settings() {
           </Modal>
         </>
       )}
+
       {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
@@ -2742,6 +3121,7 @@ export default function settings() {
           </Modal>
         </>
       )}
+
       {role === 0 && Platform.OS === "web" && (
         <>
           <TouchableOpacity
@@ -3002,16 +3382,14 @@ export default function settings() {
                                     .join(", ")}
                             </Text>
                           </TouchableOpacity>
-                          {/* {renderSelectSubModal()} */}
                           <SelectUserModal
                             visible={selectSubModalVIsible}
                             onClose={() => selectSelectSubModalVisible(false)}
                             users={allUsers}
-                            excludeUsername={formUsername} // 👈 was `.filter(u => u.username !== formUsername)`
-                            showIndex={true} // 👈 was the `{index + 1}` column
-                            addedUsers={addedSub} // 👈 greys out already-added rows
+                            excludeUsername={formUsername}
+                            showIndex={true}
+                            addedUsers={addedSub}
                             onToggleUser={(user) => {
-                              // 👈 select OR deselect
                               const isAdded = addedSub.some(
                                 (a) => a.id === user.id,
                               );
@@ -3065,24 +3443,6 @@ export default function settings() {
                           />
                         </View>
                       )}
-                      {/* <View style={styles.modalRow}>
-                        <View style={styles.modalUser}>
-                          <Text style={styles.modalSubtitle}>Role:</Text>
-                          <select
-                            value={formRole}
-                            onChange={(e) => setFormRole(e.target.value)}
-                            style={dropdownInput}
-                          >
-                            <option value="" disabled>
-                              Select a Role...
-                            </option>
-                            <option value="0">Admin</option>
-                            <option value="2">Manager</option>
-                            <option value="3">Supervisor</option>
-                            <option value="1">User</option>
-                          </select>
-                        </View>
-                      </View> */}
                     </View>
 
                     <Text style={styles.modalSubtitle}>Home Address:</Text>
@@ -3353,16 +3713,14 @@ export default function settings() {
                                     .join(", ")}
                             </Text>
                           </TouchableOpacity>
-                          {/* {renderSelectSubModal()} */}
                           <SelectUserModal
                             visible={selectSubModalVIsible}
                             onClose={() => selectSelectSubModalVisible(false)}
                             users={allUsers}
-                            excludeUsername={formUsername} // 👈 was `.filter(u => u.username !== formUsername)`
-                            showIndex={true} // 👈 was the `{index + 1}` column
-                            addedUsers={addedSub} // 👈 greys out already-added rows
+                            excludeUsername={formUsername}
+                            showIndex={true}
+                            addedUsers={addedSub}
                             onToggleUser={(user) => {
-                              // 👈 select OR deselect
                               const isAdded = addedSub.some(
                                 (a) => a.id === user.id,
                               );
@@ -3480,7 +3838,7 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
-          {/* {renderSelectUserModal()} */}
+
           <SelectUserModal
             visible={selectUserModalVisible}
             onClose={() => setSelectUserModalVisible(false)}
@@ -3551,7 +3909,6 @@ export default function settings() {
                       style={styles.selectUserButton}
                       onPress={() => {
                         setSelectUserModalVisible(true);
-                        //console.log(selectedUser);
                       }}
                     >
                       <Text style={styles.buttonText}>
@@ -3610,7 +3967,7 @@ export default function settings() {
               </KeyboardAvoidingView>
             </View>
           </Modal>
-          {/* {renderSelectUserModal()} */}
+
           <SelectUserModal
             visible={selectUserModalVisible}
             onClose={() => setSelectUserModalVisible(false)}
@@ -3643,7 +4000,7 @@ export default function settings() {
           />
         </>
       )}
-      <Text style={styles.bottomScrollText}>v1.4.2</Text>
+      <Text style={styles.bottomScrollText}>v1.4.3</Text>
     </View>
   );
 }
@@ -3815,7 +4172,7 @@ const styles = StyleSheet.create({
   },
   closeButton: { fontSize: 20, fontWeight: "bold", color: "#999" },
   disabledText: {
-    color: "#9e9e9e", // grey text
+    color: "#9e9e9e",
     backgroundColor: "#e0e0e0",
   },
   selectedText: {
@@ -3883,5 +4240,49 @@ const styles = StyleSheet.create({
     right: 12,
     top: 12,
     padding: 2,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#e0e0e0",
+  },
+  locationTextWrapper: { flex: 1, paddingRight: 12, gap: 2 },
+  locationName: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
+    padding: 0,
+  },
+  locationAddress: {
+    color: "#666",
+    fontSize: 13,
+    marginTop: 2,
+    padding: 0,
+  },
+  removeButton: { paddingHorizontal: 8, paddingVertical: 4 },
+  removeText: { color: "#f44336", fontSize: 14, fontWeight: "600" },
+  emptyText: {
+    color: "#999",
+    fontSize: 14,
+    textAlign: "center",
+    marginVertical: 24,
+  },
+  addButton: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#2196F3",
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  addButtonText: {
+    color: "#2196F3",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });
